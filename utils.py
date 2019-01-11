@@ -149,25 +149,6 @@ def add_index_stats(data, default=0):
 
     return data
 
-# 機械学習によるデータ
-def add_dl_stats(data, model, settings, name="site"):
-    dates = data.iloc[settings.term:]
-    X = []
-    for i, date in dates.iterrows():
-        tmp = data[data["date"] <= date["date"]]
-        tmp = tmp[settings.columns]
-        if len(tmp) < settings.term:
-            continue
-        tmp = tmp.iloc[-settings.term:].as_matrix().reshape(-1)
-        X.append(tmp)
-    X = numpy.array(X)
-    X = X.reshape(-1, int(X.shape[1]/len(settings.columns)), len(settings.columns), 1) # モデルによって変わる
-
-    results = model.predict(X)
-    data[name] = [0] * settings.term + list(map(lambda x: numpy.argmax(x), results))
-    data["%s_value" % name] = [0] * settings.term + list(map(lambda x: numpy.max(x), results))
-    return data
-
 def each(callback, data):
     return list(map(lambda x: callback(*x), data.iterrows()))
 
