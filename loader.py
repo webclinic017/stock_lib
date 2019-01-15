@@ -473,7 +473,7 @@ class Loader:
         while int(utils.format(current, output_format=output_format)) <= int(utils.format(end_date, output_format=output_format)):
             try:
                 months = utils.format(current, output_format=output_format)
-                d = pandas.read_csv("%s/steady_trend_stocks/%s/%s" % (Loader.settings_dir, months, filename))
+                d = pandas.read_csv("%s/steady_trend_stocks/%s/%s" % (Loader.settings_dir, months, filename), header=None)
                 d.columns = ['code']
                 data[months] = d["code"].as_matrix().tolist()
                 data["all"] = list(set(data["all"] + data[months]))
