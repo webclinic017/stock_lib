@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import re
+import math
 import numpy
 import rules
 import inspect
@@ -244,7 +245,11 @@ class StrategyUtil:
     # ポジションサイズ
     def order(self, data, setting, max_risk, risk):
         current = data.position.num()
-        order = 100 if self.falling(data, setting, risk) else int((self.max_order(max_risk, risk) - current) / 2)
+        print(max_risk, risk)
+        max_order = int((self.max_order(max_risk, risk) - current)) # 保有できる最大まで
+        max_order = int(max_order / 2) # 半分ずつ
+        max_order = int(math.ceil(max_order / 100) * 100) # 端数を切り上げ
+        order = 100 if self.falling(data, setting, risk) else max_order
 
         if order < 100:
             order = 0
