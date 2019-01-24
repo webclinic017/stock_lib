@@ -776,3 +776,14 @@ class Loader:
         except:
             data = None
 
+    @staticmethod
+    def five_times():
+        try:
+            f = open("settings/five_times.json", "r")
+            data = json.load(f)
+            return data["data"]
+        except:
+           import traceback
+           traceback.print_exc()
+           data = None
+
