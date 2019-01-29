@@ -4,6 +4,7 @@ import numpy
 import pandas
 import json
 import utils
+import redis
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
@@ -289,7 +290,11 @@ class Loader:
 
     @staticmethod
     def load_with_realtime(code, start_date, end_date):
-        data = Loader.load(code, start_date, end_date)
+        if str(code).isdigit():
+            data = Loader.load(code, start_date, end_date)
+        else:
+            data = Loader.load_index(code, start_date, end_date)
+
         d = data[data["date"] == end_date]
 
         # 当日分の日足があったらすぐ返す

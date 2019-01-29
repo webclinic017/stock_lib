@@ -23,6 +23,7 @@ def add_options(parser):
     parser.add_argument("--daytrade", action="store_true", default=False, dest="daytrade", help="デイトレ")
     parser.add_argument("--falling", action="store_true", default=False, dest="falling", help="下落相場")
     parser.add_argument("--new_high", action="store_true", default=False, dest="new_high", help="新高値")
+    parser.add_argument("--nikkei", action="store_true", default=False, dest="nikkei", help="日経")
     return parser
 
 def create_parser():
@@ -43,6 +44,8 @@ def get_prefix(args):
         target = "falling_"
     if args.new_high:
         target = "new_high_"
+    if args.nikkei:
+        target = "nikkei_"
 
     return "%s%s%s%s" % (prefix, target, tick, method)
 
@@ -101,15 +104,21 @@ def load_strategy_creator(args, combination_setting=None):
         elif args.falling:
             from strategies.production.falling import CombinationStrategy
             return CombinationStrategy(combination_setting)
-        else:
-            from strategies.production.combination import CombinationStrategy
+        elif args.nikkei:
+            from strategies.production.nikkei import CombinationStrategy
             return CombinationStrategy(combination_setting)
+        else:
+           from strategies.production.combination import CombinationStrategy
+           return CombinationStrategy(combination_setting)
     else:
         if args.daytrade:
             from strategies.daytrade import CombinationStrategy
             return CombinationStrategy(combination_setting)
         elif args.falling:
             from strategies.falling import CombinationStrategy
+            return CombinationStrategy(combination_setting)
+        elif args.nikkei:
+            from strategies.nikkei import CombinationStrategy
             return CombinationStrategy(combination_setting)
         else:
             from strategies.combination import CombinationStrategy
@@ -240,6 +249,8 @@ class StrategyUtil:
 
     # 最大ポジションサイズ
     def max_order(self, max_risk, risk):
+        if risk == 0:
+            return 0
         return int(max_risk / risk) * 100
 
     # ポジションサイズ
