@@ -4,7 +4,6 @@ import numpy
 import pandas
 import json
 import utils
-import redis
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
