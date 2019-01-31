@@ -79,6 +79,8 @@ class StrategySimulator:
                 if simulator.position().num() > 0:
                     targets.append(code)
 
+            targets = list(set(targets))
+
             if verbose:
                 print("targets: %s" % targets)
 
