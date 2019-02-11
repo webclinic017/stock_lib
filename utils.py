@@ -84,8 +84,8 @@ def add_cross_stats(data, default=0):
 
     data["env12_cross"] = convolve(data, 2, lambda x, term: gdc(x["high"].iloc[-term:], x["env12"].iloc[-term:]))
     data["env11_cross"] = convolve(data, 2, lambda x, term: gdc(x["high"].iloc[-term:], x["env11"].iloc[-term:]))
-    data["env09_cross"] = convolve(data, 2, lambda x, term: gdc(x["high"].iloc[-term:], x["env09"].iloc[-term:]))
-    data["env08_cross"] = convolve(data, 2, lambda x, term: gdc(x["high"].iloc[-term:], x["env08"].iloc[-term:]))
+    data["env09_cross"] = convolve(data, 2, lambda x, term: gdc(x["low"].iloc[-term:], x["env09"].iloc[-term:]))
+    data["env08_cross"] = convolve(data, 2, lambda x, term: gdc(x["low"].iloc[-term:], x["env08"].iloc[-term:]))
 
     return data
 
