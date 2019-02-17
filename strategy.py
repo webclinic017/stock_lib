@@ -24,6 +24,7 @@ def add_options(parser):
     parser.add_argument("--falling", action="store_true", default=False, dest="falling", help="下落相場")
     parser.add_argument("--new_high", action="store_true", default=False, dest="new_high", help="新高値")
     parser.add_argument("--nikkei", action="store_true", default=False, dest="nikkei", help="日経")
+    parser.add_argument("--rising", action="store_true", default=False, dest="rising", help="上昇銘柄")
     return parser
 
 def create_parser():
@@ -46,6 +47,8 @@ def get_prefix(args):
         target = "new_high_"
     if args.nikkei:
         target = "nikkei_"
+    if args.rising:
+        target = "rising_"
 
     return "%s%s%s%s" % (prefix, target, tick, method)
 
@@ -107,6 +110,9 @@ def load_strategy_creator(args, combination_setting=None):
         elif args.nikkei:
             from strategies.production.nikkei import CombinationStrategy
             return CombinationStrategy(combination_setting)
+        elif args.rising:
+            from strategies.production.rising import CombinationStrategy
+            return CombinationStrategy(combination_setting)
         else:
            from strategies.production.combination import CombinationStrategy
            return CombinationStrategy(combination_setting)
@@ -119,6 +125,9 @@ def load_strategy_creator(args, combination_setting=None):
             return CombinationStrategy(combination_setting)
         elif args.nikkei:
             from strategies.nikkei import CombinationStrategy
+            return CombinationStrategy(combination_setting)
+        elif args.rising:
+            from strategies.rising import CombinationStrategy
             return CombinationStrategy(combination_setting)
         else:
             from strategies.combination import CombinationStrategy

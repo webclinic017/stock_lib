@@ -21,22 +21,22 @@ def tec_conditions():
     conditions = []
     for leg in legs:
         conditions = conditions + [
-            lambda d, s: d.data["daily"]["rci"].iloc[-1] > 80,
-            lambda d, s: d.data["daily"]["rci"].iloc[-1] < 80,
-            lambda d, s: d.data["daily"]["rci"].iloc[-1] < -80,
-            lambda d, s: d.data["daily"]["rci"].iloc[-1] > -80,
-            lambda d, s: d.data["daily"]["rci_long"].iloc[-1] > 80,
-            lambda d, s: d.data["daily"]["rci_long"].iloc[-1] < 80,
-            lambda d, s: d.data["daily"]["rci_long"].iloc[-1] < -80,
-            lambda d, s: d.data["daily"]["rci_long"].iloc[-1] > -80,
-            lambda d, s: d.data["daily"]["rci"].iloc[-1] > d.data["daily"]["rci_long"].iloc[-1],
-            lambda d, s: d.data["daily"]["rci"].iloc[-1] < d.data["daily"]["rci_long"].iloc[-1],
-            lambda d, s: d.data["daily"]["macd"].iloc[-1] > 0,
-            lambda d, s: d.data["daily"]["macd"].iloc[-1] < 0,
-            lambda d, s: d.data["daily"]["macd_signal"].iloc[-1] > 0,
-            lambda d, s: d.data["daily"]["macd_signal"].iloc[-1] < 0,
-            lambda d, s: d.data["daily"]["macd"].iloc[-1] > d.data["daily"]["macdsignal"].iloc[-1],
-            lambda d, s: d.data["daily"]["macd"].iloc[-1] < d.data["daily"]["macdsignal"].iloc[-1],
+            lambda d, s: d.data[leg]["rci"].iloc[-1] > 80,
+            lambda d, s: d.data[leg]["rci"].iloc[-1] < 80,
+            lambda d, s: d.data[leg]["rci"].iloc[-1] < -80,
+            lambda d, s: d.data[leg]["rci"].iloc[-1] > -80,
+            lambda d, s: d.data[leg]["rci_long"].iloc[-1] > 80,
+            lambda d, s: d.data[leg]["rci_long"].iloc[-1] < 80,
+            lambda d, s: d.data[leg]["rci_long"].iloc[-1] < -80,
+            lambda d, s: d.data[leg]["rci_long"].iloc[-1] > -80,
+            lambda d, s: d.data[leg]["rci"].iloc[-1] > d.data["daily"]["rci_long"].iloc[-1],
+            lambda d, s: d.data[leg]["rci"].iloc[-1] < d.data["daily"]["rci_long"].iloc[-1],
+            lambda d, s: d.data[leg]["macd"].iloc[-1] > 0,
+            lambda d, s: d.data[leg]["macd"].iloc[-1] < 0,
+            lambda d, s: d.data[leg]["macd_signal"].iloc[-1] > 0,
+            lambda d, s: d.data[leg]["macd_signal"].iloc[-1] < 0,
+            lambda d, s: d.data[leg]["macd"].iloc[-1] > d.data["daily"]["macdsignal"].iloc[-1],
+            lambda d, s: d.data[leg]["macd"].iloc[-1] < d.data["daily"]["macdsignal"].iloc[-1],
         ]
     return conditions
 
