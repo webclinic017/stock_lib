@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 
+def all():
+    return average_conditions() + tec_conditions() + cross_conditions() + trend_conditions()
+
 def average_conditions():
     legs = ["daily", "weekly"]
     columns = ["daily_average", "weekly_average"]
@@ -10,8 +13,8 @@ def average_conditions():
         for column in columns:
             for target in targets:
                 conditions = conditions + [
-                    lambda d, s: d.data[leg][columns].iloc[-1] > d.data[leg][target].iloc[-1], 
-                    lambda d, s: d.data[leg][columns].iloc[-1] < d.data[leg][target].iloc[-1],
+                    lambda d, s: d.data[leg][column].iloc[-1] > d.data[leg][target].iloc[-1], 
+                    lambda d, s: d.data[leg][column].iloc[-1] < d.data[leg][target].iloc[-1],
                 ]
 
     return conditions
@@ -29,14 +32,16 @@ def tec_conditions():
             lambda d, s: d.data[leg]["rci_long"].iloc[-1] < 80,
             lambda d, s: d.data[leg]["rci_long"].iloc[-1] < -80,
             lambda d, s: d.data[leg]["rci_long"].iloc[-1] > -80,
-            lambda d, s: d.data[leg]["rci"].iloc[-1] > d.data["daily"]["rci_long"].iloc[-1],
-            lambda d, s: d.data[leg]["rci"].iloc[-1] < d.data["daily"]["rci_long"].iloc[-1],
+            lambda d, s: d.data[leg]["rci"].iloc[-1] > d.data[leg]["rci_long"].iloc[-1],
+            lambda d, s: d.data[leg]["rci"].iloc[-1] < d.data[leg]["rci_long"].iloc[-1],
             lambda d, s: d.data[leg]["macd"].iloc[-1] > 0,
             lambda d, s: d.data[leg]["macd"].iloc[-1] < 0,
-            lambda d, s: d.data[leg]["macd_signal"].iloc[-1] > 0,
-            lambda d, s: d.data[leg]["macd_signal"].iloc[-1] < 0,
-            lambda d, s: d.data[leg]["macd"].iloc[-1] > d.data["daily"]["macdsignal"].iloc[-1],
-            lambda d, s: d.data[leg]["macd"].iloc[-1] < d.data["daily"]["macdsignal"].iloc[-1],
+            lambda d, s: d.data[leg]["macdsignal"].iloc[-1] > 0,
+            lambda d, s: d.data[leg]["macdsignal"].iloc[-1] < 0,
+            lambda d, s: d.data[leg]["macd"].iloc[-1] > d.data[leg]["macdsignal"].iloc[-1],
+            lambda d, s: d.data[leg]["macd"].iloc[-1] < d.data[leg]["macdsignal"].iloc[-1],
+            lambda d, s: d.data[leg]["macdhist"].iloc[-1] > 0,
+            lambda d, s: d.data[leg]["macdhist"].iloc[-1] < 0,
         ]
     return conditions
 
@@ -55,21 +60,15 @@ def stages_conditions():
 def cross_conditions():
     legs = ["daily", "weekly"]
     columns = [
-        "average_cross"
-        "macd_cross"
-        "rci_cross"
-        "env12_cross"
-        "env11_cross"
-        "env09_cross"
-        "env08_cross"
+        "average_cross", "macd_cross", "rci_cross", "env12_cross", "env11_cross", "env09_cross", "env08_cross"
     ]
 
     conditions = []
     for leg in legs:
         for column in columns:
             conditions = conditions + [
-                lambda d, s: d.data[leg][columns].iloc[-1] == 1, 
-                lambda d, s: d.data[leg][columns].iloc[-1] == -1,
+                lambda d, s: d.data[leg][column].iloc[-1] == 1, 
+                lambda d, s: d.data[leg][column].iloc[-1] == -1,
             ]
 
     return conditions
@@ -85,8 +84,8 @@ def trend_conditions():
     for leg in legs:
         for column in columns:
             conditions = conditions + [
-                lambda d, s: d.data[leg][columns].iloc[-1] == 1, 
-                lambda d, s: d.data[leg][columns].iloc[-1] == -1,
+                lambda d, s: d.data[leg][column].iloc[-1] == 1, 
+                lambda d, s: d.data[leg][column].iloc[-1] == -1,
             ]
 
     return conditions

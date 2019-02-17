@@ -580,23 +580,43 @@ def daterange(start_date, end_date):
     for n in range((end_date - start_date).days):
         yield start_date + timedelta(n)
 
+# 全組み合わせを取得
 def combinations(conditions):
-    cond = []
-    for i in range(pow(2, len(conditions))):
-      t = i # 2進数のフラグで取り出すパターンを決める 0 -> a, 1 -> b
-      a, b = [], []
-      for j in range(len(conditions)): # 1ビットずつどちらに割りふるかチェック
-        if int(bin(t & pow(2, j)), 0) != 0:
-          a.append(conditions[j])
-        else:
-          b.append(conditions[j])
-      cond += [(a, b)]
-      # 片方空のパターンはできないのであと足し
-      if len(b) > 0 and len(a) > 0:
-          cond += [(a, [])]
-          cond += [([], b)]
-    # 両方空もできないのであと足し
-    cond += [([], [])]
+    num = combinations_size(conditions)
+    cond = [combination(i, conditions) for i in range(num)]
     cond = sorted(cond, key=lambda x: len(x[0]))
-
     return cond
+
+# 2進数のフラグで取り出すパターンを決める 0 -> a, 1 -> b
+def condition(index, conditions):
+    a, b = [], []
+    for j in range(len(conditions)): # 1ビットずつどちらに割りふるかチェック
+        if int(bin(index & pow(2, j)), 0) != 0:
+            a.append(conditions[j])
+        else:
+            b.append(conditions[j])
+    return (a, b)
+
+# 生成される組み合わせのサイズ
+def combinations_size(conditions):
+    return pow(2, len(conditions))*3 - 3
+
+# 指定したindexの組み合わせを取得する
+def combination(index, conditions):
+    num = combinations_size(conditions)
+    exc = {
+        0: ([], conditions),
+        num-2: (conditions, []),
+        num-1: ([], [])
+    }
+
+    if index in exc.keys():
+        return exc[index]
+    r = divmod(index-1, 3)
+    cond = condition(r[0]+1, conditions)
+    if r[1] == 1:
+        return (cond[0], [])
+    elif r[1] == 2:
+        return ([], cond[1])
+    else:
+        return cond

@@ -302,6 +302,7 @@ class StrategyUtil:
 class CombinationSetting:
     simple = False
     position_sizing = False
+    sorted_conditions = True
 
 class Combination(StrategyCreator, StrategyUtil):
     def __init__(self, conditions, common, setting=None):
@@ -373,29 +374,50 @@ class Combination(StrategyCreator, StrategyUtil):
 
 class CombinationCreator(StrategyCreator, StrategyUtil):
     def __init__(self, setting=None):
-        self.new_combinations = utils.combinations(self.new())
-        self.taking_combinations = utils.combinations(self.taking())
-        self.stop_loss_combinations = utils.combinations(self.stop_loss())
-        self.closing_combinations = utils.combinations(self.closing())
         self.setting = setting
+        if self.setting.sorted_conditions:
+            # 条件のインデックスの組み合わせを生成
+            self.new_combinations = utils.combinations(list(range(len(self.new()))))
+            self.taking_combinations = utils.combinations(list(range(len(self.taking()))))
+            self.stop_loss_combinations = utils.combinations(list(range(len(self.stop_loss()))))
+            self.closing_combinations = utils.combinations(list(range(len(self.closing()))))
 
     def ranges(self):
         return [
-            list(range(len(self.new_combinations))),
-            list(range(len(self.taking_combinations))),
-            list(range(len(self.stop_loss_combinations))),
-            list(range(len(self.closing_combinations))),
+            list(range(utils.combinations_size(self.new()))),
+            list(range(utils.combinations_size(self.taking()))),
+            list(range(utils.combinations_size(self.stop_loss()))),
+            list(range(utils.combinations_size(self.closing()))),
         ]
 
     def create(self, setting):
-        condition = [
-            self.new_combinations[setting.new],
-            self.taking_combinations[setting.taking],
-            self.stop_loss_combinations[setting.stop_loss],
-            self.closing_combinations[setting.closing],
-        ]
+        condition = self.sorted_conditions(setting) if self.setting.sorted_conditions else self.conditions(setting)
         c = StrategyConditions().by_array(condition)
         return Combination(c, self.common(), self.setting).create(setting)
+
+    # ソート済みのリストから条件を取得
+    def sorted_conditions(self, setting):
+        return [
+            self.conditions_by_index(self.new(), self.new_combinations[setting.new]),
+            self.conditions_by_index(self.taking(), self.taking_combinations[setting.taking]),
+            self.conditions_by_index(self.stop_loss(), self.stop_loss_combinations[setting.stop_loss]),
+            self.conditions_by_index(self.closing(), self.closing_combinations[setting.closing]),
+        ]
+
+    # インデックスから直接条件を生成
+    def conditions(self, setting):
+        return [
+            utils.combination(setting.new, self.new()),
+            utils.combination(setting.taking, self.taking()),
+            utils.combination(setting.stop_loss, self.stop_loss()),
+            utils.combination(setting.closing, self.closing()),
+        ]
+
+    def conditions_by_index(self, conditions, index):
+        a = [conditions[i] for i in index[0]]
+        b = [conditions[i] for i in index[1]]
+        return [a, b]
+
 
     def subject(self):
         raise Exception("Need override subject.")
