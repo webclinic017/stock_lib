@@ -28,9 +28,9 @@ def add_tec_stats(data, default=0):
 
     close = numpy.array(data["close"].as_matrix(), dtype="f8")
     macd, macdsignal, macdhist = ta.MACD(close, fastperiod=12, slowperiod=26, signalperiod=9)
-    data["macd"]           = macd
-    data["macdsignal"]     = macdsignal
-    data["macdhist"]       = macdhist
+    data["macd"]           = macd if default is None else numpy.nan_to_num(macd)
+    data["macdsignal"]     = macdsignal if default is None else numpy.nan_to_num(macdsignal)
+    data["macdhist"]       = macdhist if default is None else numpy.nan_to_num(macdhist)
     data["macdhist_convert"] = convolve(data["macdhist"], 100, trend_convert) 
 
     # average true range
