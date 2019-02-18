@@ -374,7 +374,7 @@ class Combination(StrategyCreator, StrategyUtil):
 
 class CombinationCreator(StrategyCreator, StrategyUtil):
     def __init__(self, setting=None):
-        self.setting = setting
+        self.setting = CombinationSetting() if setting is None else setting
         if self.setting.sorted_conditions:
             # 条件のインデックスの組み合わせを生成
             self.new_combinations = utils.combinations(list(range(len(self.new()))))
