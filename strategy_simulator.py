@@ -13,15 +13,24 @@ class StrategySimulator:
         self.strategy_creator = strategy_creator
         self.verbose = verbose
 
+    def append_daterange(self, codes, date, daterange):
+        for code in codes:
+            if not code in daterange.keys():
+                daterange[code] = []
+            daterange[code].append(date)
+            daterange[code].sort()
+        return daterange
+
     def select_codes(self, args, start_date, end_date):
-        # 注目株と保有株についてシミュレーションを行う
         codes = []
+        daterange = {}
         start = utils.to_datetime_by_term(start_date, tick=args.tick)
         end = utils.to_datetime_by_term(end_date, tick=args.tick) + utils.relativeterm(1, tick=True)
         for date in utils.daterange(start, end):
             codes = self.get_targets(args, codes, utils.to_format_by_term(date, args.tick))
+            daterange = self.append_daterange(codes, date, daterange)
         validate_codes = codes
-        return codes, validate_codes
+        return codes, validate_codes, daterange
 
     def get_targets(self, args, targets, date):
         if args.code is None:
@@ -39,7 +48,7 @@ class StrategySimulator:
         tick = args.tick
 
         # この期間での対象銘柄
-        stocks, _ = self.select_codes(args, start_date, end_date)
+        stocks, _, _ = self.select_codes(args, start_date, end_date)
         index = data["index"]
         datas = {}
         for code in stocks:
