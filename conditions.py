@@ -21,9 +21,10 @@ def average_conditions():
 
 def tec_conditions():
     legs = ["daily", "weekly"]
+    columns = ["rci", "macd"]
     conditions = []
     for leg in legs:
-        conditions = conditions + [
+        rci = [
             lambda d, s: d.data[leg]["rci"].iloc[-1] > 80,
             lambda d, s: d.data[leg]["rci"].iloc[-1] < 80,
             lambda d, s: d.data[leg]["rci"].iloc[-1] < -80,
@@ -33,7 +34,9 @@ def tec_conditions():
             lambda d, s: d.data[leg]["rci_long"].iloc[-1] < -80,
             lambda d, s: d.data[leg]["rci_long"].iloc[-1] > -80,
             lambda d, s: d.data[leg]["rci"].iloc[-1] > d.data[leg]["rci_long"].iloc[-1],
-            lambda d, s: d.data[leg]["rci"].iloc[-1] < d.data[leg]["rci_long"].iloc[-1],
+            lambda d, s: d.data[leg]["rci"].iloc[-1] < d.data[leg]["rci_long"].iloc[-1]
+        ]
+        macd = [
             lambda d, s: d.data[leg]["macd"].iloc[-1] > 0,
             lambda d, s: d.data[leg]["macd"].iloc[-1] < 0,
             lambda d, s: d.data[leg]["macdsignal"].iloc[-1] > 0,
@@ -43,6 +46,8 @@ def tec_conditions():
             lambda d, s: d.data[leg]["macdhist"].iloc[-1] > 0,
             lambda d, s: d.data[leg]["macdhist"].iloc[-1] < 0,
         ]
+        conditions = conditions + rci if "rci" in columns else conditions
+        conditions = conditions + macd if "macd" in columns else conditions
     return conditions
 
 def band_conditions():
