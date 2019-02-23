@@ -164,6 +164,7 @@ class SimulatorData:
 class SimulatorSetting:
     def __init__(self):
         self.strategy = {"daily": None}
+        self.min_data_length = 30
         self.assets = 0
         self.commission = 150
         self.debug = False
@@ -454,8 +455,8 @@ class Simulator:
         trade_data = {"date": date, "new": None, "repay": None, "gain": None, "term": 0, "size": 0}
 
         # 判断に必要なデータ数がない
-        if len(data["daily"]) < 30 or price == 0:
-            self.log("less data. skip trade.")
+        if len(data["daily"]) < self._setting.min_data_length or price == 0:
+            self.log("less data. skip trade. [%s - %s]" % (data["daily"]["date"].iloc[0], data["daily"]["date"].iloc[-1]))
             self._stats.trade_history.append(trade_data)
             return self.total_assets(0)
 

@@ -14,6 +14,10 @@ from argparse import ArgumentParser
 import strategies.production as production
 import strategies as develop
 
+class LoadSettings:
+    with_stats = False
+    weekly = True
+
 def add_options(parser):
     parser.add_argument("--position_sizing", action="store_true", default=False, dest="position_sizing", help="ポジションサイジング")
     parser.add_argument("--production", action="store_true", default=False, dest="production", help="本番向け") # 実行環境の選択
@@ -25,6 +29,8 @@ def add_options(parser):
     parser.add_argument("--new_high", action="store_true", default=False, dest="new_high", help="新高値")
     parser.add_argument("--nikkei", action="store_true", default=False, dest="nikkei", help="日経")
     parser.add_argument("--rising", action="store_true", default=False, dest="rising", help="上昇銘柄")
+    parser.add_argument("--with_stats", action="store_true", default=False, dest="with_stats", help="統計データ込みで読み込む")
+    parser.add_argument("--ignore_weekly", action="store_true", default=False, dest="ignore_weekly", help="週足統計を無視")
     return parser
 
 def create_parser():
@@ -57,7 +63,11 @@ def get_filename(args):
     filename = "%ssimulate_setting.json" % prefix
     return filename
 
-def load_simulator_data(code, start_date, end_date, args):
+def load_simulator_data(code, start_date, end_date, args, load_settings=None):
+
+    if load_settings is None:
+        load_settings = LoadSettings()
+
     if args.realtime:
         days = (utils.to_datetime(end_date) - utils.to_datetime(start_date)).days
         data = Loader.loads_realtime(code, end_date, days+1)
@@ -66,20 +76,21 @@ def load_simulator_data(code, start_date, end_date, args):
         data = Loader.load_tick_ohlc(code, start_date, end_date)
         rule = "30T"
     else:
-        data = Loader.load_with_realtime(code, start_date, end_date)
+        data = Loader.load_with_realtime(code, start_date, end_date, with_stats=load_settings.with_stats)
         rule = "W"
 
     if data is None:
         print("%s: %s is None" % (start_date, code))
         return None
 
-    weekly = Loader.resample(data, rule=rule)
-
     try:
-        data = utils.add_stats(data)
-        data = utils.add_cs_stats(data)
-        weekly = utils.add_stats(weekly)
-        weekly = utils.add_cs_stats(weekly)
+        if not load_settings.with_stats:
+            data = utils.add_stats(data)
+            data = utils.add_cs_stats(data)
+        weekly = Loader.resample(data, rule=rule)
+        if load_settings.weekly:
+            weekly = utils.add_stats(weekly)
+            weekly = utils.add_cs_stats(weekly)
         return SimulatorData(code, data, weekly, rule)
     except Exception as e:
         print("load_error: %s" % e)
@@ -125,6 +136,9 @@ def load_strategy_creator(args, combination_setting=None):
             return CombinationStrategy(combination_setting)
         elif args.nikkei:
             from strategies.nikkei import CombinationStrategy
+            return CombinationStrategy(combination_setting)
+        elif args.new_high:
+            from strategies.new_high import CombinationStrategy
             return CombinationStrategy(combination_setting)
         elif args.rising:
             from strategies.rising import CombinationStrategy
@@ -265,7 +279,6 @@ class StrategyUtil:
     # ポジションサイズ
     def order(self, data, setting, max_risk, risk):
         current = data.position.num()
-        print(max_risk, risk)
         max_order = int((self.max_order(max_risk, risk) - current)) # 保有できる最大まで
         max_order = int(max_order / 2) # 半分ずつ
         max_order = int(math.ceil(max_order / 100) * 100) # 端数を切り上げ

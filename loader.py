@@ -288,9 +288,9 @@ class Loader:
         return data
 
     @staticmethod
-    def load_with_realtime(code, start_date, end_date):
+    def load_with_realtime(code, start_date, end_date, with_stats=False):
         if str(code).isdigit():
-            data = Loader.load(code, start_date, end_date)
+            data = Loader.load(code, start_date, end_date, with_stats=with_stats)
         else:
             data = Loader.load_index(code, start_date, end_date)
 
@@ -301,7 +301,7 @@ class Loader:
             return data
 
         realtime = Loader.load_realtime(code, end_date)
-        if realtime is not None:
+        if realtime is not None and with_stats == False:
             data = data[data["date"] < end_date]
             open_date = "%s 09:00:00" % end_date
             realtime = realtime[realtime["date"] >= open_date]
