@@ -173,6 +173,7 @@ class SimulatorSetting:
         self.virtual_trade = True # 仮想取引 Falseにすると注文をスタックしていく
         self.short_trade = False
         self.auto_stop_loss = False
+        self.stop_loss_rate = 0.02
 
 # 統計
 class SimulatorStats:

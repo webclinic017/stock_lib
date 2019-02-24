@@ -218,7 +218,7 @@ def create_setting_by_dict(params):
 
 class StrategyUtil:
     def max_risk(self, data, setting):
-        return data.assets * 0.02
+        return data.assets * data.setting.stop_loss_rate
 
     # 利益目標
     def goal(self, data, setting):
