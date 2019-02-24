@@ -283,10 +283,14 @@ class Trainer:
     self.model.load_weights(self.weights_path())
 
   def model_path(self):
-    output_dir = "simulator"
-    return os.path.join(output_dir, "model", "stocks_simulation_model.json")
+    output_dir = "simulator/model"
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    return os.path.join(output_dir, "stocks_simulation_model.json")
 
   def weights_path(self):
-    output_dir = "simulator"
     print(self.setting.weights_filename)
-    return os.path.join(output_dir, "weights", self.setting.weights_filename)
+    output_dir = "simulator/weights"
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    return os.path.join(output_dir, self.setting.weights_filename)
