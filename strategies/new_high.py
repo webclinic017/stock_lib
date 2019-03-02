@@ -13,10 +13,17 @@ class CombinationStrategy(CombinationCreator):
         high_performance_stocks = Loader.high_performance_stocks()
         high_performance_codes = high_performance_stocks["code"].as_matrix().tolist()
 
+        target_industry = [5, 13, 15]
+        industry_map = Loader.stock_industry_code()
+        industry_codes = []
+        for industry_code in target_industry:
+            industry_codes += industry_map[industry_map["industry_code"] == industry_code]["code"].as_matrix().tolist()
+
         codes = self.current(date)
 
-        targets = list(set(codes) & set(high_performance_codes))
-        return targets if len(targets) < num else targets[:num]
+        targets = list(set(codes) & set(high_performance_codes) & set(industry_codes))
+        #return targets if len(targets) < num else targets[:num]
+        return targets
 
     def last_week(self, date):
         now = utils.to_datetime(date)
@@ -71,38 +78,35 @@ class CombinationStrategy(CombinationCreator):
             lambda d, s: self.volume_rate(d) >= 4.0, # 出来高が前日の倍以上
             lambda d, s: self.volume_rate(d) >= 5.0, # 出来高が前日の倍以上
             lambda d, s: d.index["nikkei"]["close"].iloc[-1] > d.index["nikkei"]["close"].iloc[-2], # 日経も前日より上げている
-            lambda d, s: d.index["nikkei"]["trend"].iloc[-10:].min() > -1,
-            lambda d, s: d.index["nikkei"]["trend"].iloc[-1].min() > -1,
+            lambda d, s: d.data["daily"]["rci_trend"].iloc[-1] > 0,
+            lambda d, s: d.data["daily"]["rci_long_trend"].iloc[-1] > 0,
             lambda d, s: d.data["daily"]["macd_trend"].iloc[-1] > 0,
             lambda d, s: d.data["daily"]["macdhist_trend"].iloc[-1] > 0,
         ]
 
     def taking(self):
         return [
-            lambda d, s: d.data["daily"]["weekly_average"].iloc[-1] > d.data["daily"]["close"].iloc[-1],
-            lambda d, s: d.data["daily"]["macd_cross"].iloc[-1] == -1, # MACDデッドクロス
-            lambda d, s: d.data["daily"]["macd"].iloc[-1] > 0,
-            lambda d, s: d.data["daily"]["macd"].iloc[-1] < 0,
-            lambda d, s: d.data["daily"]["macdsignal"].iloc[-1] > 0,
-            lambda d, s: d.data["daily"]["macdsignal"].iloc[-1] < 0,
-            lambda d, s: d.data["daily"]["macdhist"].iloc[-1] > 0,
-            lambda d, s: d.data["daily"]["macdhist"].iloc[-1] < 0,
-            lambda d, s: d.data["daily"]["macd_trend"].iloc[-1] < 0,
-            lambda d, s: d.data["daily"]["macdhist_trend"].iloc[-1] < 0,
+            lambda d, s: d.data["daily"]["rci"].iloc[-1] > 80,
+            lambda d, s: d.data["daily"]["rci"].iloc[-1] < 80,
+            lambda d, s: d.data["daily"]["rci_long"].iloc[-1] > 80,
+            lambda d, s: d.data["daily"]["rci_long"].iloc[-1] < 80,
+            lambda d, s: d.data["daily"]["rci"].iloc[-1] > d.data["daily"]["rci_long"].iloc[-1],
+            lambda d, s: d.data["daily"]["rci"].iloc[-1] < d.data["daily"]["rci_long"].iloc[-1],
+            lambda d, s: d.data["daily"]["rci_trend"].iloc[-1] < 0,
+            lambda d, s: d.data["daily"]["rci_long_trend"].iloc[-1] < 0,
         ]
 
     def stop_loss(self):
         return [
-            lambda d, s: d.data["daily"]["weekly_average"].iloc[-1] > d.data["daily"]["close"].iloc[-1],
-            lambda d, s: d.data["daily"]["macd_cross"].iloc[-1] == -1, # MACDデッドクロス
-            lambda d, s: d.data["daily"]["macd"].iloc[-1] > 0,
-            lambda d, s: d.data["daily"]["macd"].iloc[-1] < 0,
-            lambda d, s: d.data["daily"]["macdsignal"].iloc[-1] > 0,
-            lambda d, s: d.data["daily"]["macdsignal"].iloc[-1] < 0,
-            lambda d, s: d.data["daily"]["macdhist"].iloc[-1] > 0,
-            lambda d, s: d.data["daily"]["macdhist"].iloc[-1] < 0,
-            lambda d, s: d.data["daily"]["macd_trend"].iloc[-1] < 0,
-            lambda d, s: d.data["daily"]["macdhist_trend"].iloc[-1] < 0,
+            lambda d, s: d.data["daily"]["rci"].iloc[-1] > 80,
+            lambda d, s: d.data["daily"]["rci"].iloc[-1] < 80,
+            lambda d, s: d.data["daily"]["rci_long"].iloc[-1] > 80,
+            lambda d, s: d.data["daily"]["rci_long"].iloc[-1] < 80,
+            lambda d, s: d.data["daily"]["rci"].iloc[-1] > d.data["daily"]["rci_long"].iloc[-1],
+            lambda d, s: d.data["daily"]["rci"].iloc[-1] < d.data["daily"]["rci_long"].iloc[-1],
+            lambda d, s: d.data["daily"]["rci_trend"].iloc[-1] < 0,
+            lambda d, s: d.data["daily"]["rci_long_trend"].iloc[-1] < 0,
+
         ]
 
     def closing(self):

@@ -199,6 +199,9 @@ class StrategySetting():
         self.closing = int(params[3])
         return self
 
+    def to_dict(self):
+        return {"new": self.new, "taking": self.taking, "stop_loss": self.stop_loss, "closing": self.closing}
+
 class StrategyConditions():
     def __init__(self):
         self.new = []
