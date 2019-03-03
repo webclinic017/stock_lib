@@ -200,7 +200,7 @@ class StrategySetting():
         return self
 
     def to_dict(self):
-        return {"new": self.new, "taking": self.taking, "stop_loss": self.stop_loss, "closing": self.closing}
+        return strategy_setting_to_dict(self)
 
 class StrategyConditions():
     def __init__(self):
@@ -218,6 +218,9 @@ class StrategyConditions():
 
 def create_setting_by_dict(params):
      return namedtuple("StrategySetting", params.keys())(*params.values())
+
+def strategy_setting_to_dict(strategy_setting):
+    return {"new": strategy_setting.new, "taking": strategy_setting.taking, "stop_loss": strategy_setting.stop_loss, "closing": strategy_setting.closing}
 
 class StrategyUtil:
     def max_risk(self, data, setting):
