@@ -766,7 +766,7 @@ class Loader:
         d = utils.format(date)
         try:
             data = pandas.read_csv("%s/%s/%s.csv" % (Loader.ranking_dir, ranking_type, d), header=None)
-            data.columns = ["code", "price"]
+            data.columns = ["code"]
             return data
         except:
             return None
