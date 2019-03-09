@@ -7,7 +7,12 @@ from loader import Loader
 
 class CombinationStrategy(CombinationCreator):
     def subject(self, date):
-        codes = Loader.before_ranking(date, "volume")
+        stocks = Loader.before_ranking(date, "volume")
+        if stocks is None:
+            return []
+
+        codes = stocks["code"].iloc[:10].as_matrix().tolist()
+
         return codes
 
     def common(self):

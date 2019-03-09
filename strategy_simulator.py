@@ -131,7 +131,10 @@ class StrategySimulator:
 
         # 統計 =======================================
         wins = list(filter(lambda x: x[1]["return"] > 0, stats.items()))
-        codes = list(map(lambda x: x[0], wins))
+        lose = list(filter(lambda x: x[1]["return"] < 0, stats.items()))
+        win_codes = list(map(lambda x: x[0], wins))
+        lose_codes = list(map(lambda x: x[0], lose))
+        codes = win_codes + lose_codes
         gain = list(map(lambda x: x[1]["assets"] - self.simulator_setting.assets, stats.items()))
         trade_history = list(map(lambda x: x[1]["trade_history"], stats.items()))
         position_size = list(map(lambda x: list(map(lambda y: y["size"], x)), trade_history))
@@ -147,6 +150,8 @@ class StrategySimulator:
         s = stats.values()
         results = {
             "codes": codes,
+            "win": win_codes,
+            "lose": lose_codes,
             "gain": sum(gain),
             "return": sum(gain) / self.simulator_setting.assets,
             "drawdown": numpy.average(list(map(lambda x: x["drawdown"], s))) if len(s) > 0 else 0,

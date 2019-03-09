@@ -113,7 +113,7 @@ class Loader:
         return data
 
     @staticmethod
-    def load_tick(code, start_date, end_date, with_filter=True, strict=False):
+    def load_tick(code, start_date, end_date, with_filter=True, strict=False, with_stats=False):
         start = utils.to_datetime(start_date)
         end = utils.to_datetime(end_date)
         current = start
@@ -123,6 +123,10 @@ class Loader:
             current = utils.to_datetime(utils.to_format(current + relativedelta(months=1), output_format="%Y-%m-01"))
             try:
                 data_ = pandas.read_csv(Loader.tick_dir + "/" + month + "/" + str(code) + ".csv", header=None)
+                if with_stats:
+                    stats = pandas.read_csv(Loader.tick_dir + "/" + month + "/" + str(code) + "_stats.csv")
+                    stats = stats.drop("date", axis=1)
+                    data_ = pandas.concat([data_, stats], axis=1)
             except:
                 continue
             data = data_ if (data is None) else pandas.concat([data, data_])
@@ -678,7 +682,7 @@ class Loader:
             if stock is not None:
                 codes.extend(stock["code"].as_matrix().tolist())
 
-        codes = codes + Loader.before_ranking(date, "volume", before=0)
+        codes = codes + Loader.before_ranking_codes(date, "volume", before=0)
 
         print(codes)
         return list(set(codes))
@@ -690,10 +694,14 @@ class Loader:
             d = d - utils.relativeterm(1, tick=True)
         d = utils.to_format(d)
         stocks = Loader.ranking(d, ranking_type)
+        return stocks
+
+    @staticmethod
+    def before_ranking_codes(date, ranking_type, before=1):
+        stocks = Loader.before_ranking(date, ranking_type, before=before)
         if stocks is None:
             return []
         codes = stocks["code"].iloc[:3].as_matrix().tolist()
-        return codes
 
     @staticmethod
     def kabuplus_stock_data():

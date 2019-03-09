@@ -34,8 +34,7 @@ def add_tec_stats(data, default=0):
     data["macdhist_convert"] = convolve(data["macdhist"], 100, trend_convert) 
 
     # average true range
-    atr = ta.ATR(data["high"].astype(float).as_matrix(), data["low"].astype(float).as_matrix(), data["close"].astype(float).as_matrix(), timeperiod=14)
-    data["atr"] = atr if default is None else numpy.nan_to_num(atr)
+    data["atr"] = atr(data, default)
     return data
 
 def add_band_stats(data, default=0):
@@ -444,6 +443,11 @@ def rci(data, term):
       d += ((i+1) - (si+1)) ** 2
 
     return int(( 1.0 - ( (6 * d) / float(term ** 3 - term) ) ) * 100)
+
+# average true range
+def atr(data, default=0):
+    atr = ta.ATR(data["high"].astype(float).as_matrix(), data["low"].astype(float).as_matrix(), data["close"].astype(float).as_matrix(), timeperiod=14)
+    return atr if default is None else numpy.nan_to_num(atr)
 
 # 標準偏差
 def sigma(data, term):
