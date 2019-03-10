@@ -70,14 +70,17 @@ def load_simulator_data(code, start_date, end_date, args, load_settings=None):
         load_settings = LoadSettings()
 
     if args.realtime:
-        days = (utils.to_datetime(end_date) - utils.to_datetime(start_date)).days
+        start = utils.to_datetime(start_date) - utils.relativeterm(1, True)
+        days = (utils.to_datetime(end_date) - start).days
         data = Loader.loads_realtime(code, end_date, days+1)
         rule = "30T"
     elif args.tick:
-        data = Loader.load_tick_ohlc(code, start_date, end_date)
+        start = utils.to_format(utils.to_datetime(start_date) - utils.relativeterm(1, True))
+        data = Loader.load_tick_ohlc(code, start, end_date)
         rule = "30T"
     else:
-        data = Loader.load_with_realtime(code, start_date, end_date, with_stats=load_settings.with_stats)
+        start = utils.to_format(utils.to_datetime(start_date) - utils.relativeterm(3))
+        data = Loader.load_with_realtime(code, start, end_date, with_stats=load_settings.with_stats)
         rule = "W"
 
     if data is None:
