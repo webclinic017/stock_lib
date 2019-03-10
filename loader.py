@@ -668,7 +668,7 @@ class Loader:
             return None
 
     @staticmethod
-    def realtime_sheet_stocks(date):
+    def realtime_sheet_stocks(date, monitor_size=3):
         codes = []
         stocks = [
             Loader.ordered_stocks(),
@@ -682,7 +682,7 @@ class Loader:
             if stock is not None:
                 codes.extend(stock["code"].as_matrix().tolist())
 
-        codes = codes + Loader.before_ranking_codes(date, "volume", before=0)
+        codes = codes + Loader.before_ranking_codes(date, "volume", before=0, monitor_size=monitor_size)
 
         print(codes)
         return list(set(codes))
@@ -697,11 +697,12 @@ class Loader:
         return stocks
 
     @staticmethod
-    def before_ranking_codes(date, ranking_type, before=1):
+    def before_ranking_codes(date, ranking_type, before=1, monitor_size=3):
         stocks = Loader.before_ranking(date, ranking_type, before=before)
         if stocks is None:
             return []
-        codes = stocks["code"].iloc[:3].as_matrix().tolist()
+        codes = stocks["code"].iloc[:monitor_size].as_matrix().tolist()
+        return codes
 
     @staticmethod
     def kabuplus_stock_data():

@@ -31,7 +31,7 @@ def add_options(parser):
     parser.add_argument("--rising", action="store_true", default=False, dest="rising", help="上昇銘柄")
     parser.add_argument("--with_stats", action="store_true", default=False, dest="with_stats", help="統計データ込みで読み込む")
     parser.add_argument("--ignore_weekly", action="store_true", default=False, dest="ignore_weekly", help="週足統計を無視")
-    parser.add_argument("--monitor_num", action="store", default=None, dest="monitor_num", help="監視銘柄数")
+    parser.add_argument("--monitor_size", action="store", default=None, dest="monitor_size", help="監視銘柄数")
     return parser
 
 def create_parser():
@@ -108,8 +108,16 @@ def load_strategy_setting(args):
     return setting_dict, strategy_setting
 
 def load_strategy(args, combination_setting=None):
+    print(combination_setting)
     _, settings = load_strategy_setting(args)
     return load_strategy_creator(args, combination_setting).create(settings)
+
+def get_monitor_size(args):
+    setting_dict, _ = load_strategy_setting(args)
+    if "monitor_size" in setting_dict.keys() and "monitor_size_ratio" in setting_dict.keys():
+        monitor_size = setting_dict["monitor_size"] * setting_dict["monitor_size_ratio"]
+        return monitor_size
+    return 3
 
 def load_strategy_creator(args, combination_setting=None):
     if args.production:
@@ -147,6 +155,15 @@ def load_strategy_creator(args, combination_setting=None):
         else:
             from strategies.combination import CombinationStrategy
             return CombinationStrategy(combination_setting)
+
+def create_combination_setting(args, monitor_size_optimize=False):
+    combination_setting = CombinationSetting()
+    combination_setting.position_sizing = args.position_sizing
+    if monitor_size_optimize:
+        combination_setting.monitor_size = get_monitor_size(args)
+    else:
+        combination_setting.monitor_size = combination_setting.monitor_size if args.monitor_size is None else int(args.monitor_size)
+    return combination_setting
 
 # ========================================================================
 class StrategyCreator:
@@ -323,7 +340,7 @@ class CombinationSetting:
     simple = False
     position_sizing = False
     sorted_conditions = True
-    monitor_num = 3
+    monitor_size = 3
 
 class Combination(StrategyCreator, StrategyUtil):
     def __init__(self, conditions, common, setting=None):
