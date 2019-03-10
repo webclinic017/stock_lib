@@ -11,7 +11,8 @@ class CombinationStrategy(CombinationCreator):
         if stocks is None:
             return []
 
-        codes = stocks["code"].iloc[:15].as_matrix().tolist()
+        num = self.setting.monitor_num
+        codes = stocks["code"].iloc[:num].as_matrix().tolist()
 
         return codes
 

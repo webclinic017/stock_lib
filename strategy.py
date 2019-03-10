@@ -31,6 +31,7 @@ def add_options(parser):
     parser.add_argument("--rising", action="store_true", default=False, dest="rising", help="上昇銘柄")
     parser.add_argument("--with_stats", action="store_true", default=False, dest="with_stats", help="統計データ込みで読み込む")
     parser.add_argument("--ignore_weekly", action="store_true", default=False, dest="ignore_weekly", help="週足統計を無視")
+    parser.add_argument("--monitor_num", action="store", default=None, dest="monitor_num", help="監視銘柄数")
     return parser
 
 def create_parser():
@@ -322,6 +323,7 @@ class CombinationSetting:
     simple = False
     position_sizing = False
     sorted_conditions = True
+    monitor_num = 3
 
 class Combination(StrategyCreator, StrategyUtil):
     def __init__(self, conditions, common, setting=None):
