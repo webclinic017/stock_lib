@@ -111,7 +111,6 @@ def load_strategy_setting(args):
     return setting_dict, strategy_setting
 
 def load_strategy(args, combination_setting=None):
-    print(combination_setting)
     _, settings = load_strategy_setting(args)
     return load_strategy_creator(args, combination_setting).create(settings)
 
