@@ -96,7 +96,8 @@ class StrategySimulator:
             for code in targets:
                 # M&Aのチェックのために期間を区切ってデータを渡す
                 start = utils.to_format_by_term(utils.to_datetime_by_term(date, tick) - utils.relativeterm(args.validate_term, tick), tick)
-                split_data = datas[code].split(start, date)
+                #split_data = datas[code].split(start, date)
+                split_data = datas[code]
 
                 if checker.manda(split_data.daily):
                     if verbose:

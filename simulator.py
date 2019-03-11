@@ -5,7 +5,7 @@ import random
 # 売買の状態
 class Position:
     def __init__(self, num = 0, value = 0, term = 0, initial = None, system="actual", method="long"):
-        self._num = num
+        self._num = int(num)
         self._value = []
         self._initial = initial
         if value != 0:
@@ -265,12 +265,12 @@ class Simulator:
         return results
 
     def create_appliable_data(self, data, index, rate=1.0):
-        return AppliableData(data, index, self._position, self.total_assets(data["daily"]["close"].iloc[-1]), self._setting, self._stats, rate)
+        return AppliableData(data, index, self._position, self.total_assets(data["daily"]["close"].iloc[-1].item()), self._setting, self._stats, rate)
 
     # 総資産
     def total_assets(self, value):
         num = self._position.num()
-        holdings = value * num
+        holdings = float(value) * int(num)
         return self._assets + holdings
 
     # 新規
@@ -438,7 +438,7 @@ class Simulator:
 
         assert len(today) > 0, "not found %s data" % date
 
-        price = today["close"].iloc[-1]
+        price = today["close"].iloc[-1].item()
         self.log("date: %s, price %s" % (date, price))
 
         self.trade(self._setting.strategy["daily"], price, term_data, term_index)
