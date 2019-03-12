@@ -15,7 +15,8 @@ class Position:
         self.method = method
 
     def add_history(self, num, value):
-        self._value.append(value) # 平均取得価格の計算のため
+        for _ in range(int(num/100)):
+            self._value.append(value) # 平均取得価格の計算のため
         self._num += num
         if self.num() == 0:
           self._term = 0
@@ -356,9 +357,11 @@ class Simulator:
         return signals
 
     # 損切りの逆指値価格
-    def reverse_limit_price(self, price):
+    def reverse_limit_price(self, price, assets=None):
         # 注文の価格を設定
-        price_range = (self.total_assets(price) * 0.02) / self._position.num()
+        total = self.total_assets(price) if assets is None else assets
+        price_range = (total * 0.02) / self._position.num()
+        print("reverse_limit_price:", total, self._position.num(), price_range)
         if self._setting.short_trade:
             value = self._position.value() + price_range
         else:
