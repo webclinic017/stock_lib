@@ -70,9 +70,12 @@ def load_simulator_data(code, start_date, end_date, args, load_settings=None):
         load_settings = LoadSettings()
 
     if args.realtime:
-        start = utils.to_datetime(start_date) - utils.relativeterm(1, True)
+        start = utils.to_datetime(start_date) - utils.relativeterm(3, True)
         days = (utils.to_datetime(end_date) - start).days
-        data = Loader.loads_realtime(code, end_date, days+1)
+        for i in range(5):
+            data = Loader.loads_realtime(code, end_date, days+i)
+            if len(data) >= 50: # weekleyのstats生成で必要な分
+                break
         rule = "30T"
     elif args.tick:
         start = utils.to_format(utils.to_datetime(start_date) - utils.relativeterm(1, True))

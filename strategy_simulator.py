@@ -110,8 +110,7 @@ class StrategySimulator:
                     simulators[code].simulate_by_date(date, split_data, index)
                 else:
                     if verbose:
-                        print("[%s] is less data" % code)
-
+                        print("[%s] is less data: %s" % (code, date))
         # 手仕舞い
         if len(dates) > 0:
             for code in datas.keys():
