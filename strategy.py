@@ -2,7 +2,6 @@
 import re
 import math
 import numpy
-import rules
 import inspect
 import utils
 import simulator
@@ -174,42 +173,28 @@ def create_combination_setting(args, monitor_size_optimize=False):
     return combination_setting
 
 # ========================================================================
-class StrategyCreator:
-    def __init__(self, new=None, taking=None, stop_loss=None, closing=None):
-        self.new = new
-        self.taking = taking
-        self.stop_loss = stop_loss
-        self.closing = closing
+# 売買ルール
+class Rule:
+    def __init__(self, callback):
+        self._callback = callback
 
-    def create_new_rules(self, data, setting):
-        return self.new
-
-    def create_taking_rules(self, data, setting):
-        return self.taking
-
-    def create_stop_loss_rules(self, data, setting):
-        return self.stop_loss
-
-    def create_closing_rules(self, data, setting):
-        return self.closing
-
-    def create(self, setting):
-        new_rules = [lambda x: self.create_new_rules(x, setting)]
-        taking_rules = [lambda x: self.create_taking_rules(x, setting)]
-        stop_loss_rules = [lambda x: self.create_stop_loss_rules(x, setting)]
-        closing_rules = [lambda x: self.create_closing_rules(x, setting)]
-        return Strategy(new_rules, taking_rules, stop_loss_rules, closing_rules)
-
-    def ranges(self):
-        return []
+    def apply(self, data):
+        results = self._callback(data)
+        return results
 
 # 売買戦略
 class Strategy:
     def __init__(self, new_rules, taking_rules, stop_loss_rules, closing_rules):
-        self.new_rules = list(map(lambda x: rules.Rule(x), new_rules))
-        self.taking_rules = list(map(lambda x: rules.Rule(x), taking_rules))
-        self.stop_loss_rules = list(map(lambda x: rules.Rule(x), stop_loss_rules))
-        self.closing_rules = list(map(lambda x: rules.Rule(x), closing_rules))
+        self.new_rules = list(map(lambda x: Rule(x), new_rules))
+        self.taking_rules = list(map(lambda x: Rule(x), taking_rules))
+        self.stop_loss_rules = list(map(lambda x: Rule(x), stop_loss_rules))
+        self.closing_rules = list(map(lambda x: Rule(x), closing_rules))
+
+def create_setting_by_dict(params):
+     return namedtuple("StrategySetting", params.keys())(*params.values())
+
+def strategy_setting_to_dict(strategy_setting):
+    return {"new": strategy_setting.new, "taking": strategy_setting.taking, "stop_loss": strategy_setting.stop_loss, "closing": strategy_setting.closing}
 
 class StrategySetting():
     def __init__(self):
@@ -228,6 +213,35 @@ class StrategySetting():
     def to_dict(self):
         return strategy_setting_to_dict(self)
 
+class StrategyCreator:
+    def __init__(self, new=None, taking=None, stop_loss=None, closing=None):
+        self.new = new
+        self.taking = taking
+        self.stop_loss = stop_loss
+        self.closing = closing
+
+    def create_new_rules(self, data):
+        return self.new
+
+    def create_taking_rules(self, data):
+        return self.taking
+
+    def create_stop_loss_rules(self, data):
+        return self.stop_loss
+
+    def create_closing_rules(self, data):
+        return self.closing
+
+    def create(self):
+        new_rules = [lambda x: self.create_new_rules(x)]
+        taking_rules = [lambda x: self.create_taking_rules(x)]
+        stop_loss_rules = [lambda x: self.create_stop_loss_rules(x)]
+        closing_rules = [lambda x: self.create_closing_rules(x)]
+        return Strategy(new_rules, taking_rules, stop_loss_rules, closing_rules)
+
+    def ranges(self):
+        return []
+
 class StrategyConditions():
     def __init__(self):
         self.new = []
@@ -242,18 +256,13 @@ class StrategyConditions():
         self.closing = params[3]
         return self
 
-def create_setting_by_dict(params):
-     return namedtuple("StrategySetting", params.keys())(*params.values())
-
-def strategy_setting_to_dict(strategy_setting):
-    return {"new": strategy_setting.new, "taking": strategy_setting.taking, "stop_loss": strategy_setting.stop_loss, "closing": strategy_setting.closing}
 
 class StrategyUtil:
-    def max_risk(self, data, setting):
+    def max_risk(self, data):
         return data.assets * data.setting.stop_loss_rate
 
     # 利益目標
-    def goal(self, data, setting):
+    def goal(self, data):
         order = data.position.num() # 現在の保有数
         if data.setting.short_trade:
             price = data.data["daily"]["low"].iloc[-1]
@@ -268,7 +277,7 @@ class StrategyUtil:
         return goal
 
     # 損失リスク
-    def risk(self, data, setting):
+    def risk(self, data):
         order = data.position.num() # 現在の保有数
         price = data.data["daily"]["close"].iloc[-1]
 
@@ -284,19 +293,19 @@ class StrategyUtil:
         return risk
 
     # 上限
-    def upper(self, data, setting, term=1):
+    def upper(self, data, term=1):
         upper = data.data["daily"]["resistance"].iloc[-term]
 
         return upper
 
     # 下限
-    def lower(self, data, setting, term=1):
+    def lower(self, data, term=1):
         lower= data.data["daily"]["support"].iloc[-term]
 
         return lower
 
     # 不安要素
-    def falling(self, data, setting, risk):
+    def falling(self, data, risk):
         conditions = [
             risk == 0, # セーフティーを下回っている
         ]
@@ -309,26 +318,26 @@ class StrategyUtil:
         return int(max_risk / risk) * 100
 
     # ポジションサイズ
-    def order(self, data, setting, max_risk, risk):
+    def order(self, data, max_risk, risk):
         current = data.position.num()
         max_order = int((self.max_order(max_risk, risk) - current)) # 保有できる最大まで
         max_order = int(max_order / 2) # 半分ずつ
         max_order = int(math.ceil(max_order / 100) * 100) # 端数を切り上げ
-        order = 100 if self.falling(data, setting, risk) else max_order
+        order = 100 if self.falling(data, risk) else max_order
 
         if order < 100:
             order = 0
 
         return order
 
-    def safety(self, data, setting, term):
+    def safety(self, data, term):
         return data.data["daily"]["rising_safety"].iloc[-term:].max() * 0.98
 
-    def term(self, data, setting):
+    def term(self, data):
         return 1 if data.position.term()  == 0 else data.position.term()
 
     # 強気のダイバージェンス
-    def rising_divergence(self, data, setting):
+    def rising_divergence(self, data):
         conditions = [
             data.data["daily"]["weekly_average_trend"].iloc[-1] < 0,
             data.data["daily"]["daily_average_trend"].iloc[-1] >= 0,
@@ -356,61 +365,61 @@ class Combination(StrategyCreator, StrategyUtil):
         self.common = common
         self.setting = CombinationSetting() if setting is None else setting
 
-    def apply(self, data, setting, conditions):
+    def apply(self, data, conditions):
         if len(conditions) == 0:
             return False
-        a = list(map(lambda x: x(data, setting), conditions[0]))
-        b = list(map(lambda x: x(data, setting), conditions[1]))
+        a = list(map(lambda x: x(data), conditions[0]))
+        b = list(map(lambda x: x(data), conditions[1]))
         return all(a) and any(b)
 
-    def apply_common(self, data, setting, conditions):
-        common = list(map(lambda x: x(data, setting), conditions))
+    def apply_common(self, data, conditions):
+        common = list(map(lambda x: x(data), conditions))
         return all(common)
 
     # 買い
-    def create_new_rules(self, data, setting):
+    def create_new_rules(self, data):
         drawdown = list(map(lambda x: x["drawdown"], data.stats.drawdown[-20:]))
         drawdown_gradient = list(filter(lambda x: x > 0.06, numpy.gradient(drawdown))) if len(drawdown) > 1 else []
         drawdown_sum = list(filter(lambda x: x > 0, numpy.gradient(drawdown))) if len(drawdown) > 1 else []
-        risk = self.risk(data, setting)
-        max_risk = self.max_risk(data, setting)
+        risk = self.risk(data)
+        max_risk = self.max_risk(data)
         conditions = [
             len(drawdown_gradient) == 0, # 6%ルール条件外(-6%を超えて一定期間たった)
             sum(drawdown_sum) < 0.06, # 6%ルール(直近のドローダウン合計が6%以下)
             (data.position.num() < self.max_order(max_risk, risk)) if risk > 0 else False, # 最大ポジションサイズ以下
-            self.apply_common(data, setting, self.common.new)
+            self.apply_common(data, self.common.new)
         ]
 
-        order = self.order(data, setting, max_risk, risk) if self.setting.position_sizing else 100
+        order = self.order(data, max_risk, risk) if self.setting.position_sizing else 100
 
-        if self.apply(data, setting, self.conditions.new):
+        if self.apply(data, self.conditions.new):
             if all(conditions) or self.setting.simple:
                 return simulator.Order(order, [lambda x: True])
 
         return None
 
     # 利食い
-    def create_taking_rules(self, data, setting):
+    def create_taking_rules(self, data):
         conditions = [
-            self.apply_common(data, setting, self.common.taking),
-            self.apply(data, setting, self.conditions.taking)
+            self.apply_common(data, self.common.taking),
+            self.apply(data, self.conditions.taking)
         ]
         return simulator.Order(data.position.num(), [lambda x: True]) if all(conditions) else None
 
     # 損切
-    def create_stop_loss_rules(self, data, setting):
+    def create_stop_loss_rules(self, data):
         conditions = [
             utils.rate(data.position.value(), data.data["daily"]["close"].iloc[-1]) < -0.02, # 損益が-2%
-            self.apply_common(data, setting, self.common.stop_loss) and self.apply(data, setting, self.conditions.stop_loss),
+            self.apply_common(data, self.common.stop_loss) and self.apply(data, self.conditions.stop_loss),
         ]
         if any(conditions):
             return simulator.Order(data.position.num(), [lambda x: True])
         return None
 
     # 手仕舞い
-    def create_closing_rules(self, data, setting):
+    def create_closing_rules(self, data):
         conditions = [
-            self.apply_common(data, setting, self.common.closing) and self.apply(data, setting, self.conditions.closing),
+            self.apply_common(data, self.common.closing) and self.apply(data, self.conditions.closing),
         ]
 
         if any(conditions):
@@ -439,7 +448,7 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
     def create(self, setting):
         condition = self.sorted_conditions(setting) if self.setting.sorted_conditions else self.conditions(setting)
         c = StrategyConditions().by_array(condition)
-        return Combination(c, self.common(), self.setting).create(setting)
+        return Combination(c, self.common(), self.setting).create()
 
     # ソート済みのリストから条件を取得
     def sorted_conditions(self, setting):
@@ -469,7 +478,7 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
         raise Exception("Need override subject.")
 
     def default_common(self):
-        rules = [lambda d, s: True]
+        rules = [lambda d: True]
         return StrategyCreator(rules, rules, rules, rules)
 
     # @return StrategyCreator
@@ -478,22 +487,22 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
 
     def new(self):
         return [
-            lambda d, s: False
+            lambda d: False
         ]
 
     def taking(self):
         return [
-            lambda d, s: False
+            lambda d: False
         ]
 
     def stop_loss(self):
         return [
-            lambda d, s: False
+            lambda d: False
         ]
 
     def closing(self):
         return [
-            lambda d, s: False
+            lambda d: False
         ]
 
 class CombinationChecker:
