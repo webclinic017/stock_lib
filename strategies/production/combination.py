@@ -7,7 +7,7 @@ from strategy import CombinationCreator
 from loader import Loader
 
 class CombinationStrategy(CombinationCreator):
-    def __init__(selfetting):
+    def __init__(self, setting):
         self.conditions_all = conditions.all()
         setting.sorted_conditions = False
         super().__init__(setting)

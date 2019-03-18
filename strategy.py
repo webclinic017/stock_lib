@@ -81,7 +81,7 @@ def load_simulator_data(code, start_date, end_date, args, load_settings=None):
         data = Loader.load_tick_ohlc(code, start, end_date)
         rule = "30T"
     else:
-        start = utils.to_format(utils.to_datetime(start_date) - utils.relativeterm(3))
+        start = utils.to_format(utils.to_datetime(start_date) - utils.relativeterm(6))
         data = Loader.load_with_realtime(code, start, end_date, with_stats=load_settings.with_stats)
         rule = "W"
 
