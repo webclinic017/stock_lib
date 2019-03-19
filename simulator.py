@@ -323,6 +323,8 @@ class Simulator:
     def closing(self, value):
         num = self._position.num()
         self.repay(value, num)
+        self._new_orders = []
+        self._repay_orders = []
 
     # 取引手数料
     # TODO 実際のものに合わせる
