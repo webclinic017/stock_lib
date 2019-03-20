@@ -374,10 +374,12 @@ class Loader:
         return data
 
     @staticmethod
-    def loads_realtime(code, date, days, how="any"):
+    def loads_realtime(code, date, days, how="any", time=None):
         # 日本の休日を除外
         data = Loader.load_realtime(code, date) # 今日の分
         data = Loader.realtime_to_ohlc(data)
+        if time is not None:
+            data = data[data["date"] <= "%s %s" % (date, time)]
         length = 1
         current = date
         while length < days:

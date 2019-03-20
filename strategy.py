@@ -63,7 +63,7 @@ def get_filename(args):
     filename = "%ssimulate_setting.json" % prefix
     return filename
 
-def load_simulator_data(code, start_date, end_date, args, load_settings=None):
+def load_simulator_data(code, start_date, end_date, args, load_settings=None, time=None):
 
     if load_settings is None:
         load_settings = LoadSettings()
@@ -72,7 +72,7 @@ def load_simulator_data(code, start_date, end_date, args, load_settings=None):
         start = utils.to_datetime(start_date) - utils.relativeterm(3, True)
         days = (utils.to_datetime(end_date) - start).days
         for i in range(5):
-            data = Loader.loads_realtime(code, end_date, days+i)
+            data = Loader.loads_realtime(code, end_date, days+i, time=time)
             if len(data) >= 250: # weekleyのstats生成で必要な分
                 break
         rule = "30T"
