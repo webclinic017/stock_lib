@@ -433,7 +433,7 @@ class Simulator:
 
         term_data = {
             "daily": data.daily[data.daily["date"] <= date],
-            "weekly": data.weekly[data.weekly["date"] <= date]
+            "weekly": data.weekly[data.weekly["date"] <= date].iloc[:-1] # weeklyは最新の足は確定していないので最新のは除外する
         }
         term_index = {}
         for k, v in index.items():
@@ -520,7 +520,6 @@ class Simulator:
         for order in self.new_signal(strategy, data, index):
             self.log(" - new_order: num %s" % (order.num))
             self._new_orders.append(order)
-
 
         # トレード履歴
         trade_data["size"] = self._position.num()

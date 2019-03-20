@@ -521,13 +521,13 @@ class CombinationChecker:
 
     def get_strategy_source_by_index(self, index, method):
         source = inspect.getsource(method)
-        pattern = r"d, s: .*[,$\n]"
+        pattern = r"d: .*[,$\n]"
         source = re.findall(pattern, source)
         return source[index].strip("\n")
 
     def get_strategy_source(self, combinations, method):
         source = inspect.getsource(method)
-        pattern = r"d, s: .*[,$\n]"
+        pattern = r"d: .*[,$\n]"
         source = re.findall(pattern, source)
         a = numpy.array([source[i].strip("\n") for i in combinations[0]])
         b = numpy.array([source[i].strip("\n") for i in combinations[1]])
