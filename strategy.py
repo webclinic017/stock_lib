@@ -383,9 +383,16 @@ class Combination(StrategyCreator, StrategyUtil):
         drawdown_sum = list(filter(lambda x: x > 0, numpy.gradient(drawdown))) if len(drawdown) > 1 else []
         risk = self.risk(data)
         max_risk = self.max_risk(data)
-        conditions = [
+        drawdown_conditions = [
             len(drawdown_gradient) == 0, # 6%ルール条件外(-6%を超えて一定期間たった)
-            sum(drawdown_sum) < 0.06, # 6%ルール(直近のドローダウン合計が6%以下)
+            sum(drawdown_sum) < 0.06 # 6%ルール(直近のドローダウン合計が6%以下)
+        ]
+
+        if not all(drawdown_conditions) and data.setting.debug:
+            print("over drawdown: ", drawdown_conditions)
+
+        conditions = [
+            all(drawdown_conditions), # ドローダウンが問題ない状態
             (data.position.num() < self.max_order(max_risk, risk)) if risk > 0 else False, # 最大ポジションサイズ以下
             self.apply_common(data, self.common.new)
         ]
