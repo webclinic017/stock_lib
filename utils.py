@@ -12,6 +12,7 @@ import subprocess
 import talib as ta
 import slack
 
+# (minlength = 25)
 def add_average_stats(data, default=0):
     close = numpy.array(data["close"].as_matrix(), dtype="f8")
     daily_average             = ta.SMA(close, timeperiod=5)
@@ -22,6 +23,7 @@ def add_average_stats(data, default=0):
     data["volume_average"]    = volume_average if default is None else numpy.nan_to_num(volume_average)
     return data
 
+# (minlength = 100)
 def add_tec_stats(data, default=0):
     data["rci"]                 = convolve(data["close"], 9, rci, padding=True, default=default)
     data["rci_long"]            = convolve(data["close"], 27, rci, padding=True, default=default)
@@ -37,6 +39,7 @@ def add_tec_stats(data, default=0):
     data["atr"] = atr(data, default)
     return data
 
+# (minlength = 25)
 def add_band_stats(data, default=0):
     close = numpy.array(data["close"].as_matrix(), dtype="f8")
     upper, _, lower = ta.BBANDS(close, timeperiod=25, nbdevup=1, nbdevdn=1, matype=0)
@@ -53,6 +56,7 @@ def add_band_stats(data, default=0):
 
     return data
 
+# (minlength = 10)
 def add_safety_stats(data, default=0):
     data["low_noize"]         = convolve(data["low"], 2, lambda x, term: x.iloc[-2] - x.iloc[-1] if x.iloc[-2] - x.iloc[-1] < 0 else 0)
     data["rising_safety"]     = convolve(data, 10, rising_safety)
@@ -64,6 +68,7 @@ def add_safety_stats(data, default=0):
 
     return data
 
+# (minlength = 15)
 def add_stages_stats(data, default=0):
     data["resistance"] = convolve(data["high"], 15, resistance)
     data["support"] = convolve(data["low"], 15, support)
@@ -75,6 +80,7 @@ def add_stages_stats(data, default=0):
     data["macdhist_stages"] = list(map(lambda x: 1 if x[1]["macdhist"] > 0 else 0, data.iterrows()))
     return data
 
+# (minlength = 2)
 def add_cross_stats(data, default=0):
     # クロス系
     data["average_cross"] = convolve(data, 2, lambda x, term: gdc(x["daily_average"].iloc[-term:], x["weekly_average"].iloc[-term:]))
@@ -88,6 +94,7 @@ def add_cross_stats(data, default=0):
 
     return data
 
+# (minlength = 5)
 def add_trend_stats(data, default=0):
     # 気配を出力する
     data["rci_long_gradient"]   = numpy.gradient(data["rci_long"])
@@ -140,7 +147,25 @@ def add_stats(data, default=0, names=[]):
 
     return data
 
-# 指標用の統計
+def update_latest_stats(data, default=0, names=[]):
+    d = data.iloc[-100:].copy()
+    d = add_stats(d, default, names)
+    data.iloc[-1] = d.iloc[-1]
+    return data
+
+def update_latest_cs_stats(data, default=0):
+    d = data.iloc[-5:].copy()
+    d = add_cs_stats(d, default)
+    data.iloc[-1] = d.iloc[-1]
+    return data
+
+def latest_long_cs(data, begin, end):
+    d = data.copy()
+    d = d[d["date"] >= begin]
+    d = d[d["date"] <= end]
+    return d["open"].iloc[0], d["high"].max(), d["low"].min(), d["close"].iloc[-1]
+
+# 指標用の統計(minlength = 14)
 def add_index_stats(data, default=0):
     data["gradient"] = numpy.gradient(data["close"])
     data["trend"] = convolve(data["gradient"], 14, strict_trend)
@@ -151,7 +176,7 @@ def add_index_stats(data, default=0):
 def each(callback, data):
     return list(map(lambda x: callback(*x), data.iterrows()))
 
-# ろうそく足のパターン
+# ろうそく足のパターン(minlength = 5)
 def add_cs_stats(data, default=0):
 
     toint = lambda x: 1 if x else 0

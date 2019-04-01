@@ -1,17 +1,43 @@
 import sys
+import pandas
 import numpy
 
 sys.path.append("lib")
 import checker
 import utils
+import cache
+import strategy
 from simulator import Simulator
-
 
 class StrategySimulator:
     def __init__(self, simulator_setting, strategy_creator, verbose=False):
         self.simulator_setting = simulator_setting
         self.strategy_creator = strategy_creator
         self.verbose = verbose
+        self.cacher = cache.Cache("/tmp/simulator_data")
+
+    def create_cache_name(self, args, code, date):
+        prefix = strategy.get_prefix(args)
+        params = [args.date, args.validate_term, args.count, args.optimize_count, args.tick, code, date]
+        params = list(map(lambda x: str(x), params))
+        return "%s%s" % (prefix, "_".join(params))
+
+    # 対象となったら最新の長期足を更新する
+    def add_stats(self, args, data, date):
+        target_data = data.split(data.daily["date"].iloc[0], date)
+        target_data = target_data.split(target_data.daily["date"].iloc[-250], date)
+        end, begin = target_data.latest_date()
+        o,h,l,c = utils.latest_long_cs(target_data.daily, begin, end)
+        target_data.weekly["open"].iloc[-1] = o
+        target_data.weekly["high"].iloc[-1] = h
+        target_data.weekly["low"].iloc[-1] = l
+        target_data.weekly["close"].iloc[-1] = c # 最悪値にするならlをいれる
+#        target_data.weekly = utils.update_latest_stats(target_data.weekly)
+#        target_data.weekly = utils.update_latest_cs_stats(target_data.weekly)
+#        target_data.daily = utils.update_latest_stats(target_data.daily)
+#        target_data.daily = utils.update_latest_cs_stats(target_data.daily)
+#        return target_data
+        return strategy.add_stats(target_data)
 
     def append_daterange(self, codes, date, daterange):
         for code in codes:
@@ -105,7 +131,14 @@ class StrategySimulator:
                 if len(datas[code].at(date)) > 0:
                     if verbose:
                         print("[%s]" % code)
-                    simulators[code].simulate_by_date(date, datas[code], index)
+                    # 対象となったら最新の長期足を更新する
+                    cache_name = self.create_cache_name(args, code, date)
+                    if self.cacher.exists(cache_name):
+                        target_data = self.cacher.get(cache_name)
+                    else:
+                        target_data = self.add_stats(args, datas[code], date)
+                        self.cacher.create(cache_name, target_data)
+                    simulators[code].simulate_by_date(date, target_data, index)
                 else:
                     if verbose:
                         print("[%s] is less data: %s" % (code, date))

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import re
+import random
 import math
 import numpy
 import inspect
@@ -14,8 +15,7 @@ import strategies.production as production
 import strategies as develop
 
 class LoadSettings:
-    with_stats = False
-    weekly = True
+    with_stats = True
 
 def add_options(parser):
     parser.add_argument("--position_sizing", action="store_true", default=False, dest="position_sizing", help="ポジションサイジング")
@@ -28,8 +28,6 @@ def add_options(parser):
     parser.add_argument("--new_high", action="store_true", default=False, dest="new_high", help="新高値")
     parser.add_argument("--nikkei", action="store_true", default=False, dest="nikkei", help="日経")
     parser.add_argument("--rising", action="store_true", default=False, dest="rising", help="上昇銘柄")
-    parser.add_argument("--with_stats", action="store_true", default=False, dest="with_stats", help="統計データ込みで読み込む")
-    parser.add_argument("--ignore_weekly", action="store_true", default=False, dest="ignore_weekly", help="週足統計を無視")
     parser.add_argument("--monitor_size", action="store", default=None, dest="monitor_size", help="監視銘柄数")
     return parser
 
@@ -64,10 +62,10 @@ def get_filename(args):
     return filename
 
 def load_simulator_data(code, start_date, end_date, args, load_settings=None, time=None):
-
     if load_settings is None:
         load_settings = LoadSettings()
 
+    # 長さが最低250あるように期間を調整する
     if args.realtime:
         start = utils.to_datetime(start_date) - utils.relativeterm(3, True)
         days = (utils.to_datetime(end_date) - start).days
@@ -77,27 +75,34 @@ def load_simulator_data(code, start_date, end_date, args, load_settings=None, ti
                 break
         rule = "30T"
     elif args.tick:
-        start = utils.to_format(utils.to_datetime(start_date) - utils.relativeterm(1, True))
+        start = utils.to_format(utils.to_datetime(start_date) - utils.relativeterm(9, True))
         data = Loader.load_tick_ohlc(code, start, end_date)
         rule = "30T"
     else:
-        start = utils.to_format(utils.to_datetime(start_date) - utils.relativeterm(6))
-        data = Loader.load_with_realtime(code, start, end_date, with_stats=load_settings.with_stats)
+        start = utils.to_format(utils.to_datetime(start_date) - utils.relativeterm(9))
+        data = Loader.load_with_realtime(code, start, end_date)
         rule = "W"
 
     if data is None:
         print("%s: %s is None" % (start_date, code))
         return None
 
+    weekly = Loader.resample(data, rule=rule)
+
+    simulator_data = SimulatorData(code, data, weekly, rule)
+
+    if load_settings.with_stats:
+        return add_stats(simulator_data, load_settings)
+
+    return simulator_data
+
+def add_stats(simulator_data):
     try:
-        if not load_settings.with_stats:
-            data = utils.add_stats(data)
-            data = utils.add_cs_stats(data)
-        weekly = Loader.resample(data, rule=rule)
-        if load_settings.weekly:
-            weekly = utils.add_stats(weekly)
-            weekly = utils.add_cs_stats(weekly)
-        return SimulatorData(code, data, weekly, rule)
+        data = utils.add_stats(simulator_data.daily)
+        data = utils.add_cs_stats(simulator_data.daily)
+        weekly = utils.add_stats(simulator_data.weekly)
+        weekly = utils.add_cs_stats(simulator_data.weekly)
+        return SimulatorData(simulator_data.code, data, weekly, simulator_data.rule)
     except Exception as e:
         print("load_error: %s" % e)
         return None
@@ -358,6 +363,7 @@ class CombinationSetting:
     position_sizing = False
     sorted_conditions = True
     monitor_size = 3
+    montecarlo = False
 
 class Combination(StrategyCreator, StrategyUtil):
     def __init__(self, conditions, common, setting=None):
@@ -366,6 +372,9 @@ class Combination(StrategyCreator, StrategyUtil):
         self.setting = CombinationSetting() if setting is None else setting
 
     def apply(self, data, conditions):
+        if self.setting.montecarlo:
+            return bool(random.getrandbits(1)) # ランダム
+
         if len(conditions) == 0:
             return False
         a = list(map(lambda x: x(data), conditions[0]))
@@ -373,6 +382,8 @@ class Combination(StrategyCreator, StrategyUtil):
         return all(a) and any(b)
 
     def apply_common(self, data, conditions):
+        if self.setting.montecarlo: # ランダムで取引する場合は常にTrue
+            return True
         common = list(map(lambda x: x(data), conditions))
         return all(common)
 
