@@ -223,6 +223,27 @@ def score(data):
 
     return plus_score - minus_score
 
+
+def to_features(data):
+    categorical_columns = [
+        "daily_average_trend", "weekly_average_trend", "volume_average_trend", "macd_trend", "macdhist_trend",
+        "rci_trend", "rci_long_trend", "stages_trend", "stages_average_trend", "rising_safety_trend", "fall_safety_trend",
+        "average_cross", "macd_cross", "rci_cross", "env12_cross", "env11_cross", "env09_cross", "env08_cross",
+        "yang_tsutsumi", "yang_harami", "lower_kenuki", "ake_mojo", "yin_sanku", "yin_sanpei",
+        "yin_tsutsumi", "yin_harami", "upper_kenuki", "yoi_mojo", "yang_sanku", "yang_sanpei",
+        "long_upper_shadow", "long_lower_shadow", "yang", "yin", "long_yang", "long_yin", "low_roundup",
+        "high_roundup", "low_rounddown", "high_rounddown", "yang_gap", "yin_gap"
+    ]
+
+    features = []
+    for i, d in data.iterrows():
+        index, _ = price_limit_with_index(d["close"])
+        numerical_feature = "{0:x}".format(index if index < 16 else 15)
+        categorical = list(map(lambda x: str(x+1), d[categorical_columns].as_matrix().tolist()))
+        categorical_feature = "{0:x}".format(int("".join(categorical), 3), "x")
+        features = features + [numerical_feature+categorical_feature]
+    return features
+
 def rising_divergence(data, verbose=False):
     patterns = pattern(data, [
         {"key": "macdhist_convert", "callback": lambda x: x == -1}, # 最安値更新
@@ -507,6 +528,10 @@ def dead_cross(d1, d2):
 
 # 値幅制限
 def price_limit(price):
+    index, price_range = price_limit_with_index(price)
+    return price_range
+
+def price_limit_with_index(price):
     prices_low = [
         [100, 30],
         [200, 50],
@@ -526,18 +551,23 @@ def price_limit(price):
 
     prev_limit = 0
     price_range = None
-    table = prices_low if price < 1000 else prices_high
+    is_low = price < 1000
+    table = prices_low if is_low else prices_high
     p = price/1000
     if p <= 0.0:
         return price_range
-    count = int(math.log(p, 10))
-    for current in table:
+
+    count = 0 if is_low else int(math.log(int(p), 10))
+    default_index = 0 if is_low else len(prices_low) - (count+1)
+    index = default_index
+    for i, current in enumerate(table):
         next_limit = current[0] * pow(10, count)
         if prev_limit <= price and price < next_limit:
             price_range = current[1] * pow(10, count)
+            index = default_index + i + (len(prices_high) * count)
         prev_limit = next_limit
 
-    return price_range
+    return index, price_range
 
 def proc_call(params, retry=3):
     print(params)
