@@ -251,9 +251,9 @@ def score(data):
 
 def to_features(data):
     categorical_columns = [
-        "daily_average_trend", "weekly_average_trend", "volume_average_trend", "macd_trend", "macdhist_trend",
-        "rci_trend", "rci_long_trend", "stages_trend", "stages_average_trend", "rising_safety_trend", "fall_safety_trend",
-        "average_cross", "macd_cross", "rci_cross", "env12_cross", "env11_cross", "env09_cross", "env08_cross",
+#        "daily_average_trend", "weekly_average_trend", "volume_average_trend", "macd_trend", "macdhist_trend",
+#        "rci_trend", "rci_long_trend", "stages_trend", "stages_average_trend", "rising_safety_trend", "fall_safety_trend",
+#        "average_cross", "macd_cross", "rci_cross", "env12_cross", "env11_cross", "env09_cross", "env08_cross",
         "yang_tsutsumi", "yang_harami", "lower_kenuki", "ake_mojo", "yin_sanku", "yin_sanpei",
         "yin_tsutsumi", "yin_harami", "upper_kenuki", "yoi_mojo", "yang_sanku", "yang_sanpei",
         "long_upper_shadow", "long_lower_shadow", "yang", "yin", "long_yang", "long_yin", "low_roundup",
@@ -264,8 +264,8 @@ def to_features(data):
     for i, d in data.iterrows():
         index, _ = price_limit_with_index(d["close"])
         numerical_feature = "{0:x}".format(index if index < 16 else 15)
-        categorical = list(map(lambda x: str(x+1), d[categorical_columns].as_matrix().tolist()))
-        categorical_feature = "{0:x}".format(int("".join(categorical), 3), "x")
+        categorical = list(map(lambda x: str(x), d[categorical_columns].as_matrix().tolist()))
+        categorical_feature = "{0:x}".format(int("".join(categorical), 2), "x")
         features = features + [numerical_feature+categorical_feature]
     return features
 
