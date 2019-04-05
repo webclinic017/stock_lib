@@ -580,7 +580,7 @@ def price_limit_with_index(price):
     table = prices_low if is_low else prices_high
     p = price/1000
     if p <= 0.0:
-        return price_range
+        return 0, prices_low[0][1]
 
     count = 0 if is_low else int(math.log(int(p), 10))
     default_index = 0 if is_low else len(prices_low) - (count+1)
