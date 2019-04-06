@@ -152,11 +152,6 @@ class SimulatorData:
         w = w[w["date"] >= start_date]
         return SimulatorData(self.code, d, w, self.rule)
 
-    def latest_date(self):
-        d = self.daily["date"].iloc[-1]
-        w = self.weekly["date"].iloc[-1]
-        return d, w
-
     def dates(self, start_date, end_date):
         d = self.daily[self.daily["date"] >= start_date]
         d = d[d["date"] <= end_date]
@@ -438,11 +433,8 @@ class Simulator:
 
         term_data = {
             "daily": data.daily[data.daily["date"] <= date],
-#            "weekly": data.weekly[data.weekly["date"] <= date].iloc[:-1] # weeklyは最新の足は確定していないので最新のは除外する
-            "weekly": data.weekly[data.weekly["date"] <= date]
+            "weekly": data.weekly[data.weekly["date"] <= date].iloc[:-1] # weeklyは最新の足は確定していないので最新のは除外する
         }
-        self.log("latest date: %s, %s" % (term_data["daily"]["date"].iloc[-1], term_data["weekly"]["date"].iloc[-1]))
-
         term_index = {}
         for k, v in index.items():
             term_index[k] = v[v["date"] <= date]
