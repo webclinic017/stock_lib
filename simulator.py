@@ -438,8 +438,8 @@ class Simulator:
 
         term_data = {
             "daily": data.daily[data.daily["date"] <= date],
-#            "weekly": data.weekly[data.weekly["date"] <= date].iloc[:-1] # weeklyは最新の足は確定していないので最新のは除外する
-            "weekly": data.weekly[data.weekly["date"] <= date]
+            "weekly": data.weekly[data.weekly["date"] <= date].iloc[:-1] # weeklyは最新の足は確定していないので最新のは除外する
+#            "weekly": data.weekly[data.weekly["date"] <= date]
         }
         self.log("latest date: %s, %s" % (term_data["daily"]["date"].iloc[-1], term_data["weekly"]["date"].iloc[-1]))
 
