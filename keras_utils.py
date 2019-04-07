@@ -1,3 +1,4 @@
+import numpy
 import keras.backend as K
 import collections
 import json

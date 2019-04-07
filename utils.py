@@ -223,8 +223,7 @@ def score(data):
 
     return plus_score - minus_score
 
-
-def to_features(data):
+def feature_columns():
     categorical_columns = [
 #        "daily_average_trend", "weekly_average_trend", "volume_average_trend", "macd_trend", "macdhist_trend",
 #        "rci_trend", "rci_long_trend", "stages_trend", "stages_average_trend", "rising_safety_trend", "fall_safety_trend",
@@ -234,15 +233,34 @@ def to_features(data):
         "long_upper_shadow", "long_lower_shadow", "yang", "yin", "long_yang", "long_yin", "low_roundup",
         "high_roundup", "low_rounddown", "high_rounddown", "yang_gap", "yin_gap"
     ]
+    return categorical_columns
+
+def to_features(data):
+    columns = feature_columns()
 
     features = []
     for i, d in data.iterrows():
         index, _ = price_limit_with_index(d["close"])
         numerical_feature = "{0:x}".format(index if index < 16 else 15)
-        categorical = list(map(lambda x: str(x), d[categorical_columns].as_matrix().tolist()))
+        categorical = list(map(lambda x: str(x), d[columns].as_matrix().tolist()))
         categorical_feature = "{0:x}".format(int("".join(categorical), 2), "x")
         features = features + [numerical_feature+categorical_feature]
     return features
+
+def from_features(features):
+    columns = feature_columns()
+
+    data = {}
+    for column in columns:
+        data[column] = []
+
+    for f in features:
+        num = int(f, 16)
+        flags = ("{0:0%sb}" % len(columns)).format(num)
+        for column, flag in zip(columns, flags):
+            data[column].append(int(flag))
+    detail = pandas.DataFrame(data)
+    return detail
 
 def rising_divergence(data, verbose=False):
     patterns = pattern(data, [
