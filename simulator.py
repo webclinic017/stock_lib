@@ -432,9 +432,9 @@ class Simulator:
     def simulate_by_date(self, date, data, index):
         assert type(data) is SimulatorData, "data is not SimulatorData."
 
-        if self.setting.ignore_latest_weekly:
+        if self._setting.ignore_latest_weekly:
             weekly = data.weekly[data.weekly["date"] <= date].iloc[:-1] # weeklyは最新の足は確定していないので最新のは除外する
-        else
+        else:
             weekly = data.weekly[data.weekly["date"] <= date]
 
         term_data = {
