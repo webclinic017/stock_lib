@@ -175,6 +175,7 @@ class SimulatorSetting:
         self.short_trade = False
         self.auto_stop_loss = False
         self.stop_loss_rate = 0.02
+        self.ignore_latest_weekly = False
 
 # 統計
 class SimulatorStats:
@@ -431,11 +432,16 @@ class Simulator:
     def simulate_by_date(self, date, data, index):
         assert type(data) is SimulatorData, "data is not SimulatorData."
 
+        if self.setting.ignore_latest_weekly:
+            weekly = data.weekly[data.weekly["date"] <= date].iloc[:-1] # weeklyは最新の足は確定していないので最新のは除外する
+        else
+            weekly = data.weekly[data.weekly["date"] <= date]
+
         term_data = {
             "daily": data.daily[data.daily["date"] <= date],
-            "weekly": data.weekly[data.weekly["date"] <= date].iloc[:-1] # weeklyは最新の足は確定していないので最新のは除外する
-#            "weekly": data.weekly[data.weekly["date"] <= date]
+            "weekly": weekly
         }
+
         term_index = {}
         for k, v in index.items():
             term_index[k] = v[v["date"] <= date]
