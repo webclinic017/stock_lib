@@ -24,6 +24,7 @@ def add_options(parser):
     parser.add_argument("--tick", action="store_true", default=False, dest="tick", help="ティックデータを使う")
     parser.add_argument("--realtime", action="store_true", default=False, dest="realtime", help="リアルタイムデータを使う")
     parser.add_argument("--daytrade", action="store_true", default=False, dest="daytrade", help="デイトレ")
+    parser.add_argument("--dayshort", action="store_true", default=False, dest="dayshort", help="デイトレ")
     parser.add_argument("--falling", action="store_true", default=False, dest="falling", help="下落相場")
     parser.add_argument("--new_high", action="store_true", default=False, dest="new_high", help="新高値")
     parser.add_argument("--nikkei", action="store_true", default=False, dest="nikkei", help="日経")
@@ -47,6 +48,8 @@ def get_prefix(args):
     target = ""
     if args.daytrade:
         target = "daytrade_"
+    if args.dayshort:
+        target = "dayshort_"
     if args.falling:
         target = "falling_"
     if args.new_high:
@@ -146,6 +149,9 @@ def load_strategy_creator(args, combination_setting=None):
     else:
         if args.daytrade:
             from strategies.daytrade import CombinationStrategy
+            return CombinationStrategy(combination_setting)
+        elif args.dayshort:
+            from strategies.dayshort import CombinationStrategy
             return CombinationStrategy(combination_setting)
         elif args.falling:
             from strategies.falling import CombinationStrategy
@@ -258,6 +264,18 @@ class StrategyConditions():
 
 
 class StrategyUtil:
+    # ドローダウン
+    def drawdown(self, data):
+        term = self.term(data)
+        price = data.data["daily"]["close"].iloc[-1]
+        gain = data.position.gain(price)
+        if data.setting.short_trade:
+            max_gain = data.position.gain(data.data["daily"]["low"].min())
+        else:
+            max_gain = data.position.gain(data.data["daily"]["high"].max())
+        return max_gain - gain
+
+    # 最大許容損失
     def max_risk(self, data):
         return data.assets * data.setting.stop_loss_rate
 
@@ -281,11 +299,10 @@ class StrategyUtil:
         order = data.position.num() # 現在の保有数
         price = data.data["daily"]["close"].iloc[-1]
 
+        safety = self.safety(data, 1)
         if data.setting.short_trade:
-            safety = data.data["daily"]["fall_safety"].iloc[-1]
             risk = (safety - price)
         else:
-            safety = data.data["daily"]["rising_safety"].iloc[-1]
             risk = (price - safety)
 
         # riskがマイナスの場合、safetyを抜けているのでリスクが高い
@@ -331,25 +348,13 @@ class StrategyUtil:
         return order
 
     def safety(self, data, term):
-        return data.data["daily"]["rising_safety"].iloc[-term:].max() * 0.98
+        if data.setting.short_trade:
+            return data.data["daily"]["fall_safety"].iloc[-term:].min()
+        else:
+            return data.data["daily"]["rising_safety"].iloc[-term:].max()
 
     def term(self, data):
         return 1 if data.position.term()  == 0 else data.position.term()
-
-    # 強気のダイバージェンス
-    def rising_divergence(self, data):
-        conditions = [
-            data.data["daily"]["weekly_average_trend"].iloc[-1] < 0,
-            data.data["daily"]["daily_average_trend"].iloc[-1] >= 0,
-            data.data["daily"]["macd_trend"].iloc[-1] > 0,
-            data.data["daily"]["macdhist_trend"].iloc[-1] > 0,
-        ]
-
-        return [
-            data.data["daily"]["weekly_average_trend"].iloc[-1] > 0 and data.data["daily"]["daily_average_trend"].iloc[-1] <= 0,
-            data.data["daily"]["weekly_average_trend"].iloc[-1] >= 0 and data.data["daily"]["daily_average_trend"].iloc[-1] < 0,
-            all(conditions),
-        ]
 
 ## 指定可能な戦略====================================================================================================================
 
