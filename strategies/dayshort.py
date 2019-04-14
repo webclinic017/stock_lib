@@ -22,6 +22,9 @@ class CombinationStrategy(CombinationCreator):
             lambda d: self.risk(d) < self.max_risk(d), # リスクが2%以内
             lambda d: self.risk(d) < self.goal(d), # リスクより利益のほうが大きい
         ]
+        default.stop_loss = [
+            lambda d: self.drawdown(d) > (self.max_risk(d) / 2),
+        ]
 
         return default
 
@@ -41,6 +44,8 @@ class CombinationStrategy(CombinationCreator):
 
     def taking(self):
         return [
+            lambda d: d.position.gain(d.data["daily"]["close"].iloc[-1]) > 5000,
+            lambda d: d.position.gain(d.data["daily"]["close"].iloc[-1]) > 2500,
             lambda d: self.risk(d) > self.goal(d),
             lambda d: self.lower(d) < d.data["daily"]["low"].iloc[-1],
             lambda d: d.data["daily"]["stages_average"].iloc[-1] > 0,
@@ -54,7 +59,6 @@ class CombinationStrategy(CombinationCreator):
 
     def stop_loss(self):
         return [
-            lambda d: self.drawdown(d) > (self.max_risk(d) / 2),
             lambda d: d.data["daily"]["high"].iloc[-1] < self.safety(d, self.term(d)), # セーフゾーンを割った
             lambda d: d.data["daily"]["macdhist_trend"].iloc[-5:].min() == 1 and d.data["daily"]["volume_average_trend"].iloc[-1] == 1, # ダマシでない下方ブレイク
             lambda d: d.data["daily"]["macdhist_trend"].iloc[-1] == 1,

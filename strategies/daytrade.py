@@ -24,6 +24,9 @@ class CombinationStrategy(CombinationCreator):
             lambda d: self.risk(d) < self.max_risk(d), # リスクが2%以内
             lambda d: self.risk(d) < self.goal(d), # リスクより利益のほうが大きい
         ]
+        default.stop_loss = [
+            lambda d: self.drawdown(d) > (self.max_risk(d) / 2),
+        ]
 
         return default
 
