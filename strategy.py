@@ -29,6 +29,7 @@ def add_options(parser):
     parser.add_argument("--new_high", action="store_true", default=False, dest="new_high", help="新高値")
     parser.add_argument("--nikkei", action="store_true", default=False, dest="nikkei", help="日経")
     parser.add_argument("--rising", action="store_true", default=False, dest="rising", help="上昇銘柄")
+    parser.add_argument("--open_close", action="store_true", default=False, dest="open_close", help="寄せ引け")
     parser.add_argument("--with_stats", action="store_true", default=False, dest="with_stats", help="統計データ込みで読み込む")
     parser.add_argument("--ignore_weekly", action="store_true", default=False, dest="ignore_weekly", help="週足統計を無視")
     parser.add_argument("--monitor_size", action="store", default=None, dest="monitor_size", help="監視銘柄数")
@@ -58,6 +59,8 @@ def get_prefix(args):
         target = "nikkei_"
     if args.rising:
         target = "rising_"
+    if args.open_close:
+        target = "open_close_"
 
     return "%s%s%s%s" % (prefix, target, tick, method)
 
@@ -164,6 +167,9 @@ def load_strategy_creator(args, combination_setting=None):
             return CombinationStrategy(combination_setting)
         elif args.rising:
             from strategies.rising import CombinationStrategy
+            return CombinationStrategy(combination_setting)
+        elif args.open_close:
+            from strategies.open_close import CombinationStrategy
             return CombinationStrategy(combination_setting)
         else:
             from strategies.combination import CombinationStrategy
@@ -404,36 +410,46 @@ class Combination(StrategyCreator, StrategyUtil):
 
         order = self.order(data, max_risk, risk) if self.setting.position_sizing else 100
 
-        if self.apply(data, self.conditions.new):
-            if all(conditions) or self.setting.simple:
-                return simulator.Order(order, [lambda x: True])
+        if not self.setting.simple:
+            conditions = conditions + [self.apply(data, self.conditions.new)]
+
+        if all(conditions):
+            return simulator.Order(order, [lambda x: True])
 
         return None
 
     # 利食い
     def create_taking_rules(self, data):
-        conditions = [
-            self.apply_common(data, self.common.taking),
-            self.apply(data, self.conditions.taking)
-        ]
+        if self.setting.simple:
+            conditions = [self.apply_common(data, self.common.taking)]
+        else:
+            conditions = [
+                self.apply_common(data, self.common.taking),
+                self.apply(data, self.conditions.taking)
+            ]
         return simulator.Order(data.position.num(), [lambda x: True]) if all(conditions) else None
 
     # 損切
     def create_stop_loss_rules(self, data):
-        conditions = [
-            utils.rate(data.position.value(), data.data["daily"]["close"].iloc[-1]) < -0.02, # 損益が-2%
-            self.apply_common(data, self.common.stop_loss) and self.apply(data, self.conditions.stop_loss),
-        ]
+        if self.setting.simple:
+            conditions = [self.apply_common(data, self.common.stop_loss)]
+        else:
+            conditions = [
+                utils.rate(data.position.value(), data.data["daily"]["close"].iloc[-1]) < -0.02, # 損益が-2%
+                self.apply_common(data, self.common.stop_loss) and self.apply(data, self.conditions.stop_loss),
+            ]
         if any(conditions):
             return simulator.Order(data.position.num(), [lambda x: True])
         return None
 
     # 手仕舞い
     def create_closing_rules(self, data):
-        conditions = [
-            self.apply_common(data, self.common.closing) and self.apply(data, self.conditions.closing),
-        ]
-
+        if self.setting.simple:
+            conditions = [self.apply_common(data, self.common.closing)]
+        else:
+            conditions = [
+                self.apply_common(data, self.common.closing) and self.apply(data, self.conditions.closing),
+            ]
         if any(conditions):
             return simulator.Order(data.position.num(), [lambda x: True])
 
