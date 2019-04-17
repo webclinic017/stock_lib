@@ -477,34 +477,39 @@ class Simulator:
         if self._position.num() > 0:
             self._position.increment_term()
 
-        # 新規注文
-        open_price = data["daily"]["open"].iloc[-1]
-        if self._setting.virtual_trade:
-            new_orders = self.new_order(open_price)
-        else:
-            new_orders = []
-
         # 返済注文
         for order in self.taking_signal(strategy, data, index):
-            self.log(" - taking_order: num %s" % (order.num))
+            if order.num > 0:
+                self.log(" - taking_order: num %s" % (order.num))
             self._repay_orders.append(order)
 
         for order in self.stop_loss_signal(strategy, data, index):
-            self.log(" - stop_loss_order: num %s" % (order.num))
+            if order.num > 0:
+                self.log(" - stop_loss_order: num %s" % (order.num))
             self._repay_orders.append(order)
 
         for order in self.closing_signal(strategy, data, index):
-            self.log(" - closing_order: num %s" % (order.num))
+            if order.num > 0:
+                self.log(" - closing_order: num %s" % (order.num))
             self._repay_orders.append(order)
 
         # ポジションがなければ返済シグナルは捨てる
-        if self._position.num() == 0:
+        if self._position.num() <= 0:
             self._repay_orders = []
 
         # 新規・返済が同時に出ている場合何もしない
         if len(self._new_orders) > 0 and len(self._repay_orders) > 0 :
             self._new_orders = []
             self._repay_orders = []
+
+        # 新規注文
+        open_price = data["daily"]["open"].iloc[-1]
+
+        # 前足の終値で判定した新規注文を取得
+        if self._setting.virtual_trade:
+            new_orders = self.new_order(open_price)
+        else:
+            new_orders = []
 
         # 寄り付き====================================================================
         for order in new_orders:
@@ -526,6 +531,9 @@ class Simulator:
             repay_orders += self.repay_order(price)
 
         for order in repay_orders:
+            if self._position.num() <= 0:
+                self._repay_orders = [] # ポジションがなくなってたら以降の注文はキャンセル
+                break
             gain = self._position.gain(order.price)
             if self.repay(order.price, order.num):
                 trade_data["repay"] = order.price
