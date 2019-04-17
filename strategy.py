@@ -390,13 +390,13 @@ class Combination(StrategyCreator, StrategyUtil):
     # 買い
     def create_new_rules(self, data):
         drawdown = list(map(lambda x: x["drawdown"], data.stats.drawdown[-20:]))
-        drawdown_gradient = list(filter(lambda x: x > 0.06, numpy.gradient(drawdown))) if len(drawdown) > 1 else []
+        drawdown_gradient = list(filter(lambda x: x > data.setting.stop_loss_rate * 3, numpy.gradient(drawdown))) if len(drawdown) > 1 else []
         drawdown_sum = list(filter(lambda x: x > 0, numpy.gradient(drawdown))) if len(drawdown) > 1 else []
         risk = self.risk(data)
         max_risk = self.max_risk(data)
         drawdown_conditions = [
             len(drawdown_gradient) == 0, # 6%ルール条件外(-6%を超えて一定期間たった)
-            sum(drawdown_sum) < 0.06 # 6%ルール(直近のドローダウン合計が6%以下)
+            sum(drawdown_sum) < data.setting.stop_loss_rate * 3 # 6%ルール(直近のドローダウン合計が6%以下)
         ]
 
         if not all(drawdown_conditions) and data.setting.debug:
@@ -435,7 +435,7 @@ class Combination(StrategyCreator, StrategyUtil):
             conditions = [self.apply_common(data, self.common.stop_loss)]
         else:
             conditions = [
-                utils.rate(data.position.value(), data.data["daily"]["close"].iloc[-1]) < -0.02, # 損益が-2%
+                utils.rate(data.position.value(), data.data["daily"]["close"].iloc[-1]) < -data.setting.stop_loss_rate, # 損益が-2%
                 self.apply_common(data, self.common.stop_loss) and self.apply(data, self.conditions.stop_loss),
             ]
         if any(conditions):

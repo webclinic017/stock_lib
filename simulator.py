@@ -477,32 +477,41 @@ class Simulator:
         if self._position.num() > 0:
             self._position.increment_term()
 
-        # 寄り付き====================================================================
-        # 新規実行
+        # 新規注文
         open_price = data["daily"]["open"].iloc[-1]
         if self._setting.virtual_trade:
             new_orders = self.new_order(open_price)
         else:
             new_orders = []
+
+        # 返済注文
+        for order in self.taking_signal(strategy, data, index):
+            self.log(" - taking_order: num %s" % (order.num))
+            self._repay_orders.append(order)
+
+        for order in self.stop_loss_signal(strategy, data, index):
+            self.log(" - stop_loss_order: num %s" % (order.num))
+            self._repay_orders.append(order)
+
+        for order in self.closing_signal(strategy, data, index):
+            self.log(" - closing_order: num %s" % (order.num))
+            self._repay_orders.append(order)
+
+        # ポジションがなければ返済シグナルは捨てる
+        if self._position.num() == 0:
+            self._repay_orders = []
+
+        # 新規・返済が同時に出ている場合何もしない
+        if len(self._new_orders) > 0 and len(self._repay_orders) > 0 :
+            self._new_orders = []
+            self._repay_orders = []
+
+        # 寄り付き====================================================================
         for order in new_orders:
             if self.new(order.price, order.num):
                 trade_data["new"] = order.price
 
         ## 引け直前===================================================================
-        if self._position.num() > 0:
-            # 損切・返済気配のときは新規シグナルが出てても買わない
-            for order in self.taking_signal(strategy, data, index):
-                self.log(" - taking_order: num %s" % (order.num))
-                self._repay_orders.append(order)
-
-            for order in self.stop_loss_signal(strategy, data, index):
-                self.log(" - stop_loss_order: num %s" % (order.num))
-                self._repay_orders.append(order)
-
-            for order in self.closing_signal(strategy, data, index):
-                self.log(" - closing_order: num %s" % (order.num))
-                self._repay_orders.append(order)
-
         # 返済注文実行
         repay_orders = []
         if self._setting.virtual_trade and self._position.num() > 0:

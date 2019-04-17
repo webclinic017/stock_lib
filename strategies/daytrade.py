@@ -19,13 +19,10 @@ class CombinationStrategy(CombinationCreator):
     def common(self):
         default = self.default_common()
         default.new = [
-            lambda d: d.data["daily"]["rci_long_trend"].iloc[-1] > 0, # 週足が上昇トレンド
-            lambda d: d.data["daily"]["weekly_average_trend"].iloc[-1] > 0, # 週足が上昇トレンド
+            lambda d: d.data["weekly"]["rci_trend"].iloc[-1] > 0, # 週足が上昇トレンド
+            lambda d: d.data["weekly"]["daily_average_trend"].iloc[-1] > 0, # 週足が上昇トレンド
             lambda d: self.risk(d) < self.max_risk(d), # リスクが2%以内
             lambda d: self.risk(d) < self.goal(d), # リスクより利益のほうが大きい
-        ]
-        default.stop_loss = [
-            lambda d: self.drawdown(d) > (self.max_risk(d) / 2),
         ]
 
         return default
@@ -40,7 +37,7 @@ class CombinationStrategy(CombinationCreator):
             lambda d: d.data["daily"]["rci_trend"].iloc[-1] == -1,
             lambda d: d.data["daily"]["average_cross"].iloc[-5:].min() == 0, # 平均線のデッドクロス直後ではない
             lambda d: d.data["daily"]["low_roundup"].iloc[-1] == 1,
-            lambda d: d.data["daily"]["low_roundup"].iloc[-1] == 1,
+            lambda d: d.data["weekly"]["low_roundup"].iloc[-1] == 1,
         ]
 
     def taking(self):
@@ -51,9 +48,9 @@ class CombinationStrategy(CombinationCreator):
             lambda d: d.data["daily"]["macdhist_convert"].iloc[-1] == 1,
             lambda d: d.data["daily"]["rci_trend"].iloc[-1] == 1,
             lambda d: d.data["daily"]["low_roundup"].iloc[-1] == 0,
-            lambda d: d.data["daily"]["weekly_average_trend"].iloc[-1] == -1,
-            lambda d: d.data["daily"]["rci_long_trend"].iloc[-1] == -1,
-            lambda d: d.data["daily"]["macdhist_trend"].iloc[-1] == -1,
+            lambda d: d.data["weekly"]["daily_average_trend"].iloc[-1] == -1,
+            lambda d: d.data["weekly"]["rci_trend"].iloc[-1] == -1,
+            lambda d: d.data["weekly"]["macdhist_trend"].iloc[-1] == -1,
         ]
 
     def stop_loss(self):
@@ -64,9 +61,9 @@ class CombinationStrategy(CombinationCreator):
             lambda d: d.data["daily"]["macd_cross"].iloc[-1] == -1, # MACDデッドクロス
             lambda d: d.data["daily"]["rci_trend"].iloc[-1] == 1,
             lambda d: d.data["daily"]["low_roundup"].iloc[-1] == 0,
-            lambda d: d.data["daily"]["weekly_average_trend"].iloc[-1] == -1,
-            lambda d: d.data["daily"]["rci_trend"].iloc[-1] == -1,
-            lambda d: d.data["daily"]["macdhist_trend"].iloc[-1] == -1,
+            lambda d: d.data["weekly"]["daily_average_trend"].iloc[-1] == -1,
+            lambda d: d.data["weekly"]["rci_trend"].iloc[-1] == -1,
+            lambda d: d.data["weekly"]["macdhist_trend"].iloc[-1] == -1,
         ]
 
 
