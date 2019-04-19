@@ -289,7 +289,7 @@ class StrategyUtil:
         return max_gain
 
     def take_gain(self, data):
-        return data.assets * 0.005
+        return data.assets * data.setting.taking_rate
 
     # 最大許容損失
     def max_risk(self, data):

@@ -175,6 +175,7 @@ class SimulatorSetting:
         self.short_trade = False
         self.auto_stop_loss = False
         self.stop_loss_rate = 0.02
+        self.taking_rate = 0.005
         self.ignore_latest_weekly = False
 
 # 統計
