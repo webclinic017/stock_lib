@@ -20,7 +20,7 @@ def add_average_stats(data, default=0):
     data["weekly_average"]    = weekly_average if default is None else numpy.nan_to_num(weekly_average)
     volume_average            = ta.SMA(data["volume"].astype(float).as_matrix(), timeperiod=5)
     data["volume_average"]    = volume_average if default is None else numpy.nan_to_num(volume_average)
-    data["ma_divergence"]     = (data["close"] - data["daily_average"]) / data["daily_average"]
+    data["ma_divergence"]     = (data["close"] - data["weekly_average"]) / data["weekly_average"]
     return data
 
 def add_tec_stats(data, default=0):
