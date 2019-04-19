@@ -270,16 +270,26 @@ class StrategyConditions():
 
 
 class StrategyUtil:
+    def price(self, data):
+        return data.data["daily"]["close"].iloc[-1]
+
     # ドローダウン
     def drawdown(self, data):
         term = self.term(data)
-        price = data.data["daily"]["close"].iloc[-1]
+        price = self.price(data)
         gain = data.position.gain(price)
+        max_gain = self.max_gain(data)
+        return max_gain - gain
+
+    def max_gain(self, data):
         if data.setting.short_trade:
             max_gain = data.position.gain(data.data["daily"]["low"].min())
         else:
             max_gain = data.position.gain(data.data["daily"]["high"].max())
-        return max_gain - gain
+        return max_gain
+
+    def take_gain(self, data):
+        return data.assets * 0.005
 
     # 最大許容損失
     def max_risk(self, data):

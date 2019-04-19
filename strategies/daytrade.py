@@ -25,6 +25,10 @@ class CombinationStrategy(CombinationCreator):
             lambda d: self.risk(d) < self.goal(d), # リスクより利益のほうが大きい
         ]
 
+        default.taking = [
+            lambda d: d.position.gain(self.price(d)) > 0,
+        ]
+
         return default
 
     def new(self):
@@ -44,13 +48,7 @@ class CombinationStrategy(CombinationCreator):
         return [
             lambda d: self.risk(d) > self.goal(d),
             lambda d: self.upper(d) < d.data["daily"]["high"].iloc[-1],
-            lambda d: d.data["daily"]["stages_average"].iloc[-1] > 0,
-            lambda d: d.data["daily"]["macdhist_convert"].iloc[-1] == 1,
-            lambda d: d.data["daily"]["rci_trend"].iloc[-1] == 1,
-            lambda d: d.data["daily"]["low_roundup"].iloc[-1] == 0,
-            lambda d: d.data["weekly"]["daily_average_trend"].iloc[-1] == -1,
-            lambda d: d.data["weekly"]["rci_trend"].iloc[-1] == -1,
-            lambda d: d.data["weekly"]["macdhist_trend"].iloc[-1] == -1,
+            lambda d: (self.drawdown(d) > self.take_gain(d) or self.take_gain(d) > d.position.gain(self.price(d))) and self.max_gain(d) > self.drawdown(d), # 許容損失・利食いラインを超えたら利確
         ]
 
     def stop_loss(self):

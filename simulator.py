@@ -473,7 +473,7 @@ class Simulator:
             self._stats.trade_history.append(trade_data)
             return self.total_assets(0)
 
-        # 新規ポジションがあり、返済ルールに当てはまる場合売る
+        # ポジションの保有期間を増やす
         if self._position.num() > 0:
             self._position.increment_term()
 
