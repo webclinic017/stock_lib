@@ -182,6 +182,7 @@ class SimulatorSetting:
 class SimulatorStats:
     def __init__(self, setting):
         self.assets_history = []
+        self.available_assets_history = []
         self.max_assets = setting.assets
         self.drawdown = []
         self.trade = []
@@ -216,6 +217,9 @@ class SimulatorStats:
             diff = self.max_assets - assets
             dd = round(diff/float(self.max_assets), 2)
             self.drawdown.append({"date": date, "drawdown": dd})
+
+    def add_available_assets_history(self, date, assets):
+        self.available_assets_history.append({"date": date, "assets": assets})
 
     # 最大ドローダウン
     def max_drawdown(self):
@@ -291,7 +295,7 @@ class Simulator:
         self.log(" new: %s yen x %s, total %s, ave %s, assets %s" % (value, num, self._position.num(), self._position.value(), self.total_assets(value)))
 
         if self._setting.auto_stop_loss:
-            order = Order(num, [lambda x: x["position"].gain(x["value"]) < - (pos * 0.02)], is_reverse_limit=True) # 損失が総資産の2%以上なら即損切
+            order = Order(num, [lambda x: x["position"].gain(x["value"]) < - (pos * self._setting.stop_loss_rate)], is_reverse_limit=True) # 損失が総資産の2%以上なら即損切
             self.log(" - auto_stop_loss_order: num %s" % (num))
 
         return True
@@ -390,6 +394,7 @@ class Simulator:
         stats["return"] = float((stats["assets"] - self._setting.assets) / float(self._setting.assets))
         stats["win_rate"] = float(self.stats().win_rate())
         stats["drawdown"] = float(self.stats().max_drawdown())
+        stats["max_unavailable_assets"] = max(list(map(lambda x: self._setting.assets - x["assets"], self.stats().available_assets_history))) if len(self.stats().available_assets_history) > 0 else 0
         stats["trade"] = int(self.stats().trade_num())
         stats["win_trade"] = int(self.stats().win_trade_num())
         # 平均利益率
@@ -463,6 +468,7 @@ class Simulator:
         date = data["daily"]["date"].iloc[-1]
         self._stats.trade.append(0)
         self._stats.add_assets_history(date, self.total_assets(price))
+        self._stats.add_available_assets_history(date, self._assets)
 #        self.log("[drawdown] %s" % self._stats.drawdown[-1])
         trade_data = {"date": date, "new": None, "repay": None, "gain": None, "term": 0, "size": 0}
 

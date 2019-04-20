@@ -130,7 +130,7 @@ class StrategySimulator:
         stats = {}
         for code in datas.keys():
             s = simulators[code].get_stats()
-            keys = ["return", "drawdown", "win_trade", "trade", "assets", "trade_history"]
+            keys = ["return", "drawdown", "win_trade", "trade", "assets", "max_unavailable_assets", "trade_history"]
             result = {}
             for k in keys:
                 result[k] = s[k]
@@ -148,6 +148,7 @@ class StrategySimulator:
         position_size = list(filter(lambda x: x != 0, sum(position_size, [])))
         position_term = list(map(lambda x: list(map(lambda y: y["term"], x)), trade_history))
         position_term = list(filter(lambda x: x != 0, sum(position_term, [])))
+        max_unavailable_assets = list(map(lambda x: x[1]["max_unavailable_assets"], stats.items()))
 
         if verbose:
             print(start_date, end_date, "assets:", self.simulator_setting.assets, "gain:", gain, sum(gain))
@@ -169,6 +170,7 @@ class StrategySimulator:
             "max_position_size": max(position_size) if len(position_size) > 0 else 0,
             "position_term": numpy.average(position_term) if len(position_term) > 0 else 0,
             "max_position_term": max(position_term) if len(position_term) > 0 else 0,
+            "max_unavailable_assets": max(max_unavailable_assets) if len(max_unavailable_assets) > 0 else 0,
         }
 
         return results
