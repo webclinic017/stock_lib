@@ -105,7 +105,7 @@ class StrategySimulator:
                 else:
                     split_data = datas[code].split(start, date)
                     manda = checker.manda(split_data.daily)
-                    self.cacher.create(manda)
+                    self.cacher.create(manda_cache_name, manda)
                 if manda:
                     if verbose:
                         print("[%s] is manda" % code)

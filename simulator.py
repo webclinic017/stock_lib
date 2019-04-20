@@ -214,9 +214,7 @@ class SimulatorStats:
             self.drawdown.append({"date": date, "drawdown": 0})
         else:
             diff = self.max_assets - assets
-            dd = diff/float(self.max_assets)
-            dd = int(dd * 100)
-            dd = 0.0 if dd == 0 else dd / 100
+            dd = round(diff/float(self.max_assets), 2)
             self.drawdown.append({"date": date, "drawdown": dd})
 
     # 最大ドローダウン

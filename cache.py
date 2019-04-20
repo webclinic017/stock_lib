@@ -31,4 +31,5 @@ class Cache:
         os.remove(self.path(name))
 
     def remove_dir(self):
-        shutil.rmtree(self.dir())
+        if os.path.exists(self.dir()):
+            shutil.rmtree(self.dir())

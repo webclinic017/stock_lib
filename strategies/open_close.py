@@ -14,7 +14,7 @@ class CombinationStrategy(CombinationCreator):
         stocks = Loader.before_ranking(date, "ma_divergence")
         if stocks is None:
             return []
-        stocks = stocks[(stocks["key"] <= -0.05) & (stocks["key"] >= -0.1)]
+        stocks = stocks[(stocks["key"] <= -0.3) & (stocks["key"] >= -0.45)]
         codes = stocks["code"].as_matrix().tolist()
         return codes
 
@@ -28,25 +28,8 @@ class CombinationStrategy(CombinationCreator):
             lambda d: d.position.num() > 0,
         ]
 
+        default.stop_loss = [
+#            lambda d: d.position.gain_rate(self.price(d)) < -d.setting.stop_loss_rate, # 損益が-2%
+        ]
+
         return default
-
-    def new(self):
-        return [
-            lambda d: False,
-        ]
-
-    def taking(self):
-        return [
-            lambda d: False,
-        ]
-
-    def stop_loss(self):
-        return [
-            lambda d: False,
-        ]
-
-    def closing(self):
-        return [
-            lambda d: False,
-        ]
-

@@ -406,12 +406,12 @@ class Combination(StrategyCreator, StrategyUtil):
     # 買い
     def create_new_rules(self, data):
         drawdown = list(map(lambda x: x["drawdown"], data.stats.drawdown[-20:]))
-        drawdown_gradient = list(filter(lambda x: x > data.setting.stop_loss_rate * 3, numpy.gradient(drawdown))) if len(drawdown) > 1 else []
-        drawdown_sum = list(filter(lambda x: x > 0, numpy.gradient(drawdown))) if len(drawdown) > 1 else []
+        drawdown_diff = list(filter(lambda x: x > data.setting.stop_loss_rate * 3, numpy.diff(drawdown))) if len(drawdown) > 1 else []
+        drawdown_sum = list(filter(lambda x: x > 0, numpy.diff(drawdown))) if len(drawdown) > 1 else []
         risk = self.risk(data)
         max_risk = self.max_risk(data)
         drawdown_conditions = [
-            len(drawdown_gradient) == 0, # 6%ルール条件外(-6%を超えて一定期間たった)
+            len(drawdown_diff) == 0, # 6%ルール条件外(-6%を超えて一定期間たった)
             sum(drawdown_sum) < data.setting.stop_loss_rate * 3 # 6%ルール(直近のドローダウン合計が6%以下)
         ]
 
