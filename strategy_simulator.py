@@ -3,6 +3,7 @@ import numpy
 
 sys.path.append("lib")
 import checker
+import cache
 import utils
 from simulator import Simulator
 
@@ -12,6 +13,8 @@ class StrategySimulator:
         self.simulator_setting = simulator_setting
         self.strategy_creator = strategy_creator
         self.verbose = verbose
+        self.cacher = cache.Cache("/tmp/strategy_simulator")
+        self.cacher.remove_dir()
 
     def append_daterange(self, codes, date, daterange):
         for code in codes:
@@ -96,8 +99,14 @@ class StrategySimulator:
             for code in targets:
                 # M&Aのチェックのために期間を区切ってデータを渡す(M&Aチェックが重いから)
                 start = utils.to_format_by_term(utils.to_datetime_by_term(date, tick) - utils.relativeterm(args.validate_term, tick), tick)
-                split_data = datas[code].split(start, date)
-                if checker.manda(split_data.daily):
+                manda_cache_name = "%s_%s_%s" % (code, start, date)
+                if self.cacher.exists(manda_cache_name):
+                    manda = self.cacher.get(manda_cache_name)
+                else:
+                    split_data = datas[code].split(start, date)
+                    manda = checker.manda(split_data.daily)
+                    self.cacher.create(manda)
+                if manda:
                     if verbose:
                         print("[%s] is manda" % code)
                     continue

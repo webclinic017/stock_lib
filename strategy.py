@@ -19,6 +19,7 @@ class LoadSettings:
 
 def add_options(parser):
     parser.add_argument("--position_sizing", action="store_true", default=False, dest="position_sizing", help="ポジションサイジング")
+    parser.add_argument("--max_position_size", action="store", default=500, dest="max_position_size", help="最大ポジションサイズ")
     parser.add_argument("--production", action="store_true", default=False, dest="production", help="本番向け") # 実行環境の選択
     parser.add_argument("--short", action="store_true", default=False, dest="short", help="空売り戦略")
     parser.add_argument("--tick", action="store_true", default=False, dest="tick", help="ティックデータを使う")
@@ -178,6 +179,7 @@ def load_strategy_creator(args, combination_setting=None):
 def create_combination_setting(args, monitor_size_optimize=False):
     combination_setting = CombinationSetting()
     combination_setting.position_sizing = args.position_sizing
+    combination_setting.max_position_size = args.max_position_size
     if monitor_size_optimize:
         combination_setting.monitor_size = get_monitor_size(args)
     else:
@@ -348,12 +350,15 @@ class StrategyUtil:
     def max_order(self, max_risk, risk):
         if risk == 0:
             return 0
-        return int(max_risk / risk) * 100
+        max_order = int(max_risk / risk) * 100
+        return max_order
 
     # ポジションサイズ
-    def order(self, data, max_risk, risk):
+    def order(self, data, max_risk, risk, max_position_size):
         current = data.position.num()
-        max_order = int((self.max_order(max_risk, risk) - current)) # 保有できる最大まで
+        max_order = self.max_order(max_risk, risk)
+        max_order = max_order if max_order < max_position_size else max_position_size
+        max_order = int((max_order - current)) # 保有できる最大まで
         max_order = int(max_order / 2) # 半分ずつ
         max_order = int(math.ceil(max_order / 100) * 100) # 端数を切り上げ
         order = 100 if self.falling(data, risk) else max_order
@@ -377,6 +382,7 @@ class StrategyUtil:
 class CombinationSetting:
     simple = False
     position_sizing = False
+    max_position_size = 500
     sorted_conditions = True
     monitor_size = 3
 
@@ -418,7 +424,7 @@ class Combination(StrategyCreator, StrategyUtil):
             self.apply_common(data, self.common.new)
         ]
 
-        order = self.order(data, max_risk, risk) if self.setting.position_sizing else 100
+        order = self.order(data, max_risk, risk, self.setting.max_position_size) if self.setting.position_sizing else 100
 
         if not self.setting.simple:
             conditions = conditions + [self.apply(data, self.conditions.new)]

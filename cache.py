@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+import shutil
 import pickle
 
 class Cache:
@@ -26,4 +27,8 @@ class Cache:
             cache = pickle.load(f)
         return cache
 
+    def remove(self, name):
+        os.remove(self.path(name))
 
+    def remove_dir(self):
+        shutil.rmtree(self.dir())
