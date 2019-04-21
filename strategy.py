@@ -128,8 +128,8 @@ def get_monitor_size(args):
         return int(args.monitor_size)
 
     setting_dict, _ = load_strategy_setting(args)
-    if "monitor_size" in setting_dict.keys() and "monitor_size_ratio" in setting_dict.keys():
-        monitor_size = setting_dict["monitor_size"] * setting_dict["monitor_size_ratio"]
+    if "monitor_size" in setting_dict.keys():
+        monitor_size = setting_dict["monitor_size"]
         return monitor_size
     return 3
 
