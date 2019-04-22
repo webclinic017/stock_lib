@@ -19,7 +19,7 @@ class LoadSettings:
 
 def add_options(parser):
     parser.add_argument("--position_sizing", action="store_true", default=False, dest="position_sizing", help="ポジションサイジング")
-    parser.add_argument("--max_position_size", action="store", default=500, dest="max_position_size", help="最大ポジションサイズ")
+    parser.add_argument("--max_position_size", type=int, action="store", default=500, dest="max_position_size", help="最大ポジションサイズ")
     parser.add_argument("--production", action="store_true", default=False, dest="production", help="本番向け") # 実行環境の選択
     parser.add_argument("--short", action="store_true", default=False, dest="short", help="空売り戦略")
     parser.add_argument("--tick", action="store_true", default=False, dest="tick", help="ティックデータを使う")

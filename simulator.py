@@ -416,6 +416,20 @@ class Simulator:
 
         return stats
 
+    def create_term_data(self, date, data):
+        assert type(data) is SimulatorData, "data is not SimulatorData."
+
+        if self._setting.ignore_latest_weekly:
+            weekly = data.weekly[data.weekly["date"] <= date].iloc[:-1] # weeklyは最新の足は確定していないので最新のは除外する
+        else:
+            weekly = data.weekly[data.weekly["date"] <= date]
+
+        term_data = {
+            "daily": data.daily[data.daily["date"] <= date],
+            "weekly": weekly
+        }
+        return term_data
+
     def simulate(self, dates, data, index):
         assert type(data) is SimulatorData, "data is not SimulatorData."
 
@@ -434,17 +448,7 @@ class Simulator:
 
     # 高速化
     def simulate_by_date(self, date, data, index):
-        assert type(data) is SimulatorData, "data is not SimulatorData."
-
-        if self._setting.ignore_latest_weekly:
-            weekly = data.weekly[data.weekly["date"] <= date].iloc[:-1] # weeklyは最新の足は確定していないので最新のは除外する
-        else:
-            weekly = data.weekly[data.weekly["date"] <= date]
-
-        term_data = {
-            "daily": data.daily[data.daily["date"] <= date],
-            "weekly": weekly
-        }
+        term_data = self.create_term_data(date, data)
 
         term_index = {}
         for k, v in index.items():
@@ -460,6 +464,33 @@ class Simulator:
         self.trade(self._setting.strategy["daily"], price, term_data, term_index)
         return self.total_assets(price)
 
+    def repay_signal(self, strategy, data, index):
+        for order in self.taking_signal(strategy, data, index):
+            if order.num > 0:
+                self.log(" - taking_order: num %s" % (order.num))
+            self._repay_orders.append(order)
+
+        for order in self.stop_loss_signal(strategy, data, index):
+            if order.num > 0:
+                self.log(" - stop_loss_order: num %s" % (order.num))
+            self._repay_orders.append(order)
+
+        for order in self.closing_signal(strategy, data, index):
+            if order.num > 0:
+                self.log(" - closing_order: num %s" % (order.num))
+            self._repay_orders.append(order)
+
+    def order_adjust(self):
+        # ポジションがなければ返済シグナルは捨てる
+        if self._position.num() <= 0 and len(self._repay_orders) > 0:
+            self.log("[cancel] repay order")
+            self._repay_orders = []
+
+        # 新規・返済が同時に出ている場合何もしない
+        if len(self._new_orders) > 0 and len(self._repay_orders) > 0:
+            self.log("[cancel] new/repay order")
+            self._new_orders = []
+            self._repay_orders = []
 
     # トレード
     def trade(self, strategy, price, data, index):
@@ -483,29 +514,8 @@ class Simulator:
             self._position.increment_term()
 
         # 返済注文
-        for order in self.taking_signal(strategy, data, index):
-            if order.num > 0:
-                self.log(" - taking_order: num %s" % (order.num))
-            self._repay_orders.append(order)
-
-        for order in self.stop_loss_signal(strategy, data, index):
-            if order.num > 0:
-                self.log(" - stop_loss_order: num %s" % (order.num))
-            self._repay_orders.append(order)
-
-        for order in self.closing_signal(strategy, data, index):
-            if order.num > 0:
-                self.log(" - closing_order: num %s" % (order.num))
-            self._repay_orders.append(order)
-
-        # ポジションがなければ返済シグナルは捨てる
-        if self._position.num() <= 0:
-            self._repay_orders = []
-
-        # 新規・返済が同時に出ている場合何もしない
-        if len(self._new_orders) > 0 and len(self._repay_orders) > 0 :
-            self._new_orders = []
-            self._repay_orders = []
+        self.repay_signal(strategy, data, index)
+        self.order_adjust()
 
         # 新規注文
         open_price = data["daily"]["open"].iloc[-1]
