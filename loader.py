@@ -661,24 +661,11 @@ class Loader:
             return None
 
     @staticmethod
-    def favorite_stocks():
-        try:
-            data = pandas.read_csv("settings/favorite_stocks.csv", header=None)
-            data.columns = ["code"]
-            return data
-        except:
-            return None
-
-    @staticmethod
     def realtime_sheet_stocks(date, monitor_size=3):
         codes = []
         stocks = [
             Loader.ordered_stocks(),
             Loader.hold_stocks(),
-            Loader.attention_stocks(),
-            Loader.fall_high_performance_attention_stocks(),
-            Loader.favorite_stocks(),
-            Loader.monitor_stocks(),
         ]
         for stock in stocks:
             if stock is not None:
