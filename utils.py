@@ -24,15 +24,15 @@ def add_average_stats(data, default=0):
     return data
 
 def add_tec_stats(data, default=0):
-    data["rci"]                 = convolve(data["close"], 9, rci, padding=True, default=default)
-    data["rci_long"]            = convolve(data["close"], 27, rci, padding=True, default=default)
+    data["rci"]                 = data["close"].rolling(9).apply(rci)
+    data["rci_long"]            = data["close"].rolling(27).apply(rci)
 
     close = numpy.array(data["close"].as_matrix(), dtype="f8")
     macd, macdsignal, macdhist = ta.MACD(close, fastperiod=12, slowperiod=26, signalperiod=9)
     data["macd"]           = macd if default is None else numpy.nan_to_num(macd)
     data["macdsignal"]     = macdsignal if default is None else numpy.nan_to_num(macdsignal)
     data["macdhist"]       = macdhist if default is None else numpy.nan_to_num(macdhist)
-    data["macdhist_convert"] = convolve(data["macdhist"], 100, trend_convert) 
+    data["macdhist_convert"] = data["macdhist"].rolling(100).apply(trend_convert)
 
     # average true range
     data["atr"] = atr(data, default)
@@ -55,19 +55,19 @@ def add_band_stats(data, default=0):
     return data
 
 def add_safety_stats(data, default=0):
-    data["low_noize"]         = convolve(data["low"], 2, lambda x, term: x.iloc[-2] - x.iloc[-1] if x.iloc[-2] - x.iloc[-1] < 0 else 0)
+    data["low_noize"]         = data["low"].rolling(2).apply(lambda x: x[-2] - x[-1] if x[-2] - x[-1] < 0 else 0)
     data["rising_safety"]     = convolve(data, 10, rising_safety)
-    data["rising_safety"]     = convolve(data["rising_safety"], 3, lambda x, term: x.iloc[-term:].max()) # 過去のsafetyより低い場合は高い方に合わせる
+    data["rising_safety"]     = data["rising_safety"].rolling(3).max() # 過去のsafetyより低い場合は高い方に合わせる
 
-    data["high_noize"]        = convolve(data["high"], 2, lambda x, term: x.iloc[-2] - x.iloc[-1] if x.iloc[-2] - x.iloc[-1] > 0 else 0)
+    data["high_noize"]        = data["high"].rolling(2).apply(lambda x: x[-2] - x[-1] if x[-2] - x[-1] > 0 else 0)
     data["fall_safety"]       = convolve(data, 10, fall_safety)
-    data["fall_safety"]       = convolve(data["fall_safety"], 3, lambda x, term: x.iloc[-term:].min()) # 過去のsafetyより高い場合は低い方に合わせる
+    data["fall_safety"]       = data["fall_safety"].rolling(3).min() # 過去のsafetyより高い場合は低い方に合わせる
 
     return data
 
 def add_stages_stats(data, default=0):
-    data["resistance"] = convolve(data["high"], 15, resistance)
-    data["support"] = convolve(data["low"], 15, support)
+    data["resistance"] = data["high"].rolling(15).max()
+    data["support"] = data["low"].rolling(15).min()
 
     data["stages"]                      = list(map(lambda x: stages(x[1]), data.iterrows()))
     stages_average                      = ta.SMA(data["stages"].astype(float).as_matrix(), timeperiod=10)
@@ -103,17 +103,17 @@ def add_trend_stats(data, default=0):
     data["macd_gradient"]  = diff(data["macd"].as_matrix())
     data["macdhist_gradient"]       = diff(data["macdhist"].as_matrix())
 
-    data["daily_average_trend"] = convolve(data["daily_gradient"], 5, trend)
-    data["weekly_average_trend"] = convolve(data["weekly_gradient"], 5, trend)
-    data["volume_average_trend"] = convolve(data["volume_gradient"], 5, trend)
-    data["macd_trend"] = convolve(data["macd_gradient"], 5, trend)
-    data["macdhist_trend"] = convolve(data["macdhist_gradient"], 1, trend)
-    data["rci_trend"]       = convolve(data["rci_gradient"], 5, trend)
-    data["rci_long_trend"]  = convolve(data["rci_long_gradient"], 5, trend)
-    data["stages_trend"] = convolve(data["stages_gradient"], 5, trend)
-    data["stages_average_trend"] = convolve(data["stages_average_gradient"], 5, trend)
-    data["rising_safety_trend"] = convolve(data["rising_safety_gradient"], 5, trend)
-    data["fall_safety_trend"] = convolve(data["fall_safety_gradient"], 5, trend)
+    data["daily_average_trend"] = data["daily_gradient"].rolling(5).apply(trend)
+    data["weekly_average_trend"] = data["weekly_gradient"].rolling(5).apply(trend)
+    data["volume_average_trend"] = data["volume_gradient"].rolling(5).apply(trend)
+    data["macd_trend"] = data["macd_gradient"].rolling(5).apply(trend)
+    data["macdhist_trend"] = data["macdhist_gradient"].rolling(1).apply(trend)
+    data["rci_trend"]       = data["rci_gradient"].rolling(5).apply(trend)
+    data["rci_long_trend"]  = data["rci_long_gradient"].rolling(5).apply(trend)
+    data["stages_trend"] = data["stages_gradient"].rolling(5).apply(trend)
+    data["stages_average_trend"] = data["stages_average_gradient"].rolling(5).apply(trend)
+    data["rising_safety_trend"] = data["rising_safety_gradient"].rolling(5).apply(trend)
+    data["fall_safety_trend"] = data["fall_safety_gradient"].rolling(5).apply(trend)
 
     return data
 
@@ -145,7 +145,7 @@ def add_stats(data, default=0, names=[]):
 def add_index_stats(data, default=0):
     data["gradient"] = diff(data["close"])
     data["trend"] = convolve(data["gradient"], 14, strict_trend)
-    data["rci"]   = convolve(data["close"], 9, rci, padding=True, default=default)
+    data["rci"]   = data["close"].rolling(9).apply(rci)
 
     return data
 
@@ -333,15 +333,14 @@ def find(data, term, callback, tail=True):
     return None
 
 # トレンドが変わった
-def trend_convert(data, term):
+def trend_convert(data):
     result = 0
-
     # 前日が直近の最大値だった
-    if data.iloc[-term:].max() == data.iloc[-1]:
+    if max(data) == data[-1]:
         result = 1
 
     # 前日が直近の最小値だった
-    if data.iloc[-term:].min() == data.iloc[-1]:
+    if min(data) == data[-1]:
         result = -1
     return result
 
@@ -397,10 +396,9 @@ def fall_safety(data, term):
     average = average * 3 # 係数
     return data["high"].iloc[-1] + average
 
-def trend(data, term):
-    d = data.iloc[-term:]
-    high_noize = list(filter(lambda x: x > 0, d.as_matrix()))
-    low_noize = list(filter(lambda x: x < 0, d.as_matrix()))
+def trend(data):
+    high_noize = list(filter(lambda x: x > 0, data))
+    low_noize = list(filter(lambda x: x < 0, data))
 
     high_average = abs(numpy.average(high_noize)) if len(high_noize) > 0 else 0
     low_average = abs(numpy.average(low_noize)) if len(low_noize) > 0 else 0
@@ -478,8 +476,9 @@ def average(data, term):
     return numpy.convolve(term_data, numpy.ones(term)/float(term), 'valid')[0]
 
 # RCI
-def rci(data, term):
-    term_data = data.as_matrix()[-term:][::-1].reshape(-1)
+def rci(data):
+    term = len(data)
+    term_data = data[::-1].reshape(-1)
     index = numpy.argsort(term_data)[::-1]
     d = 0
     for i, si in enumerate(index):
