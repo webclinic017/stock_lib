@@ -91,17 +91,17 @@ def add_cross_stats(data, default=0):
 
 def add_trend_stats(data, default=0):
     # 気配を出力する
-    data["rci_long_gradient"]   = numpy.gradient(data["rci_long"])
-    data["rci_gradient"]        = numpy.gradient(data["rci"])
-    data["volume_gradient"]   = numpy.gradient(data["volume_average"])
-    data["weekly_gradient"]   = numpy.gradient(data["weekly_average"])
-    data["daily_gradient"]    = numpy.gradient(data["daily_average"])
-    data["stages_average_gradient"]     = numpy.gradient(data["stages_average"])
-    data["stages_gradient"]             = numpy.gradient(data["stages"])
-    data["fall_safety_gradient"] = numpy.gradient(data["fall_safety"])
-    data["rising_safety_gradient"] = numpy.gradient(data["rising_safety"])
-    data["macd_gradient"]  = numpy.gradient(data["macd"].as_matrix())
-    data["macdhist_gradient"]       = numpy.gradient(data["macdhist"].as_matrix())
+    data["rci_long_gradient"]   = diff(data["rci_long"])
+    data["rci_gradient"]        = diff(data["rci"])
+    data["volume_gradient"]   = diff(data["volume_average"])
+    data["weekly_gradient"]   = diff(data["weekly_average"])
+    data["daily_gradient"]    = diff(data["daily_average"])
+    data["stages_average_gradient"]     = diff(data["stages_average"])
+    data["stages_gradient"]             = diff(data["stages"])
+    data["fall_safety_gradient"] = diff(data["fall_safety"])
+    data["rising_safety_gradient"] = diff(data["rising_safety"])
+    data["macd_gradient"]  = diff(data["macd"].as_matrix())
+    data["macdhist_gradient"]       = diff(data["macdhist"].as_matrix())
 
     data["daily_average_trend"] = convolve(data["daily_gradient"], 5, trend)
     data["weekly_average_trend"] = convolve(data["weekly_gradient"], 5, trend)
@@ -143,7 +143,7 @@ def add_stats(data, default=0, names=[]):
 
 # 指標用の統計
 def add_index_stats(data, default=0):
-    data["gradient"] = numpy.gradient(data["close"])
+    data["gradient"] = diff(data["close"])
     data["trend"] = convolve(data["gradient"], 14, strict_trend)
     data["rci"]   = convolve(data["close"], 9, rci, padding=True, default=default)
 
@@ -345,6 +345,9 @@ def trend_convert(data, term):
         result = -1
     return result
 
+def diff(data):
+    return [0] + numpy.diff(data).tolist()
+
 # 線とのクロス
 def cross(data, line="daily_average"):
     conditions = [
@@ -432,7 +435,7 @@ def strict_trend(data, term):
 def to_stationary(data, term=2):
     ts = sm.tsa.seasonal_decompose(data.values, freq=7, filt=None, two_sided=True)
     d = numpy.log(ts.trend + ts.resid)
-    d = numpy.gradient(d) # 前日比
+    d = diff(d) # 前日比
     d = pandas.Series(d)
     return replace_invalid(convolve(d, term, average, padding=True, default=0))
 

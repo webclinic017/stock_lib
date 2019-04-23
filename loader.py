@@ -343,7 +343,7 @@ class Loader:
             path = '%s/%s/%s.csv' % (Loader.realtime_dir, date, code)
             data = pandas.read_csv(path, header=None)
             data = Loader.format(data, "float", replace=" ", how=how, columns=['date', 'high', 'low', 'price', 'volume', 'update_time'], date_format="%Y-%m-%d %H:%M:%S")
-            data["volume"] = numpy.gradient(data["volume"].as_matrix() / 1000)
+            data["volume"] = utils.diff(data["volume"].as_matrix() / 1000)
             data["volume"] = list(map(lambda x: 0 if x < 0 else x, data["volume"].as_matrix().tolist()))
         except:
 #            import traceback

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import numpy
 import random
+import utils
 
 # 売買の状態
 class Position:
@@ -428,6 +429,7 @@ class Simulator:
             "daily": data.daily[data.daily["date"] <= date],
             "weekly": weekly
         }
+
         return term_data
 
     def simulate(self, dates, data, index):

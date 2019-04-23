@@ -33,7 +33,7 @@ def add_options(parser):
     parser.add_argument("--open_close", action="store_true", default=False, dest="open_close", help="寄せ引け")
     parser.add_argument("--with_stats", action="store_true", default=False, dest="with_stats", help="統計データ込みで読み込む")
     parser.add_argument("--ignore_weekly", action="store_true", default=False, dest="ignore_weekly", help="週足統計を無視")
-    parser.add_argument("--monitor_size", action="store", default=None, dest="monitor_size", help="監視銘柄数")
+    parser.add_argument("--monitor_size", action="store", default=3, dest="monitor_size", help="監視銘柄数")
     return parser
 
 def create_parser():
@@ -104,6 +104,8 @@ def load_simulator_data(code, start_date, end_date, args, load_settings=None, ti
         if load_settings.weekly:
             weekly = utils.add_stats(weekly)
             weekly = utils.add_cs_stats(weekly)
+
+        print("loaded:", code, data["date"].iloc[0], data["date"].iloc[-1])
         return SimulatorData(code, data, weekly, rule)
     except Exception as e:
         print("load_error: %s" % e)
@@ -122,16 +124,6 @@ def load_strategy_setting(args):
 def load_strategy(args, combination_setting=None):
     _, settings = load_strategy_setting(args)
     return load_strategy_creator(args, combination_setting).create(settings)
-
-def get_monitor_size(args):
-    if not args.monitor_size is None:
-        return int(args.monitor_size)
-
-    setting_dict, _ = load_strategy_setting(args)
-    if "monitor_size" in setting_dict.keys():
-        monitor_size = setting_dict["monitor_size"]
-        return monitor_size
-    return 3
 
 def load_strategy_creator(args, combination_setting=None):
     if args.production:
@@ -176,14 +168,19 @@ def load_strategy_creator(args, combination_setting=None):
             from strategies.combination import CombinationStrategy
             return CombinationStrategy(combination_setting)
 
-def create_combination_setting(args, monitor_size_optimize=False):
+def create_combination_setting(args):
     combination_setting = CombinationSetting()
     combination_setting.position_sizing = args.position_sizing
     combination_setting.max_position_size = args.max_position_size
-    if monitor_size_optimize:
-        combination_setting.monitor_size = get_monitor_size(args)
-    else:
-        combination_setting.monitor_size = combination_setting.monitor_size if args.monitor_size is None else int(args.monitor_size)
+    combination_setting.monitor_size = int(args.monitor_size)
+    return combination_setting
+
+def create_combination_setting_by_json(args):
+    combination_setting = create_combination_setting(args)
+    setting_dict, _ = load_strategy_setting(args)
+    combination_setting.position_sizing = setting_dict["position_sizing"] if "position_sizing" in setting_dict.keys() else combination_setting.position_sizing
+    combination_setting.max_position_size = setting_dict["max_position_size"] if "max_position_size" in setting_dict.keys() else combination_setting.max_position_size
+    combination_setting.monitor_size = setting_dict["monitor_size"] if "monitor_size" in setting_dict.keys() else combination_setting.max_position_size
     return combination_setting
 
 # ========================================================================
