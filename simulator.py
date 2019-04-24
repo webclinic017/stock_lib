@@ -460,7 +460,7 @@ class Simulator:
 
         assert len(today) > 0, "not found %s data" % date
 
-        price = today["close"].iloc[-1].item()
+        price = today["open"].iloc[-1].item()
         self.log("date: %s, price %s" % (date, price))
 
         self.trade(self._setting.strategy["daily"], price, term_data, term_index)
@@ -515,52 +515,47 @@ class Simulator:
         if self._position.num() > 0:
             self._position.increment_term()
 
-        # 返済注文
-        self.repay_signal(strategy, data, index)
-        self.order_adjust()
-
-        # 新規注文
-        open_price = data["daily"]["open"].iloc[-1]
-
-        # 前足の終値で判定した新規注文を取得
-        if self._setting.virtual_trade:
-            new_orders = self.new_order(open_price)
-        else:
-            new_orders = []
-
         # 寄り付き====================================================================
-        for order in new_orders:
-            if self.new(order.price, order.num):
-                trade_data["new"] = order.price
+        if self._setting.virtual_trade:
+            # 仮装トレードなら注文をキューから取得
+            new_orders = self.new_order(price)
+            repay_orders = []
+            if self._position.num() > 0:
+                # 自動損切の注文処理（longなら安値、shortなら高値）
+                if self._setting.auto_stop_loss:
+                    if self._setting.short_trade:
+                        value = self.reverse_limit_price(data["daily"]["high"].iloc[-1])
+                        repay_orders += self.reverse_limit_repay_order(price, value)
+                    else:
+                        value = self.reverse_limit_price(data["daily"]["low"].iloc[-1])
+                        repay_orders += self.reverse_limit_repay_order(price, value)
+                repay_orders += self.repay_order(price)
 
-        ## 引け直前===================================================================
-        # 返済注文実行
-        repay_orders = []
-        if self._setting.virtual_trade and self._position.num() > 0:
-            # 自動損切の注文処理（longなら安値、shortなら高値）
-            if self._setting.auto_stop_loss:
-                if self._setting.short_trade:
-                    value = self.reverse_limit_price(data["daily"]["high"].iloc[-1])
-                    repay_orders += self.reverse_limit_repay_order(price, value)
-                else:
-                    value = self.reverse_limit_price(data["daily"]["low"].iloc[-1])
-                    repay_orders += self.reverse_limit_repay_order(price, value)
-            repay_orders += self.repay_order(price)
+            # 新規注文実行
+            for order in new_orders:
+                if self.new(order.price, order.num):
+                    trade_data["new"] = order.price
 
-        for order in repay_orders:
-            if self._position.num() <= 0:
-                self._repay_orders = [] # ポジションがなくなってたら以降の注文はキャンセル
-                break
-            gain = self._position.gain(order.price)
-            if self.repay(order.price, order.num):
-                trade_data["repay"] = order.price
-                trade_data["gain"] = gain
+            # 返済注文実行
+            for order in repay_orders:
+                if self._position.num() <= 0:
+                    self._repay_orders = [] # ポジションがなくなってたら以降の注文はキャンセル
+                    break
+                gain = self._position.gain(order.price)
+                if self.repay(order.price, order.num):
+                    trade_data["repay"] = order.price
+                    trade_data["gain"] = gain
 
         ## 引け後=====================================================================
         # 新規ルールに当てはまる場合買う
         for order in self.new_signal(strategy, data, index):
             self.log(" - new_order: num %s" % (order.num))
             self._new_orders.append(order)
+
+        # 返済注文
+        self.repay_signal(strategy, data, index)
+        # 注文の整理
+        self.order_adjust()
 
         # トレード履歴
         trade_data["size"] = self._position.num()
