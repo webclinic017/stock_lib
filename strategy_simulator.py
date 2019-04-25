@@ -61,8 +61,8 @@ class StrategySimulator:
         # シミュレーター準備
         simulators = {}
         self.simulator_setting.debug = verbose
+        self.simulator_setting.strategy["daily"] = self.strategy_creator.create(strategy_setting)
         for code in datas.keys():
-            self.simulator_setting.strategy["daily"] = self.strategy_creator.create(strategy_setting)
             simulators[code] = Simulator(self.simulator_setting)
 
         # 日付のリストを取得
