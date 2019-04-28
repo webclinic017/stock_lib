@@ -91,17 +91,17 @@ def add_cross_stats(data, default=0):
 
 def add_trend_stats(data, default=0):
     # 気配を出力する
-    data["rci_long_gradient"]   = diff(data["rci_long"])
-    data["rci_gradient"]        = diff(data["rci"])
-    data["volume_gradient"]   = diff(data["volume_average"])
-    data["weekly_gradient"]   = diff(data["weekly_average"])
-    data["daily_gradient"]    = diff(data["daily_average"])
+    data["rci_long_gradient"]           = diff(data["rci_long"])
+    data["rci_gradient"]                = diff(data["rci"])
+    data["volume_gradient"]             = diff(data["volume_average"])
+    data["weekly_gradient"]             = diff(data["weekly_average"])
+    data["daily_gradient"]              = diff(data["daily_average"])
     data["stages_average_gradient"]     = diff(data["stages_average"])
     data["stages_gradient"]             = diff(data["stages"])
-    data["fall_safety_gradient"] = diff(data["fall_safety"])
-    data["rising_safety_gradient"] = diff(data["rising_safety"])
-    data["macd_gradient"]  = diff(data["macd"].as_matrix())
-    data["macdhist_gradient"]       = diff(data["macdhist"].as_matrix())
+    data["fall_safety_gradient"]        = diff(data["fall_safety"])
+    data["rising_safety_gradient"]      = diff(data["rising_safety"])
+    data["macd_gradient"]               = diff(data["macd"].as_matrix())
+    data["macdhist_gradient"]           = diff(data["macdhist"].as_matrix())
 
     data["daily_average_trend"] = data["daily_gradient"].rolling(5).apply(trend)
     data["weekly_average_trend"] = data["weekly_gradient"].rolling(5).apply(trend)
@@ -345,7 +345,8 @@ def trend_convert(data):
     return result
 
 def diff(data):
-    return [0] + numpy.diff(data).tolist()
+    return numpy.gradient(data).tolist()
+#    return [0] + numpy.diff(data).tolist()
 
 # 線とのクロス
 def cross(data, line="daily_average"):

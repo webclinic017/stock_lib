@@ -22,7 +22,7 @@ class CombinationStrategy(CombinationCreator):
             lambda d: d.data["weekly"]["rci_trend"].iloc[-1] > 0, # 週足が上昇トレンド
             lambda d: d.data["weekly"]["daily_average_trend"].iloc[-1] > 0, # 週足が上昇トレンド
             lambda d: self.risk(d) < self.max_risk(d), # リスクが2%以内
-            lambda d: self.risk(d) < self.goal(d), # リスクより利益のほうが大きい
+#            lambda d: self.risk(d) < self.goal(d), # リスクより利益のほうが大きい
         ]
 
         return default

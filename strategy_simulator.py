@@ -5,7 +5,8 @@ sys.path.append("lib")
 import checker
 import cache
 import utils
-from simulator import Simulator
+import strategy
+from simulator import Simulator, TradeRecorder
 
 
 class StrategySimulator:
@@ -120,11 +121,14 @@ class StrategySimulator:
                         print("[%s] is less data: %s" % (code, date))
         # 手仕舞い
         if len(dates) > 0:
+            recorder = TradeRecorder(strategy.get_prefix(args))
             for code in datas.keys():
                 split_data = datas[code].split(dates[0], dates[-1])
                 if len(split_data.daily) == 0:
                     continue
-                simulators[code].closing(split_data.daily["close"].iloc[-1])
+                simulators[code].closing(split_data.daily["close"].iloc[-1], data=split_data.daily)
+                recorder.concat(simulators[code].trade_recorder)
+            recorder.output("%s_%s" % (start_date, end_date), append=True)
 
         # 統計 ====================================
         stats = {}

@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
+import os
 import numpy
 import random
 import utils
+import pandas
 
 # 売買の状態
 class Position:
@@ -237,6 +239,45 @@ class SimulatorStats:
     def average_loss_rate(self):
         return numpy.average(self.loss) / self.loss_trade_num()
 
+class TradeRecorder:
+    def __init__(self, output_dir=""):
+        self.output_dir = "/tmp/trade_recorder/%s" % output_dir
+        self.pattern = {"new": [], "repay": [], "gain": []}
+        self.columns = None
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
+
+    def set_columns(self, columns):
+        self.columns = columns
+
+    def pattern_num(self, num):
+        return int(num / 100)
+
+    def new(self, pattern, num):
+        assert self.columns is not None, "columns is None"
+        for _ in range(self.pattern_num(num)):
+            self.pattern["new"].append(pattern[self.columns].as_matrix().tolist())
+
+    def repay(self, pattern, gain_rate, num):
+        assert self.columns is not None, "columns is None"
+        for _ in range(self.pattern_num(num)):
+            self.pattern["repay"].append(pattern[self.columns].as_matrix().tolist())
+            self.pattern["gain"].append(gain_rate)
+
+    def concat(self, recorder):
+        self.pattern["new"].extend(recorder.pattern["new"])
+        self.pattern["repay"].extend(recorder.pattern["repay"])
+        self.pattern["gain"].extend(recorder.pattern["gain"])
+
+    def output(self, name, append=False):
+        mode = "a" if append else "w"
+        new = pandas.DataFrame(self.pattern["new"], columns=self.columns)
+        new.to_csv("%s/new_%s.csv" % (self.output_dir, name), index=None, header=None, mode=mode)
+        repay = pandas.DataFrame(self.pattern["repay"], columns=self.columns)
+        repay.to_csv("%s/repay_%s.csv" % (self.output_dir, name), index=None, header=None, mode=mode)
+        gain = pandas.DataFrame(self.pattern["gain"], columns=["gain"])
+        gain.to_csv("%s/gain_%s.csv" % (self.output_dir, name), index=None, header=None, mode=mode)
+
 # シミュレーター
 class Simulator:
     def __init__(self, setting, position = None):
@@ -249,6 +290,7 @@ class Simulator:
         self._logs = []
         self._new_orders = []
         self._repay_orders = []
+        self.trade_recorder = TradeRecorder()
 
     def log(self, message):
         if self._setting.debug:
@@ -325,9 +367,12 @@ class Simulator:
         return True
 
     # 全部売る
-    def closing(self, value):
+    def closing(self, value, data=None):
         num = self._position.num()
-        self.repay(value, num)
+        gain = self._position.gain_rate(value)
+        if self.repay(value, num) and data is not None:
+            self.trade_recorder.repay(data.iloc[-1], gain, num)
+
         self._new_orders = []
         self._repay_orders = []
 
@@ -499,6 +544,7 @@ class Simulator:
         assert type(data) is dict, "data is not dict."
         # stats
         date = data["daily"]["date"].iloc[-1]
+        self.trade_recorder.set_columns(data["daily"].columns)
         self._stats.trade.append(0)
         self._stats.add_assets_history(date, self.total_assets(price))
         self._stats.add_available_assets_history(date, self._assets)
@@ -534,6 +580,7 @@ class Simulator:
             # 新規注文実行
             for order in new_orders:
                 if self.new(order.price, order.num):
+                    self.trade_recorder.new(data["daily"].iloc[-1], order.num)
                     trade_data["new"] = order.price
 
             # 返済注文実行
@@ -541,8 +588,9 @@ class Simulator:
                 if self._position.num() <= 0:
                     self._repay_orders = [] # ポジションがなくなってたら以降の注文はキャンセル
                     break
-                gain = self._position.gain(order.price)
+                gain = self._position.gain_rate(order.price)
                 if self.repay(order.price, order.num):
+                    self.trade_recorder.repay(data["daily"].iloc[-1], gain, order.num)
                     trade_data["repay"] = order.price
                     trade_data["gain"] = gain
 

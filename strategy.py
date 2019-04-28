@@ -105,7 +105,7 @@ def load_simulator_data(code, start_date, end_date, args, load_settings=None, ti
             weekly = utils.add_stats(weekly)
             weekly = utils.add_cs_stats(weekly)
 
-        print("loaded:", code, data["date"].iloc[0], data["date"].iloc[-1])
+        print("loaded:", utils.timestamp(), code, data["date"].iloc[0], data["date"].iloc[-1])
         return SimulatorData(code, data, weekly, rule)
     except Exception as e:
         print("load_error: %s" % e)
@@ -207,6 +207,14 @@ def create_setting_by_dict(params):
 def strategy_setting_to_dict(strategy_setting):
     return {"new": strategy_setting.new, "taking": strategy_setting.taking, "stop_loss": strategy_setting.stop_loss, "closing": strategy_setting.closing}
 
+def strategy_setting_to_array(strategy_setting):
+        return [
+            strategy_setting.new,
+            strategy_setting.taking,
+            strategy_setting.stop_loss,
+            strategy_setting.closing
+        ]
+
 class StrategySetting():
     def __init__(self):
         self.new = 0
@@ -220,6 +228,7 @@ class StrategySetting():
         self.stop_loss = int(params[2])
         self.closing = int(params[3])
         return self
+
 
     def to_dict(self):
         return strategy_setting_to_dict(self)
