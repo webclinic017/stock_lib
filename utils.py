@@ -56,11 +56,13 @@ def add_band_stats(data, default=0):
 
 def add_safety_stats(data, default=0):
     data["low_noize"]         = data["low"].rolling(2).apply(lambda x: x[-2] - x[-1] if x[-2] - x[-1] < 0 else 0)
-    data["rising_safety"]     = convolve(data, 10, rising_safety)
+    data["rising_safety"]     = data["low_noize"].rolling(10).apply(rising_safety)
+    data["rising_safety"]     = data["low"] + data["rising_safety"]
     data["rising_safety"]     = data["rising_safety"].rolling(3).max() # 過去のsafetyより低い場合は高い方に合わせる
 
     data["high_noize"]        = data["high"].rolling(2).apply(lambda x: x[-2] - x[-1] if x[-2] - x[-1] > 0 else 0)
-    data["fall_safety"]       = convolve(data, 10, fall_safety)
+    data["fall_safety"]       = data["high_noize"].rolling(10).apply(fall_safety)
+    data["fall_safety"]       = data["high"] + data["fall_safety"]
     data["fall_safety"]       = data["fall_safety"].rolling(3).min() # 過去のsafetyより高い場合は低い方に合わせる
 
     return data
@@ -72,20 +74,20 @@ def add_stages_stats(data, default=0):
     data["stages"]                      = list(map(lambda x: stages(x[1]), data.iterrows()))
     stages_average                      = ta.SMA(data["stages"].astype(float).as_matrix(), timeperiod=10)
     data["stages_average"]              = stages_average if default is None else numpy.nan_to_num(stages_average)
-    data["macd_stages"] = list(map(lambda x: 1 if x[1]["macd"] > 0 else 0, data.iterrows()))
-    data["macdhist_stages"] = list(map(lambda x: 1 if x[1]["macdhist"] > 0 else 0, data.iterrows()))
+    data["macd_stages"]                 = (data["macd"] > 0) * 1
+    data["macdhist_stages"]             = (data["macdhist"] > 0) * 1
     return data
 
 def add_cross_stats(data, default=0):
     # クロス系
-    data["average_cross"] = convolve(data, 2, lambda x, term: gdc(x["daily_average"].iloc[-term:], x["weekly_average"].iloc[-term:]))
-    data["macd_cross"] = convolve(data, 2, lambda x, term: gdc(x["macd"].iloc[-term:], x["macdsignal"].iloc[-term:]))
-    data["rci_cross"] = convolve(data, 2, lambda x, term: gdc(x["rci"].iloc[-term:], x["rci_long"].iloc[-term:]))
+    data["average_cross"] = cross(data["daily_average"], data["weekly_average"])
+    data["macd_cross"] = cross(data["macd"], data["macdsignal"])
+    data["rci_cross"] = cross(data["rci"], data["rci_long"])
 
-    data["env12_cross"] = convolve(data, 2, lambda x, term: gdc(x["high"].iloc[-term:], x["env12"].iloc[-term:]))
-    data["env11_cross"] = convolve(data, 2, lambda x, term: gdc(x["high"].iloc[-term:], x["env11"].iloc[-term:]))
-    data["env09_cross"] = convolve(data, 2, lambda x, term: gdc(x["low"].iloc[-term:], x["env09"].iloc[-term:]))
-    data["env08_cross"] = convolve(data, 2, lambda x, term: gdc(x["low"].iloc[-term:], x["env08"].iloc[-term:]))
+    data["env12_cross"] = cross(data["high"], data["env12"])
+    data["env11_cross"] = cross(data["high"], data["env11"])
+    data["env09_cross"] = cross(data["low"], data["env09"])
+    data["env08_cross"] = cross(data["low"], data["env08"])
 
     return data
 
@@ -100,8 +102,8 @@ def add_trend_stats(data, default=0):
     data["stages_gradient"]             = diff(data["stages"])
     data["fall_safety_gradient"]        = diff(data["fall_safety"])
     data["rising_safety_gradient"]      = diff(data["rising_safety"])
-    data["macd_gradient"]               = diff(data["macd"].as_matrix())
-    data["macdhist_gradient"]           = diff(data["macdhist"].as_matrix())
+    data["macd_gradient"]               = diff(data["macd"])
+    data["macdhist_gradient"]           = diff(data["macdhist"])
 
     data["daily_average_trend"] = data["daily_gradient"].rolling(5).apply(trend)
     data["weekly_average_trend"] = data["weekly_gradient"].rolling(5).apply(trend)
@@ -154,11 +156,10 @@ def each(callback, data):
 
 # ろうそく足のパターン
 def add_cs_stats(data, default=0):
-
     toint = lambda x: 1 if x else 0
 
     # 実体
-    data["entity"] = each(lambda i, x: abs(x["open"] - x["close"]), data)
+    data["entity"] = (data["open"] - data["close"]).abs()
     entity = numpy.array(data["entity"].as_matrix(), dtype="f8")
     entity_average = ta.SMA(entity, timeperiod=5)
     data["entity_average"] = entity_average
@@ -168,46 +169,46 @@ def add_cs_stats(data, default=0):
 
     ## ここから
     # 長い上ヒゲ・下ヒゲ
-    data["long_upper_shadow"] = each(lambda i, x: toint(x["upper_shadow"] > x["entity"]), data)
-    data["long_lower_shadow"] = each(lambda i, x: toint(x["lower_shadow"] > x["entity"]), data)
+    data["long_upper_shadow"] = (data["upper_shadow"] > data["entity"]) * 1
+    data["long_lower_shadow"] = (data["lower_shadow"] > data["entity"]) * 1
     # 陽線・陰線
-    data["yang"]   = each(lambda i, x: toint(x["open"] < x["close"]), data)
-    data["yin"]  = each(lambda i, x: toint(x["open"] > x["close"]), data)
-    data["long_yang"]  = each(lambda i, x: toint(x["yang"] == 1 and x["entity"] > x["entity_average"]), data)
-    data["long_yin"]   = each(lambda i, x: toint(x["yin"] == 1 and x["entity"] > x["entity_average"]), data)
+    data["yang"]   = (data["open"] < data["close"]) * 1
+    data["yin"]    = (data["open"] > data["close"]) * 1
+    data["long_yang"]  = ((data["yang"] == 1) & (data["entity"] > data["entity_average"])) * 1
+    data["long_yin"]   = ((data["yin"] == 1) & (data["entity"] > data["entity_average"])) * 1
 
     # 切り上げ
-    data["low_roundup"] = convolve(data, 2, lambda x, term: toint(x["low"].iloc[-2] < x["low"].iloc[-1]))
-    data["high_roundup"] = convolve(data, 2, lambda x, term: toint(x["high"].iloc[-2] < x["high"].iloc[-1]))
+    data["low_roundup"]  = (data["low"].shift(1) < data["low"]) * 1
+    data["high_roundup"] = (data["high"].shift(1) < data["high"]) * 1
     # 切り下げ
-    data["low_rounddown"] = convolve(data, 2, lambda x, term: toint(x["low"].iloc[-2] > x["low"].iloc[-1]))
-    data["high_rounddown"] = convolve(data, 2, lambda x, term: toint(x["high"].iloc[-2] > x["high"].iloc[-1]))
+    data["low_rounddown"]  = (data["low"].shift(1) > data["low"]) * 1
+    data["high_rounddown"] = (data["high"].shift(1) > data["low"]) * 1
 
     # ギャップ
-    data["gap"] = convolve(data, 2, lambda x, term: toint(x["high"].iloc[-2] < x["low"].iloc[-1] or x["low"].iloc[-2] > x["high"].iloc[-1]))
-    data["yang_gap"] = convolve(data, 2, lambda x, term: toint(x["high"].iloc[-2] < x["low"].iloc[-1]))
-    data["yin_gap"]  = convolve(data, 2, lambda x, term: toint(x["low"].iloc[-2] > x["high"].iloc[-1]))
+    data["yang_gap"] = (data["high"].shift(1) < data["low"]) * 1
+    data["yin_gap"]  = (data["low"].shift(1) > data["high"]) * 1
+    data["gap"]      = data["yang_gap"] + data["yin_gap"]
     # つつみ線
-    data["tsutsumi"] = convolve(data, 2, lambda x, term: toint(x["entity"].iloc[-2] < x["entity"].iloc[-1]))
-    data["yang_tsutsumi"] = convolve(data, 2, lambda x, term: toint(x["tsutsumi"].iloc[-1] == 1 and x["yin"].iloc[-2] == 1 and x["yang"].iloc[-1] == 1))
-    data["yin_tsutsumi"]  = convolve(data, 2, lambda x, term: toint(x["tsutsumi"].iloc[-1] == 1 and x["yang"].iloc[-2] == 1 and x["yin"].iloc[-1] == 1))
+    data["tsutsumi"]      = (data["entity"].shift(1) < data["entity"]) * 1
+    data["yang_tsutsumi"] = ((data["tsutsumi"] == 1) & (data["yin"].shift(1) == 1) & (data["yang"] == 1)) * 1
+    data["yin_tsutsumi"]  = ((data["tsutsumi"] == 1) & (data["yang"].iloc[-2] == 1) & (data["yin"].iloc[-1] == 1)) * 1
     # はらみ線
-    data["harami"] = convolve(data, 2, lambda x, term: toint(x["entity"].iloc[-2] > x["entity"].iloc[-1]))
-    data["yang_harami"] = convolve(data, 2, lambda x, term: toint(x["harami"].iloc[-1] == 1 and x["yin"].iloc[-2] == 1 and x["yang"].iloc[-1] == 1))
-    data["yin_harami"]  = convolve(data, 2, lambda x, term: toint(x["harami"].iloc[-1] == 1 and x["yang"].iloc[-2] == 1 and x["yin"].iloc[-1] == 1))
+    data["harami"]      = (data["entity"].shift(1) > data["entity"]) * 1
+    data["yang_harami"] = ((data["harami"] == 1) & (data["yin"].shift(1) == 1) & (data["yang"] == 1)) * 1
+    data["yin_harami"]  = ((data["harami"] == 1) & (data["yang"].shift(1) == 1) & (data["yin"] == 1)) * 1
     # 毛抜き
-    data["upper_kenuki"] = convolve(data, 2, lambda x, term: toint(x["upper_shadow"].iloc[-2] < x["upper_shadow"].iloc[-1]))
-    data["lower_kenuki"] = convolve(data, 2, lambda x, term: toint(x["lower_shadow"].iloc[-2] < x["lower_shadow"].iloc[-1]))
+    data["upper_kenuki"] = (data["upper_shadow"].shift(1) < data["upper_shadow"]) * 1
+    data["lower_kenuki"] = (data["lower_shadow"].shift(1) < data["lower_shadow"]) * 1
     # 宵の明星
-    data["yoi_mojo"] = convolve(data, 3, lambda x, term: toint(x["yang_gap"].iloc[-2] == 1 and x["yin_gap"].iloc[-1] == 1))
+    data["yoi_mojo"] = ((data["yang_gap"].shift(1) == 1) & (data["yin_gap"] == 1)) * 1
     # 明けの明星
-    data["ake_mojo"] = convolve(data, 3, lambda x, term: toint(x["yin_gap"].iloc[-2] == 1 and x["yang_gap"].iloc[-1] == 1))
+    data["ake_mojo"] = ((data["yin_gap"].iloc[-2] == 1) & (data["yang_gap"].iloc[-1] == 1)) * 1
     # 三空
-    data["yang_sanku"] = convolve(data, 3, lambda x, term: toint(x["yang_gap"].iloc[-2:].min() == 1 and x["yang"].iloc[-3:].min() == 1))
-    data["yin_sanku"]  = convolve(data, 3, lambda x, term: toint(x["yin_gap"].iloc[-2:].min() == 1 and x["yin"].iloc[-3:].min() == 1))
+    data["yang_sanku"] = ((data["yang_gap"].rolling(2).min() == 1) & (data["yang"].rolling(3).min() == 1)) * 1
+    data["yin_sanku"]  = ((data["yin_gap"].rolling(2).min() == 1) & (data["yin"].rolling(3).min() == 1)) * 1
     # 三兵
-    data["yang_sanpei"] = convolve(data, 3, lambda x, term: toint(x["yang"].iloc[-3:].min() == 1 and x["low_roundup"].iloc[-2:].min() == 1 and x["long_upper_shadow"].iloc[-1] == 1))
-    data["yin_sanpei"]  = convolve(data, 3, lambda x, term: toint(x["yin"].iloc[-3:].min() == 1 and x["high_rounddown"].iloc[-2:].min() == 1 and x["long_lower_shadow"].iloc[-1] == 1))
+    data["yang_sanpei"] = ((data["yang"].rolling(3).min() == 1) & (data["low_roundup"].rolling(2).min() == 1) & (data["long_upper_shadow"] == 1)) * 1
+    data["yin_sanpei"]  = ((data["yin"].rolling(3).min() == 1) & (data["high_rounddown"].rolling(2).min() == 1) & (data["long_lower_shadow"] == 1)) * 1
 
     # スコア
     data["score"] = each(lambda i, x: score(x), data)
@@ -348,18 +349,22 @@ def diff(data):
     return numpy.gradient(data).tolist()
 #    return [0] + numpy.diff(data).tolist()
 
-# 線とのクロス
-def cross(data, line="daily_average"):
-    conditions = [
-        data["low"] < data[line] and data[line] < data["high"]
-    ]
+def cross(base, target):
 
-    return all(conditions)
+    base_pre = base.shift(1)
+    target_pre = target.shift(1)
+
+    gc = ((base_pre <= target_pre) & (base >= target)) * 1
+    dc = ((base_pre >= target_pre) & (base <= target)) * -1
+
+    return gc + dc
 
 def stages(data):
     stage = 0
 
-    if cross(data):
+    cross = lambda data, line: all([data["low"] < data[line] and data[line] < data["high"]])
+
+    if cross(data, "daily_average"):
         stage = 0
     elif data["daily_average"] < data["low"]:
         stage = 1
@@ -382,20 +387,18 @@ def support(data, term):
     return data.iloc[-term:].min()
 
 # 上昇中の底値圏
-def rising_safety(data, term):
-    d = data.iloc[-term:]
-    noize = list(filter(lambda x: x < 0, d["low_noize"].as_matrix()))
+def rising_safety(data):
+    noize = list(filter(lambda x: x < 0, data))
     average = numpy.average(noize) if len(noize) > 0 else 0
     average = average * 3 # 係数
-    return data["low"].iloc[-1] + average
+    return average
 
 # 下落中の天井圏
-def fall_safety(data, term):
-    d = data.iloc[-term:]
-    noize = list(filter(lambda x: x > 0, d["high_noize"].as_matrix()))
+def fall_safety(data):
+    noize = list(filter(lambda x: x > 0, data))
     average = numpy.average(noize) if len(noize) > 0 else 0
     average = average * 3 # 係数
-    return data["high"].iloc[-1] + average
+    return average
 
 def trend(data):
     high_noize = list(filter(lambda x: x > 0, data))
