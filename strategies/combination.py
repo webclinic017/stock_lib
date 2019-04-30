@@ -18,8 +18,8 @@ class CombinationStrategy(CombinationCreator):
     def common(self):
         default = self.default_common()
         default.new = [
-            #lambda d: d.data["weekly"]["rci_trend"].iloc[-1] > 0, # 週足が上昇トレンド
-            #lambda d: d.data["weekly"]["daily_average_trend"].iloc[-1] > 0, # 週足が上昇トレンド
+            #lambda d: d.data.weekly["rci_trend"].iloc[-1] > 0, # 週足が上昇トレンド
+            #lambda d: d.data.weekly["daily_average_trend"].iloc[-1] > 0, # 週足が上昇トレンド
             lambda d: self.risk(d) < self.max_risk(d), # リスクが2%以内
             lambda d: self.risk(d) < self.goal(d), # リスクより利益のほうが大きい
         ]
@@ -32,7 +32,7 @@ class CombinationStrategy(CombinationCreator):
     def taking(self):
         return self.conditions_all + [
             lambda d: self.risk(d) > self.goal(d),
-            lambda d: self.upper(d) < d.data["daily"]["high"].iloc[-1],
+            lambda d: self.upper(d) < d.data.daily["high"].iloc[-1],
         ]
 
     def stop_loss(self):

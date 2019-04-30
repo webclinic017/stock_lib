@@ -47,8 +47,8 @@ class CombinationStrategy(CombinationCreator):
         return stocks["code"].as_matrix().tolist()
 
     def volume_rate(self, d):
-        before = d.data["daily"]["volume"].iloc[-2]
-        current = d.data["daily"]["volume"].iloc[-1]
+        before = d.data.daily["volume"].iloc[-2]
+        current = d.data.daily["volume"].iloc[-1]
         rate = 0.0
         if before > 0:
             rate = current / before
@@ -56,14 +56,14 @@ class CombinationStrategy(CombinationCreator):
 
     def opened(self, data, term=3):
         columns = ["open", "high", "low", "close"]
-        d = data.data["daily"].iloc[-term:]
+        d = data.data.daily.iloc[-term:]
         l = utils.each(lambda i, x: len(list(set(x[columns].as_matrix().tolist()))) > 1, d)
         return all(l)
 
     def common(self):
         default = self.default_common()
         default.new = [
-            lambda d: int(d.data["daily"]["volume"].iloc[-1]) >= 100, # 出来高が100単位以上
+            lambda d: int(d.data.daily["volume"].iloc[-1]) >= 100, # 出来高が100単位以上
             lambda d: self.volume_rate(d) >= 2.0, # 出来高が前日の倍以上
             lambda d: self.opened(d), # 数日以内に寄らなかった日がない
         ]
@@ -78,34 +78,34 @@ class CombinationStrategy(CombinationCreator):
             lambda d: self.volume_rate(d) >= 4.0, # 出来高が前日の倍以上
             lambda d: self.volume_rate(d) >= 5.0, # 出来高が前日の倍以上
             lambda d: d.index["nikkei"]["close"].iloc[-1] > d.index["nikkei"]["close"].iloc[-2], # 日経も前日より上げている
-            lambda d: d.data["daily"]["rci_trend"].iloc[-1] > 0,
-            lambda d: d.data["daily"]["rci_long_trend"].iloc[-1] > 0,
-            lambda d: d.data["daily"]["macd_trend"].iloc[-1] > 0,
-            lambda d: d.data["daily"]["macdhist_trend"].iloc[-1] > 0,
+            lambda d: d.data.daily["rci_trend"].iloc[-1] > 0,
+            lambda d: d.data.daily["rci_long_trend"].iloc[-1] > 0,
+            lambda d: d.data.daily["macd_trend"].iloc[-1] > 0,
+            lambda d: d.data.daily["macdhist_trend"].iloc[-1] > 0,
         ]
 
     def taking(self):
         return [
-            lambda d: d.data["daily"]["rci"].iloc[-1] > 80,
-            lambda d: d.data["daily"]["rci"].iloc[-1] < 80,
-            lambda d: d.data["daily"]["rci_long"].iloc[-1] > 80,
-            lambda d: d.data["daily"]["rci_long"].iloc[-1] < 80,
-            lambda d: d.data["daily"]["rci"].iloc[-1] > d.data["daily"]["rci_long"].iloc[-1],
-            lambda d: d.data["daily"]["rci"].iloc[-1] < d.data["daily"]["rci_long"].iloc[-1],
-            lambda d: d.data["daily"]["rci_trend"].iloc[-1] < 0,
-            lambda d: d.data["daily"]["rci_long_trend"].iloc[-1] < 0,
+            lambda d: d.data.daily["rci"].iloc[-1] > 80,
+            lambda d: d.data.daily["rci"].iloc[-1] < 80,
+            lambda d: d.data.daily["rci_long"].iloc[-1] > 80,
+            lambda d: d.data.daily["rci_long"].iloc[-1] < 80,
+            lambda d: d.data.daily["rci"].iloc[-1] > d.data.daily["rci_long"].iloc[-1],
+            lambda d: d.data.daily["rci"].iloc[-1] < d.data.daily["rci_long"].iloc[-1],
+            lambda d: d.data.daily["rci_trend"].iloc[-1] < 0,
+            lambda d: d.data.daily["rci_long_trend"].iloc[-1] < 0,
         ]
 
     def stop_loss(self):
         return [
-            lambda d: d.data["daily"]["rci"].iloc[-1] > 80,
-            lambda d: d.data["daily"]["rci"].iloc[-1] < 80,
-            lambda d: d.data["daily"]["rci_long"].iloc[-1] > 80,
-            lambda d: d.data["daily"]["rci_long"].iloc[-1] < 80,
-            lambda d: d.data["daily"]["rci"].iloc[-1] > d.data["daily"]["rci_long"].iloc[-1],
-            lambda d: d.data["daily"]["rci"].iloc[-1] < d.data["daily"]["rci_long"].iloc[-1],
-            lambda d: d.data["daily"]["rci_trend"].iloc[-1] < 0,
-            lambda d: d.data["daily"]["rci_long_trend"].iloc[-1] < 0,
+            lambda d: d.data.daily["rci"].iloc[-1] > 80,
+            lambda d: d.data.daily["rci"].iloc[-1] < 80,
+            lambda d: d.data.daily["rci_long"].iloc[-1] > 80,
+            lambda d: d.data.daily["rci_long"].iloc[-1] < 80,
+            lambda d: d.data.daily["rci"].iloc[-1] > d.data.daily["rci_long"].iloc[-1],
+            lambda d: d.data.daily["rci"].iloc[-1] < d.data.daily["rci_long"].iloc[-1],
+            lambda d: d.data.daily["rci_trend"].iloc[-1] < 0,
+            lambda d: d.data.daily["rci_long_trend"].iloc[-1] < 0,
 
         ]
 

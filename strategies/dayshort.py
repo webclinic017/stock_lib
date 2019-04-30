@@ -30,43 +30,43 @@ class CombinationStrategy(CombinationCreator):
 
     def new(self):
         return [
-            lambda d: d.data["daily"]["rci_long_trend"].iloc[-1] == -1, # 週足が上昇トレンド
-            lambda d: d.data["daily"]["weekly_average_trend"].iloc[-1] == -1, # 週足が上昇トレンド
-            lambda d: d.data["daily"]["stages_average"].iloc[-1] > 0,
-            lambda d: d.data["daily"]["weekly_average_trend"].iloc[-1] == -1 and d.data["daily"]["daily_average_trend"].iloc[-1] >= 0,
-            lambda d: d.data["daily"]["resistance"].iloc[-1] < d.data["daily"]["high"].iloc[-1], # 下方へのブレイクアウトではない
-            lambda d: d.data["daily"]["stages"].iloc[-10:].max() > -2,
-            lambda d: d.data["daily"]["macdhist_convert"].iloc[-1] == 1,
-            lambda d: d.data["daily"]["rci_trend"].iloc[-1] == 1,
-            lambda d: d.data["daily"]["average_cross"].iloc[-5:].max() == 0, # 平均線のデッドクロス直後ではない
-            lambda d: d.data["daily"]["high_rounddown"].iloc[-1] == 1,
+            lambda d: d.data.daily["rci_long_trend"].iloc[-1] == -1, # 週足が上昇トレンド
+            lambda d: d.data.daily["weekly_average_trend"].iloc[-1] == -1, # 週足が上昇トレンド
+            lambda d: d.data.daily["stages_average"].iloc[-1] > 0,
+            lambda d: d.data.daily["weekly_average_trend"].iloc[-1] == -1 and d.data.daily["daily_average_trend"].iloc[-1] >= 0,
+            lambda d: d.data.daily["resistance"].iloc[-1] < d.data.daily["high"].iloc[-1], # 下方へのブレイクアウトではない
+            lambda d: d.data.daily["stages"].iloc[-10:].max() > -2,
+            lambda d: d.data.daily["macdhist_convert"].iloc[-1] == 1,
+            lambda d: d.data.daily["rci_trend"].iloc[-1] == 1,
+            lambda d: d.data.daily["average_cross"].iloc[-5:].max() == 0, # 平均線のデッドクロス直後ではない
+            lambda d: d.data.daily["high_rounddown"].iloc[-1] == 1,
         ]
 
     def taking(self):
         return [
-            lambda d: d.position.gain(d.data["daily"]["close"].iloc[-1]) > 5000,
-            lambda d: d.position.gain(d.data["daily"]["close"].iloc[-1]) > 2500,
+            lambda d: d.position.gain(d.data.daily["close"].iloc[-1]) > 5000,
+            lambda d: d.position.gain(d.data.daily["close"].iloc[-1]) > 2500,
             lambda d: self.risk(d) > self.goal(d),
-            lambda d: self.lower(d) < d.data["daily"]["low"].iloc[-1],
-            lambda d: d.data["daily"]["stages_average"].iloc[-1] > 0,
-            lambda d: d.data["daily"]["macdhist_convert"].iloc[-1] == -1,
-            lambda d: d.data["daily"]["rci_trend"].iloc[-1] == -1,
-            lambda d: d.data["daily"]["high_rounddown"].iloc[-1] == 0,
-            lambda d: d.data["daily"]["weekly_average_trend"].iloc[-1] == 1,
-            lambda d: d.data["daily"]["rci_long_trend"].iloc[-1] == 1,
-            lambda d: d.data["daily"]["macdhist_trend"].iloc[-1] == 1,
+            lambda d: self.lower(d) < d.data.daily["low"].iloc[-1],
+            lambda d: d.data.daily["stages_average"].iloc[-1] > 0,
+            lambda d: d.data.daily["macdhist_convert"].iloc[-1] == -1,
+            lambda d: d.data.daily["rci_trend"].iloc[-1] == -1,
+            lambda d: d.data.daily["high_rounddown"].iloc[-1] == 0,
+            lambda d: d.data.daily["weekly_average_trend"].iloc[-1] == 1,
+            lambda d: d.data.daily["rci_long_trend"].iloc[-1] == 1,
+            lambda d: d.data.daily["macdhist_trend"].iloc[-1] == 1,
         ]
 
     def stop_loss(self):
         return [
-            lambda d: d.data["daily"]["high"].iloc[-1] < self.safety(d, self.term(d)), # セーフゾーンを割った
-            lambda d: d.data["daily"]["macdhist_trend"].iloc[-5:].min() == 1 and d.data["daily"]["volume_average_trend"].iloc[-1] == 1, # ダマシでない下方ブレイク
-            lambda d: d.data["daily"]["macdhist_trend"].iloc[-1] == 1,
-            lambda d: d.data["daily"]["macd_cross"].iloc[-1] == 1,
-            lambda d: d.data["daily"]["rci_trend"].iloc[-1] == -1,
-            lambda d: d.data["daily"]["high_rounddown"].iloc[-1] == 0,
-            lambda d: d.data["daily"]["weekly_average_trend"].iloc[-1] == 1,
-            lambda d: d.data["daily"]["rci_trend"].iloc[-1] == 1,
+            lambda d: d.data.daily["high"].iloc[-1] < self.safety(d, self.term(d)), # セーフゾーンを割った
+            lambda d: d.data.daily["macdhist_trend"].iloc[-5:].min() == 1 and d.data.daily["volume_average_trend"].iloc[-1] == 1, # ダマシでない下方ブレイク
+            lambda d: d.data.daily["macdhist_trend"].iloc[-1] == 1,
+            lambda d: d.data.daily["macd_cross"].iloc[-1] == 1,
+            lambda d: d.data.daily["rci_trend"].iloc[-1] == -1,
+            lambda d: d.data.daily["high_rounddown"].iloc[-1] == 0,
+            lambda d: d.data.daily["weekly_average_trend"].iloc[-1] == 1,
+            lambda d: d.data.daily["rci_trend"].iloc[-1] == 1,
         ]
 
 

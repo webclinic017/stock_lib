@@ -167,7 +167,7 @@ class SimulatorData:
 # シミュレーター設定
 class SimulatorSetting:
     def __init__(self):
-        self.strategy = {"daily": None}
+        self.strategy = None
         self.min_data_length = 30
         self.assets = 0
         self.commission = 150
@@ -268,6 +268,7 @@ class TradeRecorder:
         self.pattern["new"].extend(recorder.pattern["new"])
         self.pattern["repay"].extend(recorder.pattern["repay"])
         self.pattern["gain"].extend(recorder.pattern["gain"])
+        self.columns = recorder.columns
 
     def output(self, name, append=False):
         mode = "a" if append else "w"
@@ -277,6 +278,8 @@ class TradeRecorder:
         repay.to_csv("%s/repay_%s.csv" % (self.output_dir, name), index=None, header=None, mode=mode)
         gain = pandas.DataFrame(self.pattern["gain"], columns=["gain"])
         gain.to_csv("%s/gain_%s.csv" % (self.output_dir, name), index=None, header=None, mode=mode)
+        columns = pandas.DataFrame([], columns=self.columns)
+        columns.to_csv("%s/columns.csv" % self.output_dir, index=None)
 
 # シミュレーター
 class Simulator:
@@ -313,7 +316,7 @@ class Simulator:
         return results
 
     def create_appliable_data(self, data, index, rate=1.0):
-        return AppliableData(data, index, self._position, self.total_assets(data["daily"]["close"].iloc[-1].item()), self._setting, self._stats, rate)
+        return AppliableData(data, index, self._position, self.total_assets(data.daily["close"].iloc[-1].item()), self._setting, self._stats, rate)
 
     # 総資産
     def total_assets(self, value):
@@ -470,10 +473,8 @@ class Simulator:
         else:
             weekly = data.weekly[data.weekly["date"] <= date]
 
-        term_data = {
-            "daily": data.daily[data.daily["date"] <= date],
-            "weekly": weekly
-        }
+        daily = data.daily[data.daily["date"] <= date]
+        term_data = SimulatorData(data.code, daily, weekly, data.rule)
 
         return term_data
 
@@ -508,7 +509,7 @@ class Simulator:
         price = today["open"].iloc[-1].item()
         self.log("date: %s, price %s" % (date, price))
 
-        self.trade(self._setting.strategy["daily"], price, term_data, term_index)
+        self.trade(self._setting.strategy, price, term_data, term_index)
         return self.total_assets(price)
 
     def repay_signal(self, strategy, data, index):
@@ -541,10 +542,10 @@ class Simulator:
 
     # トレード
     def trade(self, strategy, price, data, index):
-        assert type(data) is dict, "data is not dict."
+        assert type(data) is SimulatorData, "data is not SimulatorData."
         # stats
-        date = data["daily"]["date"].iloc[-1]
-        self.trade_recorder.set_columns(data["daily"].columns)
+        date = data.daily["date"].iloc[-1]
+        self.trade_recorder.set_columns(data.daily.columns)
         self._stats.trade.append(0)
         self._stats.add_assets_history(date, self.total_assets(price))
         self._stats.add_available_assets_history(date, self._assets)
@@ -552,8 +553,8 @@ class Simulator:
         trade_data = {"date": date, "new": None, "repay": None, "gain": None, "term": 0, "size": 0}
 
         # 判断に必要なデータ数がない
-        if len(data["daily"]) < self._setting.min_data_length or price == 0:
-            self.log("less data. skip trade. [%s - %s]" % (data["daily"]["date"].iloc[0], data["daily"]["date"].iloc[-1]))
+        if len(data.daily) < self._setting.min_data_length or price == 0:
+            self.log("less data. skip trade. [%s - %s]" % (data.daily["date"].iloc[0], data.daily["date"].iloc[-1]))
             self._stats.trade_history.append(trade_data)
             return self.total_assets(0)
 
@@ -570,17 +571,17 @@ class Simulator:
                 # 自動損切の注文処理（longなら安値、shortなら高値）
                 if self._setting.auto_stop_loss:
                     if self._setting.short_trade:
-                        value = self.reverse_limit_price(data["daily"]["high"].iloc[-1])
+                        value = self.reverse_limit_price(data.daily["high"].iloc[-1])
                         repay_orders += self.reverse_limit_repay_order(price, value)
                     else:
-                        value = self.reverse_limit_price(data["daily"]["low"].iloc[-1])
+                        value = self.reverse_limit_price(data.daily["low"].iloc[-1])
                         repay_orders += self.reverse_limit_repay_order(price, value)
                 repay_orders += self.repay_order(price)
 
             # 新規注文実行
             for order in new_orders:
                 if self.new(order.price, order.num):
-                    self.trade_recorder.new(data["daily"].iloc[-1], order.num)
+                    self.trade_recorder.new(data.daily.iloc[-1], order.num)
                     trade_data["new"] = order.price
 
             # 返済注文実行
@@ -590,7 +591,7 @@ class Simulator:
                     break
                 gain = self._position.gain_rate(order.price)
                 if self.repay(order.price, order.num):
-                    self.trade_recorder.repay(data["daily"].iloc[-1], gain, order.num)
+                    self.trade_recorder.repay(data.daily.iloc[-1], gain, order.num)
                     trade_data["repay"] = order.price
                     trade_data["gain"] = gain
 

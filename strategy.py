@@ -279,7 +279,7 @@ class StrategyConditions():
 
 class StrategyUtil:
     def price(self, data):
-        return data.data["daily"]["close"].iloc[-1]
+        return data.data.daily["close"].iloc[-1]
 
     # ドローダウン
     def drawdown(self, data):
@@ -291,9 +291,9 @@ class StrategyUtil:
 
     def max_gain(self, data):
         if data.setting.short_trade:
-            max_gain = data.position.gain(data.data["daily"]["low"].min())
+            max_gain = data.position.gain(data.data.daily["low"].min())
         else:
-            max_gain = data.position.gain(data.data["daily"]["high"].max())
+            max_gain = data.position.gain(data.data.daily["high"].max())
         return max_gain
 
     def take_gain(self, data):
@@ -307,12 +307,12 @@ class StrategyUtil:
     def goal(self, data):
         order = data.position.num() # 現在の保有数
         if data.setting.short_trade:
-            price = data.data["daily"]["low"].iloc[-1]
-            line = data.data["daily"]["support"].iloc[-1]
+            price = data.data.daily["low"].iloc[-1]
+            line = data.data.daily["support"].iloc[-1]
             goal = (price - line)
         else:
-            price = data.data["daily"]["high"].iloc[-1]
-            line = data.data["daily"]["resistance"].iloc[-1]
+            price = data.data.daily["high"].iloc[-1]
+            line = data.data.daily["resistance"].iloc[-1]
             goal = (line - price)
 
         goal = 0 if goal < 0 else goal * (order + 100)
@@ -321,7 +321,7 @@ class StrategyUtil:
     # 損失リスク
     def risk(self, data):
         order = data.position.num() # 現在の保有数
-        price = data.data["daily"]["close"].iloc[-1]
+        price = data.data.daily["close"].iloc[-1]
 
         safety = self.safety(data, 1)
         if data.setting.short_trade:
@@ -335,13 +335,13 @@ class StrategyUtil:
 
     # 上限
     def upper(self, data, term=1):
-        upper = data.data["daily"]["resistance"].iloc[-term]
+        upper = data.data.daily["resistance"].iloc[-term]
 
         return upper
 
     # 下限
     def lower(self, data, term=1):
-        lower= data.data["daily"]["support"].iloc[-term]
+        lower= data.data.daily["support"].iloc[-term]
 
         return lower
 
@@ -376,9 +376,9 @@ class StrategyUtil:
 
     def safety(self, data, term):
         if data.setting.short_trade:
-            return data.data["daily"]["fall_safety"].iloc[-term:].min()
+            return data.data.daily["fall_safety"].iloc[-term:].min()
         else:
-            return data.data["daily"]["rising_safety"].iloc[-term:].max()
+            return data.data.daily["rising_safety"].iloc[-term:].max()
 
     def term(self, data):
         return 1 if data.position.term()  == 0 else data.position.term()
@@ -457,7 +457,7 @@ class Combination(StrategyCreator, StrategyUtil):
             conditions = [self.apply_common(data, self.common.stop_loss)]
         else:
             conditions = [
-                utils.rate(data.position.value(), data.data["daily"]["close"].iloc[-1]) < -data.setting.stop_loss_rate, # 損益が-2%
+                utils.rate(data.position.value(), data.data.daily["close"].iloc[-1]) < -data.setting.stop_loss_rate, # 損益が-2%
                 self.apply_common(data, self.common.stop_loss) and self.apply(data, self.conditions.stop_loss),
             ]
         if any(conditions):
@@ -526,6 +526,10 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
 
     def subject(self):
         raise Exception("Need override subject.")
+
+    # 何か追加データが欲しいときはoverrideする
+    def add_data(self, data):
+        return data
 
     def default_common(self):
         rules = [lambda d: True]

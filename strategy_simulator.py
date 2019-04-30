@@ -62,7 +62,7 @@ class StrategySimulator:
         # シミュレーター準備
         simulators = {}
         self.simulator_setting.debug = verbose
-        self.simulator_setting.strategy["daily"] = self.strategy_creator.create(strategy_setting)
+        self.simulator_setting.strategy = self.strategy_creator.create(strategy_setting)
         for code in datas.keys():
             simulators[code] = Simulator(self.simulator_setting)
 
