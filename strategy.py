@@ -71,7 +71,6 @@ def get_filename(args):
     return filename
 
 def load_simulator_data(code, start_date, end_date, args, load_settings=None, time=None):
-
     if load_settings is None:
         load_settings = LoadSettings()
 
@@ -96,6 +95,14 @@ def load_simulator_data(code, start_date, end_date, args, load_settings=None, ti
         print("%s: %s is None" % (start_date, code))
         return None
 
+    simulator_data = add_stats(code, data, rule, load_settings=load_settings)
+    print("loaded:", utils.timestamp(), code, data["date"].iloc[0], data["date"].iloc[-1])
+    return simulator_data
+
+def add_stats(code, data, rule, load_settings=None):
+    if load_settings is None:
+        load_settings = LoadSettings()
+
     try:
         if not load_settings.with_stats:
             data = utils.add_stats(data)
@@ -105,7 +112,6 @@ def load_simulator_data(code, start_date, end_date, args, load_settings=None, ti
             weekly = utils.add_stats(weekly)
             weekly = utils.add_cs_stats(weekly)
 
-        print("loaded:", utils.timestamp(), code, data["date"].iloc[0], data["date"].iloc[-1])
         return SimulatorData(code, data, weekly, rule)
     except Exception as e:
         print("load_error: %s" % e)

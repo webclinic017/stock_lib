@@ -54,9 +54,12 @@ class StrategySimulator:
             self.cacher.create(manda_cache_name, manda)
         return manda
 
-    def simulates(self, strategy_setting, data, start_date, end_date, verbose=False):
+    def log(self, message, verbose):
         if verbose:
-            print("simulating %s %s" % (start_date, end_date))
+             print(message)
+
+    def simulates(self, strategy_setting, data, start_date, end_date, verbose=False):
+        self.log("simulating %s %s" % (start_date, end_date), verbose)
 
         args = data["args"]
         tick = args.tick
@@ -87,12 +90,10 @@ class StrategySimulator:
         for date in dates:
             # 休日はスキップ
             if not utils.is_weekday(utils.to_datetime_by_term(date, tick)):
-                if verbose:
-                    print("%s is not weekday" % date)
+                self.log("%s is not weekday" % date, verbose)
                 continue
 
-            if verbose:
-                print("=== [%s] ===" % date)
+            self.log("=== [%s] ===" % date, verbose)
 
             # この日の対象銘柄
             targets = self.get_targets(args, targets, date)
@@ -104,25 +105,32 @@ class StrategySimulator:
 
             targets = list(set(targets))
 
-            if verbose:
-                print("targets: %s" % targets)
+            self.log("targets: %s" % targets, verbose)
 
             for code in targets:
                 # M&Aのチェックのために期間を区切ってデータを渡す(M&Aチェックが重いから)
                 start = utils.to_format_by_term(utils.to_datetime_by_term(date, tick) - utils.relativeterm(args.validate_term, tick), tick)
                 manda = self.manda(stocks[code], code, start, date)
                 if manda:
-                    if verbose:
-                        print("[%s] is manda" % code)
+                    self.log("[%s] is manda" % code, verbose)
                     continue
 
+                # 対象日までのデータの整形
+                # filter -> ohlc をすべてoにする-> add_stats
+#                d = stocks[code].daily
+#                d = d[d["date"] <= date].iloc[-300:].copy()
+#                for column in ["high", "low", "close"]:
+#                    tmp = d[column].as_matrix().tolist()
+#                    tmp[-1] = d["open"].iloc[-1]
+#                    d[column] = tmp
+#                d = strategy.add_stats(code, d, stocks[code].rule)
+                d = stocks[code]
+
                 if len(stocks[code].at(date)) > 0:
-                    if verbose:
-                        print("[%s]" % code)
-                    simulators[code].simulate_by_date(date, stocks[code], index)
+                    self.log("[%s]" % code, verbose)
+                    simulators[code].simulate_by_date(date, d, index)
                 else:
-                    if verbose:
-                        print("[%s] is less data: %s" % (code, date))
+                    self.log("[%s] is less data: %s" % (code, date), verbose)
         # 手仕舞い
         if len(dates) > 0:
             recorder = TradeRecorder(strategy.get_prefix(args))

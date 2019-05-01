@@ -346,8 +346,8 @@ def trend_convert(data):
     return result
 
 def diff(data):
-    return numpy.gradient(data).tolist()
-#    return [0] + numpy.diff(data).tolist()
+#    return numpy.gradient(data).tolist()
+    return [0] + numpy.diff(data).tolist()
 
 def cross(base, target):
 
