@@ -44,6 +44,16 @@ class StrategySimulator:
             targets = [args.code]
         return targets
 
+    def manda(self, data, code, start, end):
+        manda_cache_name = "%s_%s_%s" % (code, start, end)
+        if self.cacher.exists(manda_cache_name):
+            manda = self.cacher.get(manda_cache_name)
+        else:
+            split_data = data.split(start, end)
+            manda = checker.manda(split_data.daily)
+            self.cacher.create(manda_cache_name, manda)
+        return manda
+
     def simulates(self, strategy_setting, data, start_date, end_date, verbose=False):
         if verbose:
             print("simulating %s %s" % (start_date, end_date))
@@ -52,23 +62,23 @@ class StrategySimulator:
         tick = args.tick
 
         # この期間での対象銘柄
-        stocks, _, _ = self.select_codes(args, start_date, end_date)
+        codes, _, _ = self.select_codes(args, start_date, end_date)
         index = data["index"]
-        datas = {}
-        for code in stocks:
+        stocks = {}
+        for code in codes:
             if code in data["data"].keys():
-                datas[code] = data["data"][code]
+                stocks[code] = data["data"][code]
 
         # シミュレーター準備
         simulators = {}
         self.simulator_setting.debug = verbose
         self.simulator_setting.strategy = self.strategy_creator.create(strategy_setting)
-        for code in datas.keys():
+        for code in stocks.keys():
             simulators[code] = Simulator(self.simulator_setting)
 
         # 日付のリストを取得
         dates = []
-        for d in datas.values():
+        for d in stocks.values():
             dates = list(set(dates + d.dates(start_date, end_date)))
 
         # 日付ごとにシミュレーション
@@ -100,30 +110,24 @@ class StrategySimulator:
             for code in targets:
                 # M&Aのチェックのために期間を区切ってデータを渡す(M&Aチェックが重いから)
                 start = utils.to_format_by_term(utils.to_datetime_by_term(date, tick) - utils.relativeterm(args.validate_term, tick), tick)
-                manda_cache_name = "%s_%s_%s" % (code, start, date)
-                if self.cacher.exists(manda_cache_name):
-                    manda = self.cacher.get(manda_cache_name)
-                else:
-                    split_data = datas[code].split(start, date)
-                    manda = checker.manda(split_data.daily)
-                    self.cacher.create(manda_cache_name, manda)
+                manda = self.manda(stocks[code], code, start, date)
                 if manda:
                     if verbose:
                         print("[%s] is manda" % code)
                     continue
 
-                if len(datas[code].at(date)) > 0:
+                if len(stocks[code].at(date)) > 0:
                     if verbose:
                         print("[%s]" % code)
-                    simulators[code].simulate_by_date(date, datas[code], index)
+                    simulators[code].simulate_by_date(date, stocks[code], index)
                 else:
                     if verbose:
                         print("[%s] is less data: %s" % (code, date))
         # 手仕舞い
         if len(dates) > 0:
             recorder = TradeRecorder(strategy.get_prefix(args))
-            for code in datas.keys():
-                split_data = datas[code].split(dates[0], dates[-1])
+            for code in stocks.keys():
+                split_data = stocks[code].split(dates[0], dates[-1])
                 if len(split_data.daily) == 0:
                     continue
                 simulators[code].closing(split_data.daily["close"].iloc[-1], data=split_data.daily)
@@ -132,7 +136,7 @@ class StrategySimulator:
 
         # 統計 ====================================
         stats = {}
-        for code in datas.keys():
+        for code in stocks.keys():
             s = simulators[code].get_stats()
             keys = ["return", "drawdown", "win_trade", "trade", "assets", "max_unavailable_assets", "trade_history"]
             result = {}
@@ -140,6 +144,9 @@ class StrategySimulator:
                 result[k] = s[k]
             stats[code] = result
 
+        return self.get_results(stats, start_date, end_date, verbose)
+
+    def get_results(self, stats, start_date, end_date, verbose):
         # 統計 =======================================
         wins = list(filter(lambda x: x[1]["return"] > 0, stats.items()))
         lose = list(filter(lambda x: x[1]["return"] < 0, stats.items()))

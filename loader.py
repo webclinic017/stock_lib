@@ -113,7 +113,7 @@ class Loader:
         return data
 
     @staticmethod
-    def load_tick(code, start_date, end_date, with_filter=True, strict=False, with_stats=False):
+    def load_tick(code, start_date, end_date, with_filter=True, strict=False, with_stats=False, time=None):
         start = utils.to_datetime(start_date)
         end = utils.to_datetime(end_date)
         current = start
@@ -135,14 +135,15 @@ class Loader:
           return None
         data = Loader.tick_format(data)
         if with_filter:
-          filtered = Loader.filter(data, "%s 000000" % start_date, "%s 235959" % end_date, strict)
+          end_time = "235959" if time is None else utils.format("%s %s" % (end_date, end_time), output_format="%H%M%S")
+          filtered = Loader.filter(data, "%s 000000" % start_date, "%s %s" % (end_date, end_time), strict)
           if len(filtered) == 0:
             return None
           return filtered
         return data
 
     @staticmethod
-    def load_tick_ohlc(code, start_date, end_date):
+    def load_tick_ohlc(code, start_date, end_date, rule="5T", time=None):
         daily = Loader.load(code, start_date, end_date)
         columns = ["code", "date", "time", "price", "volume"]
         columns_dict = {}
@@ -158,15 +159,15 @@ class Loader:
         oc = pandas.DataFrame(columns_dict, columns=columns)
         oc = Loader.tick_format(oc)
 
-        tick = Loader.load_tick(code, start_date, end_date)
+        tick = Loader.load_tick(code, start_date, end_date, time=time)
         if tick is None:
             tick = oc
         else:
             tick = pandas.concat([tick, oc])
 
         tick = tick.set_index("date")
-        ohlc = pandas.Series(tick["price"]).resample("5T").ohlc()
-        volume = pandas.Series(tick["volume"]).resample("5T").sum()
+        ohlc = pandas.Series(tick["price"]).resample(rule).ohlc()
+        volume = pandas.Series(tick["volume"]).resample(rule).sum()
         ohlc["volume"] = volume
         ohlc = ohlc.ffill()
         ohlc = ohlc.reset_index()

@@ -85,7 +85,7 @@ def load_simulator_data(code, start_date, end_date, args, load_settings=None, ti
         rule = "30T"
     elif args.tick:
         start = utils.to_format(utils.to_datetime(start_date) - utils.relativeterm(1, True))
-        data = Loader.load_tick_ohlc(code, start, end_date)
+        data = Loader.load_tick_ohlc(code, start, end_date, time=time)
         rule = "30T"
     else:
         start = utils.to_format(utils.to_datetime(start_date) - utils.relativeterm(6))
