@@ -71,7 +71,7 @@ def add_stages_stats(data, default=0):
     data["resistance"] = data["high"].rolling(15).max()
     data["support"] = data["low"].rolling(15).min()
 
-    data["stages"]                      = list(map(lambda x: stages(x[1]), data.iterrows()))
+    data["stages"]                      = stages(data)
     stages_average                      = ta.SMA(data["stages"].astype(float).as_matrix(), timeperiod=10)
     data["stages_average"]              = stages_average if default is None else numpy.nan_to_num(stages_average)
     data["macd_stages"]                 = (data["macd"] > 0) * 1
@@ -359,25 +359,26 @@ def cross(base, target):
 
     return gc + dc
 
+# ローソク足の位置
+#   -2: 支持線とクロス
+#   -1: 移動平均と支持線の間
+#    0: 移動平均とクロス
+#    1: 移動平均と抵抗線の間
+#    2: 抵抗線とクロス
 def stages(data):
-    stage = 0
+    cross = lambda data, line: (data["low"] < data[line]) & (data[line] < data["high"])
 
-    cross = lambda data, line: all([data["low"] < data[line] and data[line] < data["high"]])
+    default = cross(data, "daily_average")
+    p1 = data["daily_average"] < data["low"]
+    m1 = data["high"] < data["daily_average"]
 
-    if cross(data, "daily_average"):
-        stage = 0
-    elif data["daily_average"] < data["low"]:
-        stage = 1
-    elif data["high"] < data["daily_average"]:
-        stage = -1
-    else:
-        stage = -1
+    stage_p1 = (~(default) & (p1)) * 1
+    stage_m1 = (~(default) & ~(p1) & (m1) ) * -1
+    stage_p2 = ((cross(data, "resistance")) | (data["resistance"] < data["high"])) * 2
+    stage_m2 = ((cross(data, "support")) | (data["low"] < data["support"])) * -2
 
-    if cross(data, "resistance") or data["resistance"] < data["high"]:
-        stage = 2
+    stage = stage_p1 + stage_m1 + stage_p2 + stage_m2
 
-    if cross(data, "support") or data["low"] < data["support"]:
-        stage = -2
     return stage
 
 def resistance(data, term):
