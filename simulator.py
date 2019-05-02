@@ -172,7 +172,6 @@ class SimulatorSetting:
         self.assets = 0
         self.commission = 150
         self.debug = False
-        self.sizing = False
         self.error_rate = 0.00
         self.virtual_trade = True # 仮想取引 Falseにすると注文をスタックしていく
         self.short_trade = False
