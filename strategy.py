@@ -6,12 +6,11 @@ import inspect
 import utils
 import simulator
 import itertools
+import time as t
 from loader import Loader
 from collections import namedtuple
 from simulator import SimulatorData
 from argparse import ArgumentParser
-import strategies.production as production
-import strategies as develop
 
 class LoadSettings:
     with_stats = False
@@ -19,7 +18,8 @@ class LoadSettings:
 
 def add_options(parser):
     parser.add_argument("--position_sizing", action="store_true", default=False, dest="position_sizing", help="ポジションサイジング")
-    parser.add_argument("--max_position_size", type=int, action="store", default=500, dest="max_position_size", help="最大ポジションサイズ")
+    parser.add_argument("--max_position_size", action="store", default=None, dest="max_position_size", help="最大ポジションサイズ")
+    parser.add_argument("--monitor_size", action="store", default=None, dest="monitor_size", help="監視銘柄数")
     parser.add_argument("--production", action="store_true", default=False, dest="production", help="本番向け") # 実行環境の選択
     parser.add_argument("--short", action="store_true", default=False, dest="short", help="空売り戦略")
     parser.add_argument("--tick", action="store_true", default=False, dest="tick", help="ティックデータを使う")
@@ -33,7 +33,6 @@ def add_options(parser):
     parser.add_argument("--open_close", action="store_true", default=False, dest="open_close", help="寄せ引け")
     parser.add_argument("--with_stats", action="store_true", default=False, dest="with_stats", help="統計データ込みで読み込む")
     parser.add_argument("--ignore_weekly", action="store_true", default=False, dest="ignore_weekly", help="週足統計を無視")
-    parser.add_argument("--monitor_size", action="store", default=3, dest="monitor_size", help="監視銘柄数")
     return parser
 
 def create_parser():
@@ -174,19 +173,23 @@ def load_strategy_creator(args, combination_setting=None):
             from strategies.combination import CombinationStrategy
             return CombinationStrategy(combination_setting)
 
+# args > json > default の優先度
 def create_combination_setting(args):
-    combination_setting = CombinationSetting()
-    combination_setting.position_sizing = args.position_sizing
-    combination_setting.max_position_size = args.max_position_size
-    combination_setting.monitor_size = int(args.monitor_size)
+    combination_setting = create_combination_setting_by_json(args)
+    combination_setting.position_sizing = args.position_sizing if args.position_sizing else combination_setting.position_sizing
+    combination_setting.max_position_size = combination_setting.max_position_size if args.max_position_size is None else int(args.max_position_size)
+    combination_setting.monitor_size = combination_setting.monitor_size if args.monitor_size is None else int(args.monitor_size)
     return combination_setting
 
 def create_combination_setting_by_json(args):
-    combination_setting = create_combination_setting(args)
+    combination_setting = CombinationSetting()
     setting_dict, _ = load_strategy_setting(args)
+    if setting_dict is None:
+        return combination_setting
     combination_setting.position_sizing = setting_dict["position_sizing"] if "position_sizing" in setting_dict.keys() else combination_setting.position_sizing
     combination_setting.max_position_size = setting_dict["max_position_size"] if "max_position_size" in setting_dict.keys() else combination_setting.max_position_size
-    combination_setting.monitor_size = setting_dict["monitor_size"] if "monitor_size" in setting_dict.keys() else combination_setting.max_position_size
+    combination_setting.monitor_size = setting_dict["monitor_size"] if "monitor_size" in setting_dict.keys() else combination_setting.monitor_size
+    combination_setting.seed = setting_dict["seed"] if "seed" in setting_dict.keys() else combination_setting.seed
     return combination_setting
 
 # ========================================================================
@@ -397,6 +400,7 @@ class CombinationSetting:
     max_position_size = 500
     sorted_conditions = True
     monitor_size = 3
+    seed = t.time()
 
 class Combination(StrategyCreator, StrategyUtil):
     def __init__(self, conditions, common, setting=None):
