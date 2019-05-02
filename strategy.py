@@ -25,11 +25,6 @@ def add_options(parser):
     parser.add_argument("--tick", action="store_true", default=False, dest="tick", help="ティックデータを使う")
     parser.add_argument("--realtime", action="store_true", default=False, dest="realtime", help="リアルタイムデータを使う")
     parser.add_argument("--daytrade", action="store_true", default=False, dest="daytrade", help="デイトレ")
-    parser.add_argument("--dayshort", action="store_true", default=False, dest="dayshort", help="デイトレ")
-    parser.add_argument("--falling", action="store_true", default=False, dest="falling", help="下落相場")
-    parser.add_argument("--new_high", action="store_true", default=False, dest="new_high", help="新高値")
-    parser.add_argument("--nikkei", action="store_true", default=False, dest="nikkei", help="日経")
-    parser.add_argument("--rising", action="store_true", default=False, dest="rising", help="上昇銘柄")
     parser.add_argument("--open_close", action="store_true", default=False, dest="open_close", help="寄せ引け")
     parser.add_argument("--with_stats", action="store_true", default=False, dest="with_stats", help="統計データ込みで読み込む")
     parser.add_argument("--ignore_weekly", action="store_true", default=False, dest="ignore_weekly", help="週足統計を無視")
@@ -49,16 +44,6 @@ def get_prefix(args):
     target = ""
     if args.daytrade:
         target = "daytrade_"
-    if args.dayshort:
-        target = "dayshort_"
-    if args.falling:
-        target = "falling_"
-    if args.new_high:
-        target = "new_high_"
-    if args.nikkei:
-        target = "nikkei_"
-    if args.rising:
-        target = "rising_"
     if args.open_close:
         target = "open_close_"
 
@@ -135,36 +120,12 @@ def load_strategy_creator(args, combination_setting=None):
         if args.daytrade:
             from strategies.production.daytrade import CombinationStrategy
             return CombinationStrategy(combination_setting)
-        elif args.falling:
-            from strategies.production.falling import CombinationStrategy
-            return CombinationStrategy(combination_setting)
-        elif args.nikkei:
-            from strategies.production.nikkei import CombinationStrategy
-            return CombinationStrategy(combination_setting)
-        elif args.rising:
-            from strategies.production.rising import CombinationStrategy
-            return CombinationStrategy(combination_setting)
         else:
            from strategies.production.combination import CombinationStrategy
            return CombinationStrategy(combination_setting)
     else:
         if args.daytrade:
             from strategies.daytrade import CombinationStrategy
-            return CombinationStrategy(combination_setting)
-        elif args.dayshort:
-            from strategies.dayshort import CombinationStrategy
-            return CombinationStrategy(combination_setting)
-        elif args.falling:
-            from strategies.falling import CombinationStrategy
-            return CombinationStrategy(combination_setting)
-        elif args.nikkei:
-            from strategies.nikkei import CombinationStrategy
-            return CombinationStrategy(combination_setting)
-        elif args.new_high:
-            from strategies.new_high import CombinationStrategy
-            return CombinationStrategy(combination_setting)
-        elif args.rising:
-            from strategies.rising import CombinationStrategy
             return CombinationStrategy(combination_setting)
         elif args.open_close:
             from strategies.open_close import CombinationStrategy

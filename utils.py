@@ -143,14 +143,6 @@ def add_stats(data, default=0, names=[]):
 
     return data
 
-# 指標用の統計
-def add_index_stats(data, default=0):
-    data["gradient"] = diff(data["close"])
-    data["trend"] = convolve(data["gradient"], 14, strict_trend)
-    data["rci"]   = data["close"].rolling(9).apply(rci)
-
-    return data
-
 def each(callback, data):
     return list(map(lambda x: callback(*x), data.iterrows()))
 
