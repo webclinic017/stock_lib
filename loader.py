@@ -279,7 +279,7 @@ class Loader:
         return data
 
     @staticmethod
-    def loads(codes, start_date, end_date, strict=True, with_code=True, with_stats=False):
+    def loads(codes, start_date, end_date, strict=False, with_code=True, with_stats=False):
         data = {} if with_code else []
         for code in codes:
             d = Loader.load(code, start_date, end_date, strict=strict, with_stats=with_stats)
