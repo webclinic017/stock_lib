@@ -61,6 +61,17 @@ class StrategySimulator:
         if self.verbose:
              print(message)
 
+    def get_data_by_date(data):
+        # filter -> ohlc をすべてoにする-> add_stats
+        d = data.daily
+        d = d[d["date"] <= date].iloc[-300:].copy()
+        for column in ["high", "low", "close"]:
+            tmp = d[column].as_matrix().tolist()
+            tmp[-1] = d["open"].iloc[-1]
+            d[column] = tmp
+        d = strategy.add_stats(data.code, d, data.rule)
+        return d
+
     def simulates(self, strategy_setting, data, start_date, end_date):
         self.log("simulating %s %s" % (start_date, end_date))
 
@@ -120,14 +131,6 @@ class StrategySimulator:
                     continue
 
                 # 対象日までのデータの整形
-                # filter -> ohlc をすべてoにする-> add_stats
-#                d = stocks[code].daily
-#                d = d[d["date"] <= date].iloc[-300:].copy()
-#                for column in ["high", "low", "close"]:
-#                    tmp = d[column].as_matrix().tolist()
-#                    tmp[-1] = d["open"].iloc[-1]
-#                    d[column] = tmp
-#                d = strategy.add_stats(code, d, stocks[code].rule)
                 d = stocks[code]
 
                 if len(stocks[code].at(date)) > 0:

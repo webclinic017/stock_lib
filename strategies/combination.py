@@ -14,18 +14,9 @@ class CombinationStrategy(CombinationCreator):
 
         random.seed(setting.seed)
 
-        self.new_conditions         = random.sample(list(range(len(self.conditions_all))), 5)
-        self.taking_conditions      = random.sample(list(range(len(self.conditions_all))), 5)
-        self.stop_loss_conditions   = random.sample(list(range(len(self.conditions_all))), 5)
-
-#        print("new:", self.new_conditions)
-#        print("taking:", self.taking_conditions)
-#        print("stop_loss:", self.stop_loss_conditions)
-
-        self.new_conditions         = self.conditions_all[self.new_conditions].tolist()
-        self.taking_conditions      = self.conditions_all[self.taking_conditions].tolist()
-        self.stop_loss_conditions   = self.conditions_all[self.stop_loss_conditions].tolist()
-
+        self.new_conditions         = random.sample(self.conditions_all, 5)
+        self.taking_conditions      = random.sample(self.conditions_all, 5)
+        self.stop_loss_conditions   = random.sample(self.conditions_all, 5)
 
         super().__init__(setting)
 
