@@ -326,9 +326,11 @@ class StrategyUtil:
         return lower
 
     # 不安要素
-    def falling(self, data, risk):
+    def caution(self, data, risk):
         conditions = [
             risk == 0, # セーフティーを下回っている
+            data.position.num() == 0, # 初回の仕掛け
+            data.position.gain(self.price(data)) < 0, # 損益がマイナス
         ]
         return any(conditions)
 
@@ -347,7 +349,7 @@ class StrategyUtil:
         max_order = int((max_order - current)) # 保有できる最大まで
         max_order = int(max_order / 2) # 半分ずつ
         max_order = int(math.ceil(max_order / 100) * 100) # 端数を切り上げ
-        order = 100 if self.falling(data, risk) else max_order
+        order = 100 if self.caution(data, risk) else max_order
 
         if order < 100:
             order = 0
@@ -362,6 +364,11 @@ class StrategyUtil:
 
     def term(self, data):
         return 1 if data.position.term()  == 0 else data.position.term()
+
+    # 1単元で最大の損切ラインを適用
+    def stop_loss_rate(self, data, max_position_size):
+        position_rate = data.position.num() / max_position_size
+        return data.setting.stop_loss_rate * position_rate
 
 ## 指定可能な戦略====================================================================================================================
 
@@ -438,7 +445,7 @@ class Combination(StrategyCreator, StrategyUtil):
             conditions = [self.apply_common(data, self.common.stop_loss)]
         else:
             conditions = [
-                utils.rate(data.position.value(), data.data.daily["close"].iloc[-1]) < -data.setting.stop_loss_rate, # 損益が-2%
+                utils.rate(data.position.value(), data.data.daily["close"].iloc[-1]) < -self.stop_loss_rate(data, self.setting.max_position_size), # 1単元で最大の損切ラインを適用
                 self.apply_common(data, self.common.stop_loss) and self.apply(data, self.conditions.stop_loss),
             ]
         if any(conditions):
