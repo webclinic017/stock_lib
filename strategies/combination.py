@@ -9,7 +9,7 @@ import random
 
 class CombinationStrategy(CombinationCreator):
     def __init__(self, setting):
-        self.conditions_all = numpy.array(conditions.all())
+        self.conditions_all = conditions.all()
         setting.sorted_conditions = False
 
         random.seed(setting.seed)

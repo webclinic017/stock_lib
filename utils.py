@@ -12,49 +12,47 @@ import subprocess
 import talib as ta
 import slack
 
-def add_average_stats(data, default=0):
+def nan_to_num(data, default=0):
+    return data if default is None else numpy.nan_to_num(data)
+
+def add_average_stats(data):
     close = numpy.array(data["close"].as_matrix(), dtype="f8")
-    daily_average             = ta.SMA(close, timeperiod=5)
-    data["daily_average"]     = daily_average if default is None else numpy.nan_to_num(daily_average)
-    weekly_average            = ta.SMA(close, timeperiod=25)
-    data["weekly_average"]    = weekly_average if default is None else numpy.nan_to_num(weekly_average)
-    volume_average            = ta.SMA(data["volume"].astype(float).as_matrix(), timeperiod=5)
-    data["volume_average"]    = volume_average if default is None else numpy.nan_to_num(volume_average)
+    data["daily_average"]     = ta.SMA(close, timeperiod=5)
+    data["weekly_average"]    = ta.SMA(close, timeperiod=25)
+    data["volume_average"]    = ta.SMA(data["volume"].astype(float).as_matrix(), timeperiod=5)
     data["ma_divergence"]     = (data["close"] - data["weekly_average"]) / data["weekly_average"]
     return data
 
-def add_tec_stats(data, default=0):
+def add_tec_stats(data):
     data["rci"]                 = data["close"].rolling(9).apply(rci)
     data["rci_long"]            = data["close"].rolling(27).apply(rci)
 
     close = numpy.array(data["close"].as_matrix(), dtype="f8")
     macd, macdsignal, macdhist = ta.MACD(close, fastperiod=12, slowperiod=26, signalperiod=9)
-    data["macd"]           = macd if default is None else numpy.nan_to_num(macd)
-    data["macdsignal"]     = macdsignal if default is None else numpy.nan_to_num(macdsignal)
-    data["macdhist"]       = macdhist if default is None else numpy.nan_to_num(macdhist)
+    data["macd"]           = macd
+    data["macdsignal"]     = macdsignal
+    data["macdhist"]       = macdhist
     data["macdhist_convert"] = data["macdhist"].rolling(100).apply(trend_convert)
 
     # average true range
-    data["atr"] = atr(data, default)
+    data["atr"] = ta.ATR(data["high"].astype(float).as_matrix(), data["low"].astype(float).as_matrix(), data["close"].astype(float).as_matrix(), timeperiod=14)
     return data
 
-def add_band_stats(data, default=0):
+def add_band_stats(data):
     close = numpy.array(data["close"].as_matrix(), dtype="f8")
     upper, _, lower = ta.BBANDS(close, timeperiod=25, nbdevup=1, nbdevdn=1, matype=0)
     upper2, _, lower2 = ta.BBANDS(close, timeperiod=25, matype=0)
 
-    data["env12"]          = upper2 if default is None else numpy.nan_to_num(upper2)
-    data["env11"]          = upper if default is None else numpy.nan_to_num(upper)
-    data["env09"]          = lower if default is None else numpy.nan_to_num(lower)
-    data["env08"]          = lower2 if default is None else numpy.nan_to_num(lower2)
+    data["env12"]          = upper2
+    data["env11"]          = upper
+    data["env09"]          = lower
+    data["env08"]          = lower2
 
     data["env_entity"]     =  each(lambda i, x: x["env12"] - x["env08"], data)
-    env_entity_average = ta.SMA(numpy.array(data["env_entity"].as_matrix(), dtype="f8"), timeperiod=5)
-    data["env_entity_average"] = env_entity_average if default is None else numpy.nan_to_num(env_entity_average)
-
+    data["env_entity_average"] = ta.SMA(numpy.array(data["env_entity"].as_matrix(), dtype="f8"), timeperiod=5)
     return data
 
-def add_safety_stats(data, default=0):
+def add_safety_stats(data):
     data["low_noize"]         = data["low"].rolling(2).apply(lambda x: x[-2] - x[-1] if x[-2] - x[-1] < 0 else 0)
     data["rising_safety"]     = data["low_noize"].rolling(10).apply(rising_safety)
     data["rising_safety"]     = data["low"] + data["rising_safety"]
@@ -67,18 +65,18 @@ def add_safety_stats(data, default=0):
 
     return data
 
-def add_stages_stats(data, default=0):
+def add_stages_stats(data):
     data["resistance"] = data["high"].rolling(15).max()
     data["support"] = data["low"].rolling(15).min()
 
     data["stages"]                      = stages(data)
     stages_average                      = ta.SMA(data["stages"].astype(float).as_matrix(), timeperiod=10)
-    data["stages_average"]              = stages_average if default is None else numpy.nan_to_num(stages_average)
+    data["stages_average"]              = stages_average
     data["macd_stages"]                 = (data["macd"] > 0) * 1
     data["macdhist_stages"]             = (data["macdhist"] > 0) * 1
     return data
 
-def add_cross_stats(data, default=0):
+def add_cross_stats(data):
     # クロス系
     data["average_cross"] = cross(data["daily_average"], data["weekly_average"])
     data["macd_cross"] = cross(data["macd"], data["macdsignal"])
@@ -91,7 +89,7 @@ def add_cross_stats(data, default=0):
 
     return data
 
-def add_trend_stats(data, default=0):
+def add_trend_stats(data):
     # 気配を出力する
     data["rci_long_gradient"]           = diff(data["rci_long"])
     data["rci_gradient"]                = diff(data["rci"])
@@ -136,10 +134,16 @@ def add_stats(data, default=0, names=[]):
 
     for name in keys:
         try:
-            data = stats[name](data, default) if is_t(name) else data
+            data = stats[name](data) if is_t(name) else data
         except Exception as e:
             import traceback
             traceback.print_exc()
+
+    if default is None:
+        return data
+
+    for column in data.columns.tolist():
+        data[column] = nan_to_num(data[column], default)
 
     return data
 
@@ -147,7 +151,7 @@ def each(callback, data):
     return list(map(lambda x: callback(*x), data.iterrows()))
 
 # ろうそく足のパターン
-def add_cs_stats(data, default=0):
+def add_cs_stats(data):
     toint = lambda x: 1 if x else 0
 
     # 実体
@@ -482,11 +486,6 @@ def rci(data):
       d += ((i+1) - (si+1)) ** 2
 
     return int(( 1.0 - ( (6 * d) / float(term ** 3 - term) ) ) * 100)
-
-# average true range
-def atr(data, default=0):
-    atr = ta.ATR(data["high"].astype(float).as_matrix(), data["low"].astype(float).as_matrix(), data["close"].astype(float).as_matrix(), timeperiod=14)
-    return atr if default is None else numpy.nan_to_num(atr)
 
 # 標準偏差
 def sigma(data, term):
