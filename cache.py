@@ -17,8 +17,9 @@ class Cache:
         return os.path.exists(self.path(name))
 
     def create(self, name, data):
-        if not os.path.exists(self.dir()):
-            os.makedirs(self.dir())
+        output_dir = os.path.dirname(self.path(name))
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
         with open(self.path(name), "wb") as f:
             pickle.dump(data, f)
 

@@ -17,6 +17,7 @@ class LoadSettings:
     weekly = True
 
 def add_options(parser):
+    parser.add_argument("--code", type=str, action="store", default=None, dest="code", help="code")
     parser.add_argument("--position_sizing", action="store_true", default=False, dest="position_sizing", help="ポジションサイジング")
     parser.add_argument("--max_position_size", action="store", default=None, dest="max_position_size", help="最大ポジションサイズ")
     parser.add_argument("--monitor_size", action="store", default=None, dest="monitor_size", help="監視銘柄数")
@@ -34,7 +35,9 @@ def create_parser():
     parser = ArgumentParser()
     return add_options(parser)
 
-def get_prefix(args):
+def get_prefix(args, ignore_code=False):
+    code = "" if args.code is None or ignore_code else "%s_" % args.code
+
     prefix = "production_" if args.production else ""
 
     tick = "tick_" if args.tick else ""
@@ -47,10 +50,10 @@ def get_prefix(args):
     if args.open_close:
         target = "open_close_"
 
-    return "%s%s%s%s" % (prefix, target, tick, method)
+    return "%s%s%s%s%s" % (code, prefix, target, tick, method)
 
-def get_filename(args):
-    prefix = get_prefix(args)
+def get_filename(args, ignore_code=False):
+    prefix = get_prefix(args, ignore_code=ignore_code)
     filename = "%ssimulate_setting.json" % prefix
     return filename
 
@@ -104,7 +107,14 @@ def add_stats(code, data, rule, load_settings=None):
 def load_strategy_setting(args):
     filename = get_filename(args)
     setting_dict = Loader.simulate_setting(filename)
+
+    # 個別銘柄の設定がなければ共通の設定を読む
+    if args.code is not None and setting_dict is None:
+        filename = get_filename(args, ignore_code=True)
+        setting_dict = Loader.simulate_setting(filename)
+
     print(filename, setting_dict)
+
     if setting_dict is None:
         strategy_setting = StrategySetting()
     else:

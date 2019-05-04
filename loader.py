@@ -554,7 +554,7 @@ class Loader:
     def simulate_setting(filename=None):
         filename = "simulate_setting.json" if filename is None else filename
         try:
-            f = open("settings/%s" % (filename), "r")
+            f = open("simulate_settings/%s" % (filename), "r")
             data = json.load(f)
         except:
             data = None
