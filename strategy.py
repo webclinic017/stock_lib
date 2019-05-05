@@ -26,12 +26,14 @@ def add_options(parser):
     parser.add_argument("--short", action="store_true", default=False, dest="short", help="空売り戦略")
     parser.add_argument("--tick", action="store_true", default=False, dest="tick", help="ティックデータを使う")
     parser.add_argument("--realtime", action="store_true", default=False, dest="realtime", help="リアルタイムデータを使う")
-    parser.add_argument("--daytrade", action="store_true", default=False, dest="daytrade", help="デイトレ")
-    parser.add_argument("--open_close", action="store_true", default=False, dest="open_close", help="寄せ引け")
     parser.add_argument("--with_stats", action="store_true", default=False, dest="with_stats", help="統計データ込みで読み込む")
     parser.add_argument("--stop_loss_rate", action="store", default=None, dest="stop_loss_rate", help="損切レート")
     parser.add_argument("--taking_rate", action="store", default=None, dest="taking_rate", help="利食いレート")
     parser.add_argument("--ignore_weekly", action="store_true", default=False, dest="ignore_weekly", help="週足統計を無視")
+
+    # strategy
+    parser.add_argument("--daytrade", action="store_true", default=False, dest="daytrade", help="デイトレ")
+    parser.add_argument("--open_close", action="store_true", default=False, dest="open_close", help="寄せ引け")
     return parser
 
 def create_parser():
@@ -53,7 +55,15 @@ def get_prefix(args, ignore_code=False):
     if args.open_close:
         target = "open_close_"
 
-    return "%s%s%s%s%s" % (code, prefix, target, tick, method)
+    return "%s%s%s%s%s" % (prefix, code, target, tick, method)
+
+def get_strategy_name(args):
+    if args.daytrade:
+        return "daytrade"
+    elif args.open_close:
+        return "open_close"
+    else:
+        return "combination"
 
 def get_filename(args, ignore_code=False):
     prefix = get_prefix(args, ignore_code=ignore_code)
@@ -110,13 +120,14 @@ def add_stats(code, data, rule, load_settings=None):
 def load_strategy_setting(args):
     filename = get_filename(args)
     setting_dict = Loader.simulate_setting(filename)
+    print(filename, setting_dict)
 
     # 個別銘柄の設定がなければ共通の設定を読む
     if args.code is not None and setting_dict is None:
         filename = get_filename(args, ignore_code=True)
         setting_dict = Loader.simulate_setting(filename)
+        print(filename, setting_dict)
 
-    print(filename, setting_dict)
 
     if setting_dict is None:
         strategy_setting = StrategySetting()
@@ -132,6 +143,9 @@ def load_strategy_creator(args, combination_setting=None):
     if args.production:
         if args.daytrade:
             from strategies.production.daytrade import CombinationStrategy
+            return CombinationStrategy(combination_setting)
+        elif args.open_close:
+            from strategies.production.open_close import CombinationStrategy
             return CombinationStrategy(combination_setting)
         else:
            from strategies.production.combination import CombinationStrategy
