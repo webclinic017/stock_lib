@@ -10,6 +10,7 @@ import time as t
 from loader import Loader
 from collections import namedtuple
 from simulator import SimulatorData
+from simulator import SimulatorSetting
 from argparse import ArgumentParser
 
 class LoadSettings:
@@ -28,6 +29,8 @@ def add_options(parser):
     parser.add_argument("--daytrade", action="store_true", default=False, dest="daytrade", help="デイトレ")
     parser.add_argument("--open_close", action="store_true", default=False, dest="open_close", help="寄せ引け")
     parser.add_argument("--with_stats", action="store_true", default=False, dest="with_stats", help="統計データ込みで読み込む")
+    parser.add_argument("--stop_loss_rate", action="store", default=None, dest="stop_loss_rate", help="損切レート")
+    parser.add_argument("--taking_rate", action="store", default=None, dest="taking_rate", help="利食いレート")
     parser.add_argument("--ignore_weekly", action="store_true", default=False, dest="ignore_weekly", help="週足統計を無視")
     return parser
 
@@ -163,6 +166,24 @@ def create_combination_setting_by_json(args):
     combination_setting.seed = setting_dict["seed"] if "seed" in setting_dict.keys() else combination_setting.seed
     return combination_setting
 
+def create_simulator_setting(args):
+    simulator_setting = create_simulator_setting_by_json(args)
+    simulator_setting.stop_loss_rate = simulator_setting.stop_loss_rate if args.stop_loss_rate is None else float(args.stop_loss_rate)
+    simulator_setting.taking_rate = simulator_setting.taking_rate if args.taking_rate is None else float(args.taking_rate)
+    simulator_setting.ignore_latest_weekly = args.daytrade
+    simulator_setting.short_trade = args.short
+    return simulator_setting
+
+def create_simulator_setting_by_json(args):
+    simulator_setting = SimulatorSetting()
+    setting_dict, _ = load_strategy_setting(args)
+    if setting_dict is None:
+        return simulator_setting
+    simulator_setting.stop_loss_rate = setting_dict["stop_loss_rate"] if "stop_loss_rate" in setting_dict.keys() else simulator_setting.stop_loss_rate
+    simulator_setting.taking_rate = setting_dict["taking_rate"] if "taking_rate" in setting_dict.keys() else simulator_setting.taking_rate
+    simulator_setting.ignore_latest_weekly = args.daytrade
+    simulator_setting.short_trade = args.short
+    return simulator_setting
 # ========================================================================
 # 売買ルール
 class Rule:
@@ -404,6 +425,8 @@ class Combination(StrategyCreator, StrategyUtil):
         drawdown_sum = list(filter(lambda x: x > 0, numpy.diff(drawdown))) if len(drawdown) > 1 else []
         risk = self.risk(data)
         max_risk = self.max_risk(data)
+        max_order = self.max_order(max_risk, risk)
+        max_order = max_order if max_order < self.setting.max_position_size else self.setting.max_position_size
         drawdown_conditions = [
             len(drawdown_diff) == 0, # 6%ルール条件外(-6%を超えて一定期間たった)
             sum(drawdown_sum) < data.setting.stop_loss_rate * 3 # 6%ルール(直近のドローダウン合計が6%以下)
@@ -414,7 +437,7 @@ class Combination(StrategyCreator, StrategyUtil):
 
         conditions = [
             all(drawdown_conditions), # ドローダウンが問題ない状態
-            (data.position.num() < self.max_order(max_risk, risk)) if risk > 0 else False, # 最大ポジションサイズ以下
+            (data.position.num() < max_order) if risk > 0 else False, # 最大ポジションサイズ以下
             self.apply_common(data, self.common.new)
         ]
 
