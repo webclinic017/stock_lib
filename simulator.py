@@ -185,6 +185,20 @@ class SimulatorStats:
     def __init__(self):
         self.trade_history = []
 
+    def create_trade_data(self):
+        trade_data = {
+            "date": None,
+            "new": None,
+            "repay": None,
+            "gain": None,
+            "gain_rate": None,
+            "assets": None,
+            "available_assets": None,
+            "term": 0,
+            "size": 0
+        }
+        return trade_data
+
     def trade(self):
         return list(filter(lambda x: x["gain"] is not None, self.trade_history))
 
@@ -565,17 +579,10 @@ class Simulator:
         # stats
         date = data.daily["date"].iloc[-1]
         self.trade_recorder.set_columns(data.daily.columns)
-        trade_data = {
-            "date": date,
-            "new": None,
-            "repay": None,
-            "gain": None,
-            "gain_rate": None,
-            "assets": self.total_assets(price),
-            "available_assets": self.assets,
-            "term": 0,
-            "size": 0
-        }
+        trade_data = self.stats.create_trade_data()
+        trade_data["date"]              = date
+        trade_data["assets"]            = self.total_assets(price)
+        trade_data["available_assets"]  = self.assets
 
         # 判断に必要なデータ数がない
         if len(data.daily) < self.setting.min_data_length or price == 0:
