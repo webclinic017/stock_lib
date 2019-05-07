@@ -257,22 +257,22 @@ class SimulatorStats:
         return max(dd)
 
     def gain(self):
-        return list(map(lambda x: x["gain"], self.trade_history))
+        return list(filter(lambda x: x is not None, map(lambda x: x["gain"], self.trade_history)))
 
     def gain_rate(self):
-        return list(map(lambda x: x["gain_rate"], self.trade_history))
+        return list(filter(lambda x: x is not None, map(lambda x: x["gain_rate"], self.trade_history)))
 
     def profits(self):
-        return list(filter(lambda x: x > 0), self.gain())
+        return list(filter(lambda x: x > 0, self.gain()))
 
     def loss(self):
-        return list(filter(lambda x: x < 0), self.gain())
+        return list(filter(lambda x: x < 0, self.gain()))
 
     def profits_rate(self):
-        return list(filter(lambda x: x > 0), self.gain_rate())
+        return list(filter(lambda x: x > 0, self.gain_rate()))
 
     def loss_rate(self):
-        return list(filter(lambda x: x < 0), self.gain_rate())
+        return list(filter(lambda x: x < 0, self.gain_rate()))
 
     # 平均利益率
     def average_profit_rate(self):
@@ -621,12 +621,13 @@ class Simulator:
                 if self.position.get_num() <= 0:
                     self.repay_orders = [] # ポジションがなくなってたら以降の注文はキャンセル
                     break
-                pos = self.position
+                gain        = self.position.gain(order.price)
+                gain_rate   = self.position.gain_rate(order.price)
                 if self.repay(order.price, order.num):
-                    self.trade_recorder.repay(data.daily.iloc[-1], pos.gain_rate(order.price), order.num)
+                    self.trade_recorder.repay(data.daily.iloc[-1], gain_rate, order.num)
                     trade_data["repay"] = order.price
-                    trade_data["gain"] = pos.gain(order.price)
-                    trade_data["gain_rate"] = pos.gain_rate(order.price)
+                    trade_data["gain"] = gain
+                    trade_data["gain_rate"] = gain_rate
 
         ## 引け後=====================================================================
         # 新規ルールに当てはまる場合買う

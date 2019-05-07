@@ -361,11 +361,20 @@ class StrategyUtil:
         return lower
 
     # 不安要素
-    def caution(self, data, risk):
+    def caution(self, data):
         conditions = [
-            risk == 0, # セーフティーを下回っている
+            self.risk(data) == 0, # セーフティーを下回っている
             data.position.get_num() == 0, # 初回の仕掛け
             data.position.gain(self.price(data)) < 0, # 損益がマイナス
+            data.stats.gain()[-1] < 0 if len(data.stats.gain()) > 0 else False, # 最後のトレードで損失
+        ]
+        return any(conditions)
+
+    # 注目要素
+    def attention(self, data):
+        conditions = [
+            data.stats.gain()[-1] > 0 if len(data.stats.gain()) > 0 else False, # 最後のトレードで利益
+            data.position.gain(self.price(data)) > 0, # 損益がプラス
         ]
         return any(conditions)
 
@@ -382,9 +391,9 @@ class StrategyUtil:
         max_order = self.max_order(max_risk, risk)
         max_order = max_order if max_order < max_position_size else max_position_size
         max_order = int((max_order - current)) # 保有できる最大まで
-        max_order = int(max_order / 2) # 半分ずつ
+        max_order = int(max_order) if self.attention(data) else int(max_order / 2) # 最後負けトレードなら半分ずつ
         max_order = int(math.ceil(max_order / 100) * 100) # 端数を切り上げ
-        order = 100 if self.caution(data, risk) else max_order
+        order = 100 if self.caution(data) else max_order # 不安要素があれば、最小単位から
 
         if order < 100:
             order = 0
