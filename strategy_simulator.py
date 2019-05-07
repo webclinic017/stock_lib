@@ -114,8 +114,8 @@ class StrategySimulator:
             targets = self.get_targets(args, targets, date)
 
             # 保有銘柄を対象に追加
-            for code, simulator in simulators.items() :
-                if simulator.position().num() > 0:
+            for code, simulator in simulators.items():
+                if simulator.position.get_num() > 0:
                     targets.append(code)
 
             targets = list(set(targets))

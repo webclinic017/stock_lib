@@ -8,22 +8,22 @@ import pandas
 # 売買の状態
 class Position:
     def __init__(self, num = 0, value = 0, term = 0, initial = None, system="actual", method="long"):
-        self._num = int(num)
-        self._value = []
-        self._initial = initial
+        self.num = int(num)
+        self.value = []
+        self.initial = initial
         if value != 0:
-            self._value = [value]
-        self._term = term # 保有期間
+            self.value = [value]
+        self.term = term # 保有期間
         self.system = system
         self.method = method
 
     def add_history(self, num, value):
         for _ in range(int(num/100)):
-            self._value.append(value) # 平均取得価格の計算のため
-        self._num += num
-        if self.num() == 0:
-          self._term = 0
-          self._value = []
+            self.value.append(value) # 平均取得価格の計算のため
+        self.num += num
+        if self.get_num() == 0:
+          self.term = 0
+          self.value = []
 
     # 新規
     def new(self, num, value):
@@ -33,64 +33,64 @@ class Position:
 
     # 返済
     def repay(self, num, value):
-        assert len(self._value) > 0, "do not repay. not hold."
-        price = num * self.value()
+        assert len(self.value) > 0, "do not repay. not hold."
+        price = num * self.get_value()
         price = price + self.gain(value)
         self.add_history(-num, value)
         return price
 
     # 保有株数
-    def num(self):
-        return self._num
+    def get_num(self):
+        return self.num
 
     # 平均取得価格
-    def value(self):
-        if len(self._value) == 0:
+    def get_value(self):
+        if len(self.value) == 0:
             return 0
-        return sum(self._value) / len(self._value)
+        return sum(self.value) / len(self.value)
 
     # ポジション取得時の価格
-    def initial(self):
-        if self._initial is None:
-            if len(self._value) > 0:
-                return self._value[0]
+    def get_initial(self):
+        if self.initial is None:
+            if len(self.value) > 0:
+                return self.value[0]
             else:
                 return None
-        return self._initial
+        return self.initial
 
     # 損益
     def gain(self, value):
-        if self.value() is None:
+        if self.get_value() is None:
             return 0
         if self.is_short():
-            return (self.value() - value) * self.num()
+            return (self.get_value() - value) * self.get_num()
         else:
-            return (value - self.value()) * self.num()
+            return (value - self.get_value()) * self.get_num()
 
     # 損益レシオ
     def gain_rate(self, value):
-        if self.value() is None or self.value() == 0:
+        if self.get_value() is None or self.get_value() == 0:
             return 0
         if self.is_short():
-            return (self.value() - value) / self.value()
+            return (self.get_value() - value) / self.get_value()
         else:
-            return (value - self.value()) / self.value()
+            return (value - self.get_value()) / self.get_value()
 
     # 取得時の価格を設定
     def set_initial(self, initial):
-        self._initial = initial
+        self.initial = initial
 
     # ポジション取得からの期間
-    def term(self):
-        return self._term
+    def get_term(self):
+        return self.term
 
     # 期間を設定
     def set_term(self, term):
-        self._term = term
+        self.term = term
 
     # 保有期間を加算
     def increment_term(self):
-        self._term += 1
+        self.term += 1
 
     # 特定口座（現物）
     def is_actual(self):
@@ -121,7 +121,7 @@ class Order:
 
 
     def increment_term(self):
-        self._term += 1
+        self.term += 1
 
     def signal(self, value, position):
         data = {
@@ -182,61 +182,95 @@ class SimulatorSetting:
 
 # 統計
 class SimulatorStats:
-    def __init__(self, setting):
-        self.assets_history = []
-        self.available_assets_history = []
-        self.max_assets = setting.assets
-        self.drawdown = []
-        self.trade = []
+    def __init__(self):
         self.trade_history = []
-        self.profits = []
-        self.loss = []
+
+    def trade(self):
+        return list(filter(lambda x: x["gain"] is not None, self.trade_history))
+
+    def win_trade(self):
+        return list(filter(lambda x: x["gain"] > 0, self.trade()))
+
+    def lose_trade(self):
+        return list(filter(lambda x: x["gain"] < 0, self.trade()))
 
     def trade_num(self):
-        return len(list(filter(lambda x: x!=0, self.trade)))
+        return len(self.trade())
 
     def win_trade_num(self):
-        return len(list(filter(lambda x: x==1, self.trade)))
+        return len(self.win_trade())
 
-    def loss_trade_num(self):
-        return len(list(filter(lambda x: x==-1, self.trade)))
+    def lose_trade_num(self):
+        return len(self.lose_trade())
 
     # 勝率
     def win_rate(self):
         trade_num = self.trade_num()
         if trade_num == 0:
             return 0
-        win = len(list(filter(lambda x: x==1, self.trade)))
-        return win / float(trade_num)
+        return self.win_trade_num() / float(trade_num)
 
-    # 資産の履歴を追加する
-    def add_assets_history(self, date, assets):
-        self.assets_history.append({"date": date, "assets": assets})
-        if self.max_assets < assets:
-            self.max_assets = assets
-            self.drawdown.append({"date": date, "drawdown": 0})
-        else:
-            diff = self.max_assets - assets
-            dd = round(diff/float(self.max_assets), 2)
-            self.drawdown.append({"date": date, "drawdown": dd})
+    def assets(self):
+        return list(map(lambda x: x["assets"], self.trade_history))
 
-    def add_available_assets_history(self, date, assets):
-        self.available_assets_history.append({"date": date, "assets": assets})
+    def max_assets(self):
+        if len(self.assets()) == 0:
+            return 0
+        return max(self.assets())
+
+    def unavailable_assets(self):
+        return list(map(lambda x: x["assets"] - x["available_assets"], self.trade_history))
+
+    def max_unavailable_assets(self):
+        if len(self.unavailable_assets()) == 0:
+            return 0
+        return max(self.unavailable_assets())
+
+    def drawdown(self):
+        drawdown = []
+        assets = self.assets()
+        for i in range(len(assets)):
+            max_assets = max(assets[:i]) if len(assets[:i]) > 0 else assets[i]
+            dd = round((max_assets - assets[i])/float(max_assets), 2)
+            drawdown.append(dd)
+        return drawdown
 
     # 最大ドローダウン
     def max_drawdown(self):
-        dd = list(map(lambda x: x["drawdown"], self.drawdown))
+        dd = self.drawdown()
         if len(dd) == 0:
             return 0
         return max(dd)
 
+    def gain(self):
+        return list(map(lambda x: x["gain"], self.trade_history))
+
+    def gain_rate(self):
+        return list(map(lambda x: x["gain_rate"], self.trade_history))
+
+    def profits(self):
+        return list(filter(lambda x: x > 0), self.gain())
+
+    def loss(self):
+        return list(filter(lambda x: x < 0), self.gain())
+
+    def profits_rate(self):
+        return list(filter(lambda x: x > 0), self.gain_rate())
+
+    def loss_rate(self):
+        return list(filter(lambda x: x < 0), self.gain_rate())
+
     # 平均利益率
     def average_profit_rate(self):
-        return numpy.average(self.profits) / self.win_trade_num()
+        if self.win_trade_num() == 0:
+            return 0
+        return numpy.average(self.profits_rate()) / self.win_trade_num()
 
     # 平均損失率
     def average_loss_rate(self):
-        return numpy.average(self.loss) / self.loss_trade_num()
+        if self.lose_trade_num() == 0:
+            return 0
+        return numpy.average(self.loss_rate()) / self.lose_trade_num()
 
 class TradeRecorder:
     def __init__(self, output_dir=""):
@@ -285,25 +319,19 @@ class Simulator:
     def __init__(self, setting, position = None):
         system = "credit" if setting.short_trade else "actual"
         method = "short" if setting.short_trade else "long"
-        self._setting = setting
-        self._position = position if position is not None else Position(system=system, method=method)
-        self._assets = setting.assets
-        self._stats = SimulatorStats(setting)
-        self._logs = []
-        self._new_orders = []
-        self._repay_orders = []
+        self.setting = setting
+        self.position = position if position is not None else Position(system=system, method=method)
+        self.assets = setting.assets
+        self.stats = SimulatorStats()
+        self.logs = []
+        self.new_orders = []
+        self.repay_orders = []
         self.trade_recorder = TradeRecorder()
 
     def log(self, message):
-        if self._setting.debug:
+        if self.setting.debug:
             print(message)
-            self._logs.append(message)
-
-    def stats(self):
-        return self._stats
-
-    def position(self):
-        return self._position
+            self.logs.append(message)
 
     # ルールすべてに当てはまるならTrue
     def apply_all_rules(self, data, index, rules, rate=1.0):
@@ -315,77 +343,69 @@ class Simulator:
         return results
 
     def create_appliable_data(self, data, index, rate=1.0):
-        return AppliableData(data, index, self._position, self.total_assets(data.daily["close"].iloc[-1].item()), self._setting, self._stats, rate)
+        return AppliableData(data, index, self.position, self.total_assets(data.daily["close"].iloc[-1].item()), self.setting, self.stats, rate)
 
     # 総資産
     def total_assets(self, value):
-        num = self._position.num()
+        num = self.position.get_num()
         holdings = float(value) * int(num)
-        return self._assets + holdings
+        return self.assets + holdings
 
     # 新規
     def new(self, value, num):
-        value = value * (1 + random.uniform(0.0, self._setting.error_rate))
-        if (self._assets - value * num) <= 0:
+        value = value * (1 + random.uniform(0.0, self.setting.error_rate))
+        if (self.assets - value * num) <= 0:
             # 資産が足りなければスルー
             self.log(" - assets_not_enough: num %s, value %s" % (num, value))
             return False
         if num <= 0:
             return False
 
-        pos = self.total_assets(self._position.value())
-        self._assets += self._position.new(num, value)
+        pos = self.total_assets(self.position.get_value())
+        self.assets += self.position.new(num, value)
         self.commission()
 
-        self.log(" new: %s yen x %s, total %s, ave %s, assets %s" % (value, num, self._position.num(), self._position.value(), self.total_assets(value)))
+        self.log(" new: %s yen x %s, total %s, ave %s, assets %s" % (value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value)))
 
-        if self._setting.auto_stop_loss:
-            order = Order(num, [lambda x: x["position"].gain(x["value"]) < - (pos * self._setting.stop_loss_rate)], is_reverse_limit=True) # 損失が総資産の2%以上なら即損切
+        if self.setting.auto_stop_loss:
+            order = Order(num, [lambda x: x["position"].gain(x["value"]) < - (pos * self.setting.stop_loss_rate)], is_reverse_limit=True) # 損失が総資産の2%以上なら即損切
             self.log(" - auto_stop_loss_order: num %s" % (num))
 
         return True
 
     # 返済
     def repay(self, value, num):
-        value = value * (1 - random.uniform(0.0, self._setting.error_rate))
-        if (num <= 0 or self._position.num() <= 0):
+        value = value * (1 - random.uniform(0.0, self.setting.error_rate))
+        if (num <= 0 or self.position.get_num() <= 0):
             return False
 
-        pos = self.total_assets(self._position.value())
-        gain_rate = self._position.gain_rate(value)
-        gain = self._position.gain(value)
-        self._assets += self._position.repay(num, value)
+        pos = self.total_assets(self.position.get_value())
+        gain_rate = self.position.gain_rate(value)
+        gain = self.position.gain(value)
+        self.assets += self.position.repay(num, value)
         self.commission()
 
-        # stats
-        if self.total_assets(value) > pos:
-          self._stats.trade.append(1)
-          self._stats.profits.append(gain_rate)
-        else:
-          self._stats.trade.append(-1)
-          self._stats.loss.append(gain_rate)
-
-        self.log(" repay: %s yen x %s, total %s, ave %s, assets %s : gain %s" % (value, num, self._position.num(), self._position.value(), self.total_assets(value), gain))
+        self.log(" repay: %s yen x %s, total %s, ave %s, assets %s : gain %s" % (value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), gain))
         return True
 
     # 全部売る
     def closing(self, value, data=None):
-        num = self._position.num()
-        gain = self._position.gain_rate(value)
+        num = self.position.get_num()
+        gain = self.position.gain_rate(value)
         if self.repay(value, num) and data is not None:
             self.trade_recorder.repay(data.iloc[-1], gain, num)
 
-        self._new_orders = []
-        self._repay_orders = []
+        self.new_orders = []
+        self.repay_orders = []
 
     # 取引手数料
     # TODO 実際のものに合わせる
     def commission(self):
-        self._assets -= self._setting.commission
+        self.assets -= self.setting.commission
 
     def new_order(self, price, agreed_price=None):
-        signals = list(filter(lambda x: x.signal(price, self._position), self._new_orders)) # 条件を満たした注文
-        self._new_orders = list(filter(lambda x: not x.signal(price, self._position), self._new_orders)) # 残っている注文
+        signals = list(filter(lambda x: x.signal(price, self.position), self.new_orders)) # 条件を満たした注文
+        self.new_orders = list(filter(lambda x: not x.signal(price, self.position), self.new_orders)) # 残っている注文
 
         # 注文の価格を設定
         for i in range(len(signals)):
@@ -393,8 +413,8 @@ class Simulator:
         return signals
 
     def repay_order(self, price, agreed_price=None):
-        signals = list(filter(lambda x: x.signal(price, self._position), self._repay_orders)) # 条件を満たした注文
-        self._repay_orders = list(filter(lambda x: not x.signal(price, self._position), self._repay_orders)) # 残っている注文
+        signals = list(filter(lambda x: x.signal(price, self.position), self.repay_orders)) # 条件を満たした注文
+        self.repay_orders = list(filter(lambda x: not x.signal(price, self.position), self.repay_orders)) # 残っている注文
 
         for i in range(len(signals)):
             signals[i].price = price if agreed_price is None else agreed_price
@@ -402,8 +422,8 @@ class Simulator:
         return signals
 
     def reverse_limit_repay_order(self, price, agreed_price=None):
-        signals = list(filter(lambda x: x.signal(price, self._position) and x.is_reverse_limit, self._repay_orders)) # 条件を満たした注文
-        self._repay_orders = list(filter(lambda x: not x.signal(price, self._position) or not x.is_reverse_limit, self._repay_orders)) # 残っている注文
+        signals = list(filter(lambda x: x.signal(price, self.position) and x.is_reverse_limit, self.repay_orders)) # 条件を満たした注文
+        self.repay_orders = list(filter(lambda x: not x.signal(price, self.position) or not x.is_reverse_limit, self.repay_orders)) # 残っている注文
 
         for i in range(len(signals)):
             signals[i].price = price if agreed_price is None else agreed_price
@@ -414,12 +434,12 @@ class Simulator:
     def reverse_limit_price(self, price, assets=None):
         # 注文の価格を設定
         total = self.total_assets(price) if assets is None else assets
-        price_range = (total * 0.02) / self._position.num()
-        print("reverse_limit_price:", total, self._position.num(), price_range)
-        if self._setting.short_trade:
-            value = self._position.value() + price_range
+        price_range = (total * 0.02) / self.position.get_num()
+        print("reverse_limit_price:", total, self.position.get_num(), price_range)
+        if self.setting.short_trade:
+            value = self.position.get_value() + price_range
         else:
-            value = self._position.value() - price_range
+            value = self.position.get_value() - price_range
         return value
 
     # 新規シグナル
@@ -437,18 +457,18 @@ class Simulator:
 
     def get_stats(self): 
         stats = dict()
-        stats["assets"] = int(self._assets)
-        stats["gain"] = stats["assets"] - self._setting.assets
-        stats["return"] = float((stats["assets"] - self._setting.assets) / float(self._setting.assets))
-        stats["win_rate"] = float(self.stats().win_rate())
-        stats["drawdown"] = float(self.stats().max_drawdown())
-        stats["max_unavailable_assets"] = max(list(map(lambda x: self._setting.assets - x["assets"], self.stats().available_assets_history))) if len(self.stats().available_assets_history) > 0 else 0
-        stats["trade"] = int(self.stats().trade_num())
-        stats["win_trade"] = int(self.stats().win_trade_num())
+        stats["assets"] = int(self.assets)
+        stats["gain"] = stats["assets"] - self.setting.assets
+        stats["return"] = float((stats["assets"] - self.setting.assets) / float(self.setting.assets))
+        stats["win_rate"] = float(self.stats.win_rate())
+        stats["drawdown"] = float(self.stats.max_drawdown())
+        stats["max_unavailable_assets"] = self.stats.max_unavailable_assets()
+        stats["trade"] = int(self.stats.trade_num())
+        stats["win_trade"] = int(self.stats.win_trade_num())
         # 平均利益率
-        stats["average_profit_rate"] = self.stats().average_profit_rate() if len(self.stats().profits) > 0 else 0.0
+        stats["average_profit_rate"] = self.stats.average_profit_rate()
         # 平均損失率
-        stats["average_loss_rate"] = self.stats().average_loss_rate() if len(self.stats().loss) > 0 else 0.0
+        stats["average_loss_rate"] = self.stats.average_loss_rate()
         # リワードリスクレシオ
         win = stats["average_profit_rate"] * stats["win_rate"]
         loss = abs(stats["average_loss_rate"]) * (1 - stats["win_rate"])
@@ -457,17 +477,17 @@ class Simulator:
         stats["rewordriskratio"] = win / loss if loss > 0 else win
 
         # トレード履歴
-        stats["trade_history"] = self.stats().trade_history
+        stats["trade_history"] = self.stats.trade_history
 
-        if self._setting.debug:
-            stats["logs"] = self._logs
+        if self.setting.debug:
+            stats["logs"] = self.logs
 
         return stats
 
     def create_term_data(self, date, data):
         assert type(data) is SimulatorData, "data is not SimulatorData."
 
-        if self._setting.ignore_latest_weekly:
+        if self.setting.ignore_latest_weekly:
             weekly = data.weekly[data.weekly["date"] <= date].iloc[:-1] # weeklyは最新の足は確定していないので最新のは除外する
         else:
             weekly = data.weekly[data.weekly["date"] <= date]
@@ -508,36 +528,36 @@ class Simulator:
         price = today["open"].iloc[-1].item()
         self.log("date: %s, price %s" % (date, price))
 
-        self.trade(self._setting.strategy, price, term_data, term_index)
+        self.trade(self.setting.strategy, price, term_data, term_index)
         return self.total_assets(price)
 
     def repay_signal(self, strategy, data, index):
         for order in self.taking_signal(strategy, data, index):
             if order.num > 0:
                 self.log(" - taking_order: num %s" % (order.num))
-            self._repay_orders.append(order)
+            self.repay_orders.append(order)
 
         for order in self.stop_loss_signal(strategy, data, index):
             if order.num > 0:
                 self.log(" - stop_loss_order: num %s" % (order.num))
-            self._repay_orders.append(order)
+            self.repay_orders.append(order)
 
         for order in self.closing_signal(strategy, data, index):
             if order.num > 0:
                 self.log(" - closing_order: num %s" % (order.num))
-            self._repay_orders.append(order)
+            self.repay_orders.append(order)
 
     def order_adjust(self):
         # ポジションがなければ返済シグナルは捨てる
-        if self._position.num() <= 0 and len(self._repay_orders) > 0:
+        if self.position.get_num() <= 0 and len(self.repay_orders) > 0:
             self.log("[cancel] repay order")
-            self._repay_orders = []
+            self.repay_orders = []
 
         # 新規・返済が同時に出ている場合何もしない
-        if len(self._new_orders) > 0 and len(self._repay_orders) > 0:
+        if len(self.new_orders) > 0 and len(self.repay_orders) > 0:
             self.log("[cancel] new/repay order")
-            self._new_orders = []
-            self._repay_orders = []
+            self.new_orders = []
+            self.repay_orders = []
 
     # トレード
     def trade(self, strategy, price, data, index):
@@ -545,31 +565,37 @@ class Simulator:
         # stats
         date = data.daily["date"].iloc[-1]
         self.trade_recorder.set_columns(data.daily.columns)
-        self._stats.trade.append(0)
-        self._stats.add_assets_history(date, self.total_assets(price))
-        self._stats.add_available_assets_history(date, self._assets)
-#        self.log("[drawdown] %s" % self._stats.drawdown[-1])
-        trade_data = {"date": date, "new": None, "repay": None, "gain": None, "term": 0, "size": 0}
+        trade_data = {
+            "date": date,
+            "new": None,
+            "repay": None,
+            "gain": None,
+            "gain_rate": None,
+            "assets": self.total_assets(price),
+            "available_assets": self.assets,
+            "term": 0,
+            "size": 0
+        }
 
         # 判断に必要なデータ数がない
-        if len(data.daily) < self._setting.min_data_length or price == 0:
+        if len(data.daily) < self.setting.min_data_length or price == 0:
             self.log("less data. skip trade. [%s - %s]" % (data.daily["date"].iloc[0], data.daily["date"].iloc[-1]))
-            self._stats.trade_history.append(trade_data)
+            self.stats.trade_history.append(trade_data)
             return self.total_assets(0)
 
         # ポジションの保有期間を増やす
-        if self._position.num() > 0:
-            self._position.increment_term()
+        if self.position.get_num() > 0:
+            self.position.increment_term()
 
         # 寄り付き====================================================================
-        if self._setting.virtual_trade:
+        if self.setting.virtual_trade:
             # 仮装トレードなら注文をキューから取得
             new_orders = self.new_order(price)
             repay_orders = []
-            if self._position.num() > 0:
+            if self.position.get_num() > 0:
                 # 自動損切の注文処理（longなら安値、shortなら高値）
-                if self._setting.auto_stop_loss:
-                    if self._setting.short_trade:
+                if self.setting.auto_stop_loss:
+                    if self.setting.short_trade:
                         value = self.reverse_limit_price(data.daily["high"].iloc[-1])
                         repay_orders += self.reverse_limit_repay_order(price, value)
                     else:
@@ -585,20 +611,21 @@ class Simulator:
 
             # 返済注文実行
             for order in repay_orders:
-                if self._position.num() <= 0:
-                    self._repay_orders = [] # ポジションがなくなってたら以降の注文はキャンセル
+                if self.position.get_num() <= 0:
+                    self.repay_orders = [] # ポジションがなくなってたら以降の注文はキャンセル
                     break
-                gain = self._position.gain_rate(order.price)
+                pos = self.position
                 if self.repay(order.price, order.num):
-                    self.trade_recorder.repay(data.daily.iloc[-1], gain, order.num)
+                    self.trade_recorder.repay(data.daily.iloc[-1], pos.gain_rate(order.price), order.num)
                     trade_data["repay"] = order.price
-                    trade_data["gain"] = gain
+                    trade_data["gain"] = pos.gain(order.price)
+                    trade_data["gain_rate"] = pos.gain_rate(order.price)
 
         ## 引け後=====================================================================
         # 新規ルールに当てはまる場合買う
         for order in self.new_signal(strategy, data, index):
             self.log(" - new_order: num %s" % (order.num))
-            self._new_orders.append(order)
+            self.new_orders.append(order)
 
         # 返済注文
         self.repay_signal(strategy, data, index)
@@ -606,7 +633,7 @@ class Simulator:
         self.order_adjust()
 
         # トレード履歴
-        trade_data["size"] = self._position.num()
-        trade_data["term"] = self._position.term()
-        self._stats.trade_history.append(trade_data)
+        trade_data["size"] = self.position.get_num()
+        trade_data["term"] = self.position.get_term()
+        self.stats.trade_history.append(trade_data)
 

@@ -320,7 +320,7 @@ class StrategyUtil:
 
     # 利益目標
     def goal(self, data):
-        order = data.position.num() # 現在の保有数
+        order = data.position.get_num() # 現在の保有数
         if data.setting.short_trade:
             price = data.data.daily["low"].iloc[-1]
             line = data.data.daily["support"].iloc[-1]
@@ -335,7 +335,7 @@ class StrategyUtil:
 
     # 損失リスク
     def risk(self, data):
-        order = data.position.num() # 現在の保有数
+        order = data.position.get_num() # 現在の保有数
         price = data.data.daily["close"].iloc[-1]
 
         safety = self.safety(data, 1)
@@ -364,7 +364,7 @@ class StrategyUtil:
     def caution(self, data, risk):
         conditions = [
             risk == 0, # セーフティーを下回っている
-            data.position.num() == 0, # 初回の仕掛け
+            data.position.get_num() == 0, # 初回の仕掛け
             data.position.gain(self.price(data)) < 0, # 損益がマイナス
         ]
         return any(conditions)
@@ -378,7 +378,7 @@ class StrategyUtil:
 
     # ポジションサイズ
     def order(self, data, max_risk, risk, max_position_size):
-        current = data.position.num()
+        current = data.position.get_num()
         max_order = self.max_order(max_risk, risk)
         max_order = max_order if max_order < max_position_size else max_position_size
         max_order = int((max_order - current)) # 保有できる最大まで
@@ -398,11 +398,11 @@ class StrategyUtil:
             return data.data.daily["rising_safety"].iloc[-term:].max()
 
     def term(self, data):
-        return 1 if data.position.term()  == 0 else data.position.term()
+        return 1 if data.position.get_term()  == 0 else data.position.get_term()
 
     # 1単元で最大の損切ラインを適用
     def stop_loss_rate(self, data, max_position_size):
-        position_rate = data.position.num() / max_position_size
+        position_rate = data.position.get_num() / max_position_size
         return data.setting.stop_loss_rate * position_rate
 
 ## 指定可能な戦略====================================================================================================================
@@ -434,7 +434,7 @@ class Combination(StrategyCreator, StrategyUtil):
 
     # 買い
     def create_new_rules(self, data):
-        drawdown = list(map(lambda x: x["drawdown"], data.stats.drawdown[-20:]))
+        drawdown = data.stats.drawdown()[-20:]
         drawdown_diff = list(filter(lambda x: x > data.setting.stop_loss_rate * 3, numpy.diff(drawdown))) if len(drawdown) > 1 else []
         drawdown_sum = list(filter(lambda x: x > 0, numpy.diff(drawdown))) if len(drawdown) > 1 else []
         risk = self.risk(data)
@@ -451,7 +451,7 @@ class Combination(StrategyCreator, StrategyUtil):
 
         conditions = [
             all(drawdown_conditions), # ドローダウンが問題ない状態
-            (data.position.num() < max_order) if risk > 0 else False, # 最大ポジションサイズ以下
+            (data.position.get_num() < max_order) if risk > 0 else False, # 最大ポジションサイズ以下
             self.apply_common(data, self.common.new)
         ]
 
@@ -474,7 +474,7 @@ class Combination(StrategyCreator, StrategyUtil):
                 self.apply_common(data, self.common.taking),
                 self.apply(data, self.conditions.taking)
             ]
-        return simulator.Order(data.position.num(), [lambda x: True]) if all(conditions) else None
+        return simulator.Order(data.position.get_num(), [lambda x: True]) if all(conditions) else None
 
     # 損切
     def create_stop_loss_rules(self, data):
@@ -482,11 +482,11 @@ class Combination(StrategyCreator, StrategyUtil):
             conditions = [self.apply_common(data, self.common.stop_loss)]
         else:
             conditions = [
-                utils.rate(data.position.value(), data.data.daily["close"].iloc[-1]) < -self.stop_loss_rate(data, self.setting.max_position_size), # 1単元で最大の損切ラインを適用
+                utils.rate(data.position.get_value(), data.data.daily["close"].iloc[-1]) < -self.stop_loss_rate(data, self.setting.max_position_size), # 1単元で最大の損切ラインを適用
                 self.apply_common(data, self.common.stop_loss) and self.apply(data, self.conditions.stop_loss),
             ]
         if any(conditions):
-            return simulator.Order(data.position.num(), [lambda x: True])
+            return simulator.Order(data.position.get_num(), [lambda x: True])
         return None
 
     # 手仕舞い
@@ -498,7 +498,7 @@ class Combination(StrategyCreator, StrategyUtil):
                 self.apply_common(data, self.common.closing) and self.apply(data, self.conditions.closing),
             ]
         if any(conditions):
-            return simulator.Order(data.position.num(), [lambda x: True])
+            return simulator.Order(data.position.get_num(), [lambda x: True])
 
         return None
 
