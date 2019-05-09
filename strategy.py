@@ -422,7 +422,8 @@ class CombinationSetting:
     max_position_size = 500
     sorted_conditions = True
     monitor_size = 3
-    seed = t.time()
+    condition_size = 5
+    seed = [t.time()]
 
 class Combination(StrategyCreator, StrategyUtil):
     def __init__(self, conditions, common, setting=None):

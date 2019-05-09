@@ -12,14 +12,13 @@ class CombinationStrategy(CombinationCreator):
         self.conditions_all = conditions.all()
         setting.sorted_conditions = False
 
-        random.seed(setting.seed)
+        random.seed(setting.seed[0])
 
-        self.new_conditions         = random.sample(self.conditions_all, 5)
-        self.taking_conditions      = random.sample(self.conditions_all, 5)
-        self.stop_loss_conditions   = random.sample(self.conditions_all, 5)
+        self.new_conditions         = random.sample(self.conditions_all, setting.condition_size)
+        self.taking_conditions      = random.sample(self.conditions_all, setting.condition_size)
+        self.stop_loss_conditions   = random.sample(self.conditions_all, setting.condition_size)
 
         super().__init__(setting)
-
 
     def subject(self, date):
         stocks = Loader.before_ranking(date, "volume")
