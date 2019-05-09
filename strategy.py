@@ -162,8 +162,8 @@ def load_strategy_creator(args, combination_setting=None):
             return CombinationStrategy(combination_setting)
 
 # args > json > default の優先度
-def create_combination_setting(args):
-    combination_setting = create_combination_setting_by_json(args)
+def create_combination_setting(args, use_json=True):
+    combination_setting = create_combination_setting_by_json(args) if use_json else CombinationSetting()
     combination_setting.position_sizing = args.position_sizing if args.position_sizing else combination_setting.position_sizing
     combination_setting.max_position_size = combination_setting.max_position_size if args.max_position_size is None else int(args.max_position_size)
     combination_setting.monitor_size = combination_setting.monitor_size if args.monitor_size is None else int(args.monitor_size)
@@ -180,8 +180,8 @@ def create_combination_setting_by_json(args):
     combination_setting.seed = setting_dict["seed"] if "seed" in setting_dict.keys() else combination_setting.seed
     return combination_setting
 
-def create_simulator_setting(args):
-    simulator_setting = create_simulator_setting_by_json(args)
+def create_simulator_setting(args, use_json=True):
+    simulator_setting = create_simulator_setting_by_json(args) if use_json else SimulatorSetting()
     simulator_setting.stop_loss_rate = simulator_setting.stop_loss_rate if args.stop_loss_rate is None else float(args.stop_loss_rate)
     simulator_setting.taking_rate = simulator_setting.taking_rate if args.taking_rate is None else float(args.taking_rate)
     simulator_setting.ignore_latest_weekly = args.daytrade
