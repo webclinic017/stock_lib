@@ -40,13 +40,6 @@ class CombinationStrategy(CombinationCreator):
             lambda d: d.position.gain(self.price(d)) < 0,
         ]
 
-        if len(self.setting.seed) > 1:
-            for s in self.setting.seed[1:]:
-                default.new         = default.new       + utils.combination(setting.new, self.new_conditions)
-                default.taking      = default.taking    + utils.combination(setting.taking, self.taking_conditions)
-                default.stop_loss   = default.stop_loss + utils.combination(setting.stop_loss, self.stop_loss_conditions)
-                self.conditions_by_seed(s)
-
         return default
 
     def new(self):
