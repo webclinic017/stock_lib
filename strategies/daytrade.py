@@ -9,16 +9,19 @@ from loader import Loader
 
 class CombinationStrategy(CombinationCreator):
     def __init__(self, setting):
-        self.conditions_all = conditions.all()
+        self.conditions_all         = conditions.all()
         setting.sorted_conditions = False
 
-        random.seed(setting.seed[0])
-
-        self.new_conditions         = random.sample(self.conditions_all, setting.condition_size)
-        self.taking_conditions      = random.sample(self.conditions_all, setting.condition_size)
-        self.stop_loss_conditions   = random.sample(self.conditions_all, setting.condition_size)
-
         super().__init__(setting)
+
+        self.conditions_by_seed(setting.seed[0])
+
+    def conditions_by_seed(self, seed):
+        random.seed(seed)
+
+        self.new_conditions         = random.sample(self.conditions_all, self.setting.condition_size)
+        self.taking_conditions      = random.sample(self.conditions_all, self.setting.condition_size)
+        self.stop_loss_conditions   = random.sample(self.conditions_all, self.setting.condition_size)
 
     def subject(self, date):
         stocks = Loader.before_ranking(date, "volume")
@@ -30,7 +33,7 @@ class CombinationStrategy(CombinationCreator):
 
         return codes
 
-    def common(self):
+    def common(self, setting):
         default = self.default_common()
         default.new = [
         ]
