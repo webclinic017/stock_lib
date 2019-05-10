@@ -12,16 +12,16 @@ class CombinationStrategy(CombinationCreator):
         self.conditions_all         = conditions.all()
         setting.sorted_conditions = False
 
-        self.conditions_by_seed(setting.seed[0])
-
         super().__init__(setting)
+
+        self.conditions_by_seed(setting.seed[0])
 
     def conditions_by_seed(self, seed):
         random.seed(seed)
 
-        self.new_conditions         = random.sample(self.conditions_all, setting.condition_size)
-        self.taking_conditions      = random.sample(self.conditions_all, setting.condition_size)
-        self.stop_loss_conditions   = random.sample(self.conditions_all, setting.condition_size)
+        self.new_conditions         = random.sample(self.conditions_all, self.setting.condition_size)
+        self.taking_conditions      = random.sample(self.conditions_all, self.setting.condition_size)
+        self.stop_loss_conditions   = random.sample(self.conditions_all, self.setting.condition_size)
 
 
     def subject(self, date):
@@ -39,6 +39,12 @@ class CombinationStrategy(CombinationCreator):
         default.stop_loss = [
             lambda d: d.position.gain(self.price(d)) < 0,
         ]
+
+        for i in range(1, len(setting[1:])):
+            default.new         = default.new           + [lambda d: self.apply(utils.combination(setting[i].new, self.new_conditions))]
+            default.taking      = default.taking        + [lambda d: self.apply(utils.combination(setting[i].taking, self.taking_conditions))]
+            default.stop_loss   = default.stop_loss     + [lambda d: self.apply(utils.combination(setting[i].stop_loss, self.stop_loss_conditions))]
+            self.conditions_by_seed(self.setting.seed[i])
 
         return default
 

@@ -130,9 +130,9 @@ def load_strategy_setting(args):
 
 
     if setting_dict is None:
-        strategy_setting = StrategySetting()
+        strategy_setting = []
     else:
-        strategy_setting = create_setting_by_dict(setting_dict["setting"])
+        strategy_setting = list(map(lambda x: create_setting_by_dict(x), setting_dict["setting"]))
     return setting_dict, strategy_setting
 
 def load_strategy(args, combination_setting=None):
@@ -217,7 +217,12 @@ class Strategy:
         self.closing_rules = list(map(lambda x: Rule(x), closing_rules))
 
 def create_setting_by_dict(params):
-     return namedtuple("StrategySetting", params.keys())(*params.values())
+     return StrategySetting().by_array([
+        params["new"],
+        params["taking"],
+        params["stop_loss"],
+        params["closing"]
+     ])
 
 def strategy_setting_to_dict(strategy_setting):
     return {"new": strategy_setting.new, "taking": strategy_setting.taking, "stop_loss": strategy_setting.stop_loss, "closing": strategy_setting.closing}
@@ -530,10 +535,10 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
             list(range(utils.combinations_size(self.closing()))),
         ]
 
-    def create(self, setting):
-        condition = self.sorted_conditions(setting) if self.setting.sorted_conditions else self.conditions(setting)
+    def create(self, settings):
+        condition = self.sorted_conditions(settings[0]) if self.setting.sorted_conditions else self.conditions(settings[0])
         c = StrategyConditions().by_array(condition)
-        return Combination(c, self.common(setting), self.setting).create()
+        return Combination(c, self.common(settings), self.setting).create()
 
     # ソート済みのリストから条件を取得
     def sorted_conditions(self, setting):

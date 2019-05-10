@@ -10,9 +10,10 @@ from simulator import Simulator, TradeRecorder
 
 
 class StrategySimulator:
-    def __init__(self, simulator_setting, combination_setting, verbose=False):
+    def __init__(self, simulator_setting, combination_setting, strategy_settings, verbose=False):
         self.simulator_setting = simulator_setting
         self.combination_setting = combination_setting
+        self.strategy_settings = strategy_settings
         self.verbose = verbose
         self.cacher = cache.Cache("/tmp/strategy_simulator")
         self.cacher.remove_dir()
@@ -90,7 +91,8 @@ class StrategySimulator:
         simulators = {}
         simulator_setting = self.simulator_setting
         simulator_setting.debug = self.verbose
-        simulator_setting.strategy = self.strategy_creator(args).create(strategy_setting)
+        strategy_settings = self.strategy_settings[:-1] + [strategy_setting] # 最後の設定を変えて検証
+        simulator_setting.strategy = self.strategy_creator(args).create(strategy_settings)
         for code in stocks.keys():
             simulators[code] = Simulator(simulator_setting)
 
