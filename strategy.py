@@ -293,6 +293,17 @@ class StrategyConditions():
 
 
 class StrategyUtil:
+    def apply(self, data, conditions):
+        if len(conditions) == 0:
+            return False
+        a = list(map(lambda x: x(data), conditions[0]))
+        b = list(map(lambda x: x(data), conditions[1]))
+        return all(a) and any(b)
+
+    def apply_common(self, data, conditions):
+        common = list(map(lambda x: x(data), conditions))
+        return all(common)
+
     def price(self, data):
         return data.data.daily["close"].iloc[-1]
 
@@ -431,17 +442,6 @@ class Combination(StrategyCreator, StrategyUtil):
         self.common = common
         self.setting = CombinationSetting() if setting is None else setting
 
-    def apply(self, data, conditions):
-        if len(conditions) == 0:
-            return False
-        a = list(map(lambda x: x(data), conditions[0]))
-        b = list(map(lambda x: x(data), conditions[1]))
-        return all(a) and any(b)
-
-    def apply_common(self, data, conditions):
-        common = list(map(lambda x: x(data), conditions))
-        return all(common)
-
     # 買い
     def create_new_rules(self, data):
         drawdown = data.stats.drawdown()[-20:]
@@ -533,7 +533,7 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
     def create(self, setting):
         condition = self.sorted_conditions(setting) if self.setting.sorted_conditions else self.conditions(setting)
         c = StrategyConditions().by_array(condition)
-        return Combination(c, self.common(), self.setting).create()
+        return Combination(c, self.common(setting), self.setting).create()
 
     # ソート済みのリストから条件を取得
     def sorted_conditions(self, setting):
@@ -571,7 +571,7 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
         return StrategyCreator(rules, rules, rules, rules)
 
     # @return StrategyCreator
-    def common(self):
+    def common(self, setting):
         return self.default_common()
 
     def new(self):

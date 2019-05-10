@@ -9,36 +9,25 @@ from loader import Loader
 
 class CombinationStrategy(CombinationCreator):
     def __init__(self, setting):
-        self.conditions_all = conditions.all()
+        self.conditions_all         = conditions.all()
         setting.sorted_conditions = False
 
-        random.seed(setting.seed[0])
-
-        self.new_conditions         = random.sample(self.conditions_all, setting.condition_size)
-        self.taking_conditions      = random.sample(self.conditions_all, setting.condition_size)
-        self.stop_loss_conditions   = random.sample(self.conditions_all, setting.condition_size)
-
-        if len(setting.seed) > 1:
-            # seed値で既存の設定を利用する範囲を決める
-            new, taking, stop_loss = [], [], []
-            for i, seed in enumerate(setting.seed[1:]):
-                random.seed(seed)
-                new         = new       + [random.choice(self.new_conditions)]
-                taking      = taking    + [random.choice(self.taking_conditions)]
-                stop_loss   = stop_loss + [random.choice(self.stop_loss_conditions)]
-
-            # 足りない条件は全体から追加する
-            self.new_conditions         = new       + random.sample(self.conditions_all, setting.condition_size - len(new))
-            self.taking_conditions      = taking    + random.sample(self.conditions_all, setting.condition_size - len(taking))
-            self.stop_loss_conditions   = stop_loss + random.sample(self.conditions_all, setting.condition_size - len(stop_loss))
-
-
         super().__init__(setting)
+
+        self.conditions_by_seed(setting.seed[0])
+
+    def conditions_by_seed(self, seed):
+        random.seed(seed)
+
+        self.new_conditions         = random.sample(self.conditions_all, self.setting.condition_size)
+        self.taking_conditions      = random.sample(self.conditions_all, self.setting.condition_size)
+        self.stop_loss_conditions   = random.sample(self.conditions_all, self.setting.condition_size)
+
 
     def subject(self, date):
         return ["nikkei"]
 
-    def common(self):
+    def common(self, setting):
         default = self.default_common()
         default.new = [
         ]
@@ -50,6 +39,13 @@ class CombinationStrategy(CombinationCreator):
         default.stop_loss = [
             lambda d: d.position.gain(self.price(d)) < 0,
         ]
+
+        if len(self.setting.seed) > 1:
+            for s in self.setting.seed[1:]:
+                default.new         = default.new       + [lambda d: self.apply(d, utils.combination(setting.new, self.new_conditions))]
+                default.taking      = default.taking    + [lambda d: self.apply(d, utils.combination(setting.taking, self.taking_conditions))]
+                default.stop_loss   = default.stop_loss + [lambda d: self.apply(d, utils.combination(setting.stop_loss, self.stop_loss_conditions))]
+                self.conditions_by_seed(s)
 
         return default
 
