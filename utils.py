@@ -43,10 +43,10 @@ def add_band_stats(data):
     upper, _, lower = ta.BBANDS(close, timeperiod=25, nbdevup=1, nbdevdn=1, matype=0)
     upper2, _, lower2 = ta.BBANDS(close, timeperiod=25, matype=0)
 
-    data["env12"]          = upper2
-    data["env11"]          = upper
-    data["env09"]          = lower
-    data["env08"]          = lower2
+    data["env12"]          = nan_to_num(upper2)
+    data["env11"]          = nan_to_num(upper)
+    data["env09"]          = nan_to_num(lower)
+    data["env08"]          = nan_to_num(lower2)
 
     data["env_entity"]     =  each(lambda i, x: x["env12"] - x["env08"], data)
     data["env_entity_average"] = ta.SMA(numpy.array(data["env_entity"].as_matrix(), dtype="f8"), timeperiod=5)
