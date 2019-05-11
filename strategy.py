@@ -184,7 +184,6 @@ def create_simulator_setting(args, use_json=True):
     simulator_setting = create_simulator_setting_by_json(args) if use_json else SimulatorSetting()
     simulator_setting.stop_loss_rate = simulator_setting.stop_loss_rate if args.stop_loss_rate is None else float(args.stop_loss_rate)
     simulator_setting.taking_rate = simulator_setting.taking_rate if args.taking_rate is None else float(args.taking_rate)
-    simulator_setting.ignore_latest_weekly = args.daytrade
     simulator_setting.short_trade = args.short
     return simulator_setting
 
@@ -195,7 +194,6 @@ def create_simulator_setting_by_json(args):
         return simulator_setting
     simulator_setting.stop_loss_rate = setting_dict["stop_loss_rate"] if "stop_loss_rate" in setting_dict.keys() else simulator_setting.stop_loss_rate
     simulator_setting.taking_rate = setting_dict["taking_rate"] if "taking_rate" in setting_dict.keys() else simulator_setting.taking_rate
-    simulator_setting.ignore_latest_weekly = args.daytrade
     simulator_setting.short_trade = args.short
     return simulator_setting
 # ========================================================================

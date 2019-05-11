@@ -178,7 +178,6 @@ class SimulatorSetting:
         self.auto_stop_loss = False
         self.stop_loss_rate = 0.02
         self.taking_rate = 0.005
-        self.ignore_latest_weekly = False
 
 # 統計
 class SimulatorStats:
@@ -501,10 +500,7 @@ class Simulator:
     def create_term_data(self, date, data):
         assert type(data) is SimulatorData, "data is not SimulatorData."
 
-        if self.setting.ignore_latest_weekly:
-            weekly = data.weekly[data.weekly["date"] <= date].iloc[:-1] # weeklyは最新の足は確定していないので最新のは除外する
-        else:
-            weekly = data.weekly[data.weekly["date"] <= date]
+        weekly = data.weekly[data.weekly["date"] <= date].iloc[:-1] # weeklyは最新の足は確定していないので最新のは除外する
 
         daily = data.daily[data.daily["date"] <= date]
         term_data = SimulatorData(data.code, daily, weekly, data.rule)
