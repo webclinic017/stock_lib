@@ -2,7 +2,6 @@
 import os
 import numpy
 import random
-import utils
 import pandas
 
 # 売買の状態
