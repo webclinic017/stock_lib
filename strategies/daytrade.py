@@ -15,6 +15,7 @@ class CombinationStrategy(CombinationCreator):
         super().__init__(setting)
 
         self.conditions_by_seed(setting.seed[0])
+        self.ranking_type = random.choice(["volume_ratio"])
 
     def conditions_by_seed(self, seed):
         random.seed(seed)
@@ -24,7 +25,7 @@ class CombinationStrategy(CombinationCreator):
         self.stop_loss_conditions   = random.sample(self.conditions_all, self.setting.condition_size)
 
     def subject(self, date):
-        stocks = Loader.before_ranking(date, "volume")
+        stocks = Loader.before_ranking(date, self.ranking_type)
         if stocks is None:
             return []
 

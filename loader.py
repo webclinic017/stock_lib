@@ -135,7 +135,7 @@ class Loader:
           return None
         data = Loader.tick_format(data)
         if with_filter:
-          end_time = "23:59:59" if time is None else utils.format("%s %s" % (end_date, end_time), output_format="%H:%M:%S")
+          end_time = "23:59:59" if time is None else utils.format("%s %s" % (end_date, time), output_format="%H:%M:%S")
           filtered = Loader.filter(data, "%s 00:00:00" % start_date, "%s %s" % (end_date, end_time), strict)
           if len(filtered) == 0:
             return None

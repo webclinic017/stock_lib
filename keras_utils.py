@@ -7,13 +7,6 @@ from keras.models import model_from_json
 from loader import Loader
 
 #### 機械学習用#####
-# アンダーサンプリング
-def under_sampling(X, Y, split):
-    split_pos = int(len(X) * split)
-    x, y = Creator.classify(X[0:split_pos], Y[0:split_pos])
-    x_test, y_test = Creator.classify(X[split_pos:], Y[split_pos:])
-    return x, y, x_test, y_test
-
 # データ数の差を埋める形で重みを変える
 def with_class_weight(y):
     count_dict = collections.Counter(numpy.asarray(y))

@@ -62,7 +62,7 @@ class StrategySimulator:
         if self.verbose:
              print(message)
 
-    def get_data_by_date(data):
+    def get_data_by_date(data, date):
         # filter -> ohlc をすべてoにする-> add_stats
         d = data.daily
         d = d[d["date"] <= date].iloc[-300:].copy()
