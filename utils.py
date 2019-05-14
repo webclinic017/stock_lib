@@ -8,9 +8,11 @@ import statsmodels.api as sm
 import collections
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
+from functools import wraps
 import subprocess
 import talib as ta
 import slack
+import time
 
 def nan_to_num(data, default=0):
     return data if default is None else numpy.nan_to_num(data)
@@ -117,6 +119,14 @@ def add_trend_stats(data):
 
     return data
 
+def add_manda_stats(data):
+    data["pct_change"] = data["close"].pct_change()
+    data["stock_split"]             = (data["pct_change"] < -0.45) * 1
+    data["reverse_stock_split"]     = (data["pct_change"] > 2.0) * 1
+    data["manda"]                   = ((data["stock_split"] == 1) & (data["reverse_stock_split"] == 1)) * 1
+
+    return data
+
 def add_stats(data, default=0, names=[]):
     is_t = lambda name : len(names) == 0 or name in names
 
@@ -128,9 +138,10 @@ def add_stats(data, default=0, names=[]):
         "stages": add_stages_stats,
         "cross": add_cross_stats,
         "trend": add_trend_stats,
+        "manda": add_manda_stats,
     }
 
-    keys = ["average", "tec", "band", "safety", "stages", "cross", "trend"]
+    keys = ["average", "tec", "band", "safety", "stages", "cross", "trend", "manda"]
 
     for name in keys:
         try:
@@ -671,3 +682,13 @@ def combination(index, conditions):
         return ([], cond[1])
     else:
         return cond
+
+def stop_watch(func) :
+    @wraps(func)
+    def wrapper(*args, **kargs):
+        start = time.time()
+        result = func(*args,**kargs)
+        elapsed_time =  time.time() - start
+        print("%s: %s sec." % (func.__name__, round(elapsed_time, 6)))
+        return result
+    return wrapper

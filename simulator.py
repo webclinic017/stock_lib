@@ -3,6 +3,7 @@ import os
 import numpy
 import random
 import pandas
+import utils
 
 # 売買の状態
 class Position:
@@ -197,6 +198,18 @@ class SimulatorStats:
         }
         return trade_data
 
+    def size(self):
+        return list(map(lambda x: x["size"], self.trade_history))
+
+    def term(self):
+        return list(map(lambda x: x["term"], self.trade_history))
+
+    def max_size(self):
+        return max(self.size())
+
+    def max_term(self):
+        return max(self.term())
+
     def trade(self):
         return list(filter(lambda x: x["gain"] is not None, self.trade_history))
 
@@ -239,13 +252,11 @@ class SimulatorStats:
         return max(self.unavailable_assets())
 
     def drawdown(self):
-        drawdown = []
-        assets = self.assets()
-        for i in range(len(assets)):
-            max_assets = max(assets[:i]) if len(assets[:i]) > 0 else assets[i]
-            dd = round((max_assets - assets[i])/float(max_assets), 2)
-            drawdown.append(dd)
-        return drawdown
+        assets = numpy.array(self.assets())
+        max_assets = numpy.maximum.accumulate(assets)
+        drawdown = max_assets - assets
+        drawdown = drawdown / max_assets
+        return drawdown.tolist()
 
     # 最大ドローダウン
     def max_drawdown(self):
@@ -284,13 +295,24 @@ class SimulatorStats:
             return 0
         return numpy.average(self.loss_rate()) / self.lose_trade_num()
 
+    def reword_ratio():
+        return self.average_profit_rate() * self.win_rate()
+
+    def risk_ratio():
+        return abs(self.average_loss_rate) * (1 - self.win_rate())
+
+    # リワードリスクレシオ
+    def rewordriskratio(self):
+        reword = self.reword_ratio()
+        risk = self.risk_ratio()
+        return reword / risk if risk > 0 else reword
+
+
 class TradeRecorder:
     def __init__(self, output_dir=""):
         self.output_dir = "/tmp/trade_recorder/%s" % output_dir
         self.pattern = {"new": [], "repay": [], "gain": []}
         self.columns = None
-        if not os.path.exists(self.output_dir):
-            os.makedirs(self.output_dir)
 
     def set_columns(self, columns):
         self.columns = columns
@@ -316,6 +338,8 @@ class TradeRecorder:
         self.columns = recorder.columns
 
     def output(self, name, append=False):
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
         mode = "a" if append else "w"
         new = pandas.DataFrame(self.pattern["new"], columns=self.columns)
         new.to_csv("%s/new_%s.csv" % (self.output_dir, name), index=None, header=None, mode=mode)
@@ -482,11 +506,7 @@ class Simulator:
         # 平均損失率
         stats["average_loss_rate"] = self.stats.average_loss_rate()
         # リワードリスクレシオ
-        win = stats["average_profit_rate"] * stats["win_rate"]
-        loss = abs(stats["average_loss_rate"]) * (1 - stats["win_rate"])
-        stats["reword"] = win
-        stats["risk"] = loss
-        stats["rewordriskratio"] = win / loss if loss > 0 else win
+        stats["rewordriskratio"] = self.stats.rewordriskratio()
 
         # トレード履歴
         stats["trade_history"] = self.stats.trade_history
@@ -540,7 +560,12 @@ class Simulator:
         self.trade(self.setting.strategy, price, term_data, term_index)
         return self.total_assets(price)
 
-    def repay_signal(self, strategy, data, index):
+    def new_signals(self, strategy, data, index):
+        for order in self.new_signal(strategy, data, index):
+            self.log(" - new_order: num %s" % (order.num))
+            self.new_orders.append(order)
+
+    def repay_signals(self, strategy, data, index):
         for order in self.taking_signal(strategy, data, index):
             if order.num > 0:
                 self.log(" - taking_order: num %s" % (order.num))
@@ -556,6 +581,14 @@ class Simulator:
                 self.log(" - closing_order: num %s" % (order.num))
             self.repay_orders.append(order)
 
+    def signals(self, strategy, data, index):
+        # 新規ルールに当てはまる場合買う
+        self.new_signals(strategy, data, index)
+        # 返済注文
+        self.repay_signals(strategy, data, index)
+        # 注文の整理
+        self.order_adjust()
+
     def order_adjust(self):
         # ポジションがなければ返済シグナルは捨てる
         if self.position.get_num() <= 0 and len(self.repay_orders) > 0:
@@ -567,6 +600,42 @@ class Simulator:
             self.log("[cancel] new/repay order")
             self.new_orders = []
             self.repay_orders = []
+
+    def virtual_trade(self, price, data, trade_data):
+        # 仮想トレードなら注文をキューから取得
+        new_orders = self.new_order(price)
+        repay_orders = []
+        if self.position.get_num() > 0:
+            # 自動損切の注文処理（longなら安値、shortなら高値）
+            if self.setting.auto_stop_loss:
+                if self.setting.short_trade:
+                    value = self.reverse_limit_price(data.daily["high"].iloc[-1])
+                    repay_orders += self.reverse_limit_repay_order(price, value)
+                else:
+                    value = self.reverse_limit_price(data.daily["low"].iloc[-1])
+                    repay_orders += self.reverse_limit_repay_order(price, value)
+            repay_orders += self.repay_order(price)
+
+        # 新規注文実行
+        for order in new_orders:
+            if self.new(order.price, order.num):
+                self.trade_recorder.new(data.daily.iloc[-1], order.num)
+                trade_data["new"] = order.price
+
+        # 返済注文実行
+        for order in repay_orders:
+            if self.position.get_num() <= 0:
+                self.repay_orders = [] # ポジションがなくなってたら以降の注文はキャンセル
+                break
+            gain        = self.position.gain(order.price)
+            gain_rate   = self.position.gain_rate(order.price)
+            if self.repay(order.price, order.num):
+                self.trade_recorder.repay(data.daily.iloc[-1], gain_rate, order.num)
+                trade_data["repay"] = order.price
+                trade_data["gain"] = gain
+                trade_data["gain_rate"] = gain_rate
+
+        return trade_data
 
     # トレード
     def trade(self, strategy, price, data, index):
@@ -591,49 +660,10 @@ class Simulator:
 
         # 寄り付き====================================================================
         if self.setting.virtual_trade:
-            # 仮装トレードなら注文をキューから取得
-            new_orders = self.new_order(price)
-            repay_orders = []
-            if self.position.get_num() > 0:
-                # 自動損切の注文処理（longなら安値、shortなら高値）
-                if self.setting.auto_stop_loss:
-                    if self.setting.short_trade:
-                        value = self.reverse_limit_price(data.daily["high"].iloc[-1])
-                        repay_orders += self.reverse_limit_repay_order(price, value)
-                    else:
-                        value = self.reverse_limit_price(data.daily["low"].iloc[-1])
-                        repay_orders += self.reverse_limit_repay_order(price, value)
-                repay_orders += self.repay_order(price)
-
-            # 新規注文実行
-            for order in new_orders:
-                if self.new(order.price, order.num):
-                    self.trade_recorder.new(data.daily.iloc[-1], order.num)
-                    trade_data["new"] = order.price
-
-            # 返済注文実行
-            for order in repay_orders:
-                if self.position.get_num() <= 0:
-                    self.repay_orders = [] # ポジションがなくなってたら以降の注文はキャンセル
-                    break
-                gain        = self.position.gain(order.price)
-                gain_rate   = self.position.gain_rate(order.price)
-                if self.repay(order.price, order.num):
-                    self.trade_recorder.repay(data.daily.iloc[-1], gain_rate, order.num)
-                    trade_data["repay"] = order.price
-                    trade_data["gain"] = gain
-                    trade_data["gain_rate"] = gain_rate
+            trade_data = self.virtual_trade(price, data, trade_data)
 
         ## 引け後=====================================================================
-        # 新規ルールに当てはまる場合買う
-        for order in self.new_signal(strategy, data, index):
-            self.log(" - new_order: num %s" % (order.num))
-            self.new_orders.append(order)
-
-        # 返済注文
-        self.repay_signal(strategy, data, index)
-        # 注文の整理
-        self.order_adjust()
+        self.signals(strategy, data, index)
 
         # トレード履歴
         trade_data["size"] = self.position.get_num()

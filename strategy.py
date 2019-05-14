@@ -350,16 +350,19 @@ class StrategyUtil:
     # 損失リスク
     def risk(self, data):
         order = data.position.get_num() # 現在の保有数
-        price = data.data.daily["close"].iloc[-1]
-
+        price = self.price(data)
         safety = self.safety(data, 1)
+
         if data.setting.short_trade:
-            risk = (safety - price)
+            risk = safety - price
         else:
-            risk = (price - safety)
+            risk = price - safety
 
         # riskがマイナスの場合、safetyを抜けているのでリスクが高い
-        risk = 0 if risk < 0 else risk * (order + 100)
+        if risk < 0:
+            return 0
+
+        risk = risk * (order + 100)
         return risk
 
     # 上限
@@ -376,18 +379,20 @@ class StrategyUtil:
 
     # 不安要素
     def caution(self, data):
+        gain = data.stats.gain()
         conditions = [
             self.risk(data) == 0, # セーフティーを下回っている
             data.position.get_num() == 0, # 初回の仕掛け
             data.position.gain(self.price(data)) < 0, # 損益がマイナス
-            data.stats.gain()[-1] < 0 if len(data.stats.gain()) > 0 else False, # 最後のトレードで損失
+            gain[-1] < 0 if len(gain) > 0 else False, # 最後のトレードで損失
         ]
         return any(conditions)
 
     # 注目要素
     def attention(self, data):
+        gain = data.stats.gain()
         conditions = [
-            data.stats.gain()[-1] > 0 if len(data.stats.gain()) > 0 else False, # 最後のトレードで利益
+            gain[-1] > 0 if len(gain) > 0 else False, # 最後のトレードで利益
             data.position.gain(self.price(data)) > 0, # 損益がプラス
         ]
         return any(conditions)
@@ -416,9 +421,9 @@ class StrategyUtil:
 
     def safety(self, data, term):
         if data.setting.short_trade:
-            return data.data.daily["fall_safety"].iloc[-term:].min()
+            return data.data.daily["fall_safety"].iloc[-term]
         else:
-            return data.data.daily["rising_safety"].iloc[-term:].max()
+            return data.data.daily["rising_safety"].iloc[-term]
 
     def term(self, data):
         return 1 if data.position.get_term()  == 0 else data.position.get_term()
@@ -445,26 +450,33 @@ class Combination(StrategyCreator, StrategyUtil):
         self.common = common
         self.setting = CombinationSetting() if setting is None else setting
 
+    def drawdown_allowable(self, data):
+        allowable_dd = data.setting.stop_loss_rate * 3
+        drawdown = data.stats.drawdown()[-20:]
+        drawdown_diff = list(filter(lambda x: x > allowable_dd, numpy.diff(drawdown))) if len(drawdown) > 1 else []
+        drawdown_sum = list(filter(lambda x: x > 0, numpy.diff(drawdown))) if len(drawdown) > 1 else []
+        drawdown_conditions = [
+            len(drawdown_diff) == 0, # 6%ルール条件外(-6%を超えて一定期間たった)
+            sum(drawdown_sum) < allowable_dd # 6%ルール(直近のドローダウン合計が6%以下)
+        ]
+
+        allow = all(drawdown_conditions)
+
+        if not allow and data.setting.debug:
+            print("over drawdown: ", drawdown_conditions)
+
+        return allow
+
     # 買い
     def create_new_rules(self, data):
-        drawdown = data.stats.drawdown()[-20:]
-        drawdown_diff = list(filter(lambda x: x > data.setting.stop_loss_rate * 3, numpy.diff(drawdown))) if len(drawdown) > 1 else []
-        drawdown_sum = list(filter(lambda x: x > 0, numpy.diff(drawdown))) if len(drawdown) > 1 else []
         risk = self.risk(data)
         max_risk = self.max_risk(data)
         max_order = self.max_order(max_risk, risk)
         max_order = max_order if max_order < self.setting.max_position_size else self.setting.max_position_size
-        drawdown_conditions = [
-            len(drawdown_diff) == 0, # 6%ルール条件外(-6%を超えて一定期間たった)
-            sum(drawdown_sum) < data.setting.stop_loss_rate * 3 # 6%ルール(直近のドローダウン合計が6%以下)
-        ]
-
-        if not all(drawdown_conditions) and data.setting.debug:
-            print("over drawdown: ", drawdown_conditions)
 
         conditions = [
-            all(drawdown_conditions), # ドローダウンが問題ない状態
-            (data.position.get_num() < max_order) if risk > 0 else False, # 最大ポジションサイズ以下
+            self.drawdown_allowable(data), # ドローダウンが問題ない状態
+            data.position.get_num() < max_order, # 最大ポジションサイズ以下
             self.apply_common(data, self.common.new)
         ]
 

@@ -1,5 +1,6 @@
 import sys
 import numpy
+import time
 
 sys.path.append("lib")
 import checker
@@ -15,8 +16,6 @@ class StrategySimulator:
         self.combination_setting = combination_setting
         self.strategy_settings = strategy_settings
         self.verbose = verbose
-        self.cacher = cache.Cache("/tmp/strategy_simulator")
-        self.cacher.remove_dir()
 
     def strategy_creator(self, args):
         return strategy.load_strategy_creator(args, self.combination_setting)
@@ -48,15 +47,8 @@ class StrategySimulator:
             targets = [args.code]
         return targets
 
-    def manda(self, data, code, start, end):
-        manda_cache_name = "%s_%s_%s" % (code, start, end)
-        if self.cacher.exists(manda_cache_name):
-            manda = self.cacher.get(manda_cache_name)
-        else:
-            split_data = data.split(start, end)
-            manda = checker.manda(split_data.daily)
-            self.cacher.create(manda_cache_name, manda)
-        return manda
+    def manda(self, data, start, end):
+        return data.split(start, end).daily["manda"].isin([1]).any()
 
     def log(self, message):
         if self.verbose:
@@ -98,6 +90,7 @@ class StrategySimulator:
 
         # 日付ごとにシミュレーション
         dates = sorted(dates, key=lambda x: utils.to_datetime_by_term(x, tick))
+        self.log("targets: %s" % codes)
         for date in dates:
             # 休日はスキップ
             if not utils.is_weekday(utils.to_datetime_by_term(date, tick)):
@@ -105,12 +98,11 @@ class StrategySimulator:
                 continue
 
             self.log("=== [%s] ===" % date)
-            self.log("targets: %s" % codes)
 
             for code in codes:
                 # M&Aのチェックのために期間を区切ってデータを渡す(M&Aチェックが重いから)
                 start = utils.to_format_by_term(utils.to_datetime_by_term(date, tick) - utils.relativeterm(args.validate_term, tick), tick)
-                manda = self.manda(stocks[code], code, start, date)
+                manda = self.manda(stocks[code], start, date)
                 if manda:
                     self.log("[%s] is manda" % code)
                     continue
@@ -137,49 +129,43 @@ class StrategySimulator:
         # 統計 ====================================
         stats = {}
         for code in stocks.keys():
-            s = simulators[code].get_stats()
-            keys = ["return", "drawdown", "win_trade", "trade", "assets", "max_unavailable_assets", "trade_history"]
-            result = {}
-            for k in keys:
-                result[k] = s[k]
-            stats[code] = result
+            stats[code] = simulators[code].stats
 
         return self.get_results(stats, start_date, end_date)
 
     def get_results(self, stats, start_date, end_date):
         # 統計 =======================================
-        wins = list(filter(lambda x: x[1]["return"] > 0, stats.items()))
-        lose = list(filter(lambda x: x[1]["return"] < 0, stats.items()))
+        wins = list(filter(lambda x: sum(x[1].gain_rate()) > 0, stats.items()))
+        lose = list(filter(lambda x: sum(x[1].gain_rate()) < 0, stats.items()))
         win_codes = list(map(lambda x: x[0], wins))
         lose_codes = list(map(lambda x: x[0], lose))
         codes = win_codes + lose_codes
-        gain = list(map(lambda x: x[1]["assets"] - self.simulator_setting.assets, stats.items()))
-        trade_history = list(map(lambda x: x[1]["trade_history"], stats.items()))
-        position_size = list(map(lambda x: list(map(lambda y: y["size"], x)), trade_history))
+        gain = list(map(lambda x: sum(x[1].gain()), stats.items()))
+        position_size = list(map(lambda x: x[1].size(), stats.items()))
         position_size = list(filter(lambda x: x != 0, sum(position_size, [])))
-        position_term = list(map(lambda x: list(map(lambda y: y["term"], x)), trade_history))
+        position_term = list(map(lambda x: x[1].term(), stats.items()))
         position_term = list(filter(lambda x: x != 0, sum(position_term, [])))
-        max_unavailable_assets = list(map(lambda x: x[1]["max_unavailable_assets"], stats.items()))
+        max_unavailable_assets = list(map(lambda x: x[1].max_unavailable_assets(), stats.items()))
 
         if self.verbose:
             print(start_date, end_date, "assets:", self.simulator_setting.assets, "gain:", gain, sum(gain))
-            for code, s in sorted(stats.items(), key=lambda x: x[1]["return"]):
-                print("[%s] return: %s, drawdown: %s, trade: %s, win: %s" % (code, s["return"], s["drawdown"], s["trade"], s["win_trade"]))
+            for code, s in sorted(stats.items(), key=lambda x: x[1].gain()):
+                print("[%s] return: %s, drawdown: %s, trade: %s, win: %s" % (code, s.gain_rate(), s.max_drawdown(), s.trade.num(), s.win_trade_num()))
 
         s = stats.values()
         results = {
             "codes": codes,
             "win": win_codes,
             "lose": lose_codes,
-            "gain": sum(gain),
+            "gain": round(sum(gain)),
             "return": round(sum(gain) / self.simulator_setting.assets, 2),
-            "drawdown": numpy.average(list(map(lambda x: x["drawdown"], s))) if len(s) > 0 else 0,
-            "max_drawdown": max(list(map(lambda x: x["drawdown"], s))) if len(s) > 0 else 0,
-            "win_trade": sum(list(map(lambda x: x["win_trade"], s))) if len(s) > 0 else 0,
-            "trade": sum(list(map(lambda x: x["trade"], s))) if len(s) > 0 else 0,
-            "position_size": numpy.average(position_size) if len(position_size) > 0 else 0,
+            "drawdown": numpy.average(list(map(lambda x: x.max_drawdown(), s))) if len(s) > 0 else 0,
+            "max_drawdown": max(list(map(lambda x: x.max_drawdown(), s))) if len(s) > 0 else 0,
+            "win_trade": sum(list(map(lambda x: x.win_trade_num(), s))) if len(s) > 0 else 0,
+            "trade": sum(list(map(lambda x: x.trade_num(), s))) if len(s) > 0 else 0,
+            "position_size": round(numpy.average(position_size), -2) if len(position_size) > 0 else 0,
             "max_position_size": max(position_size) if len(position_size) > 0 else 0,
-            "position_term": numpy.average(position_term) if len(position_term) > 0 else 0,
+            "position_term": round(numpy.average(position_term)) if len(position_term) > 0 else 0,
             "max_position_term": max(position_term) if len(position_term) > 0 else 0,
             "max_unavailable_assets": max(max_unavailable_assets) if len(max_unavailable_assets) > 0 else 0,
         }
