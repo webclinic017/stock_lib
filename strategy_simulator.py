@@ -77,15 +77,10 @@ class StrategySimulator:
         self.log("simulating %s %s" % (start_date, end_date))
 
         args = data["args"]
-        tick = args.tick
-
-        # この期間での対象銘柄
-        codes, _, _ = self.select_codes(args, start_date, end_date)
+        stocks = data["data"]
         index = data["index"]
-        stocks = {}
-        for code in codes:
-            if code in data["data"].keys():
-                stocks[code] = data["data"][code]
+        tick = args.tick
+        codes = stocks.keys()
 
         # シミュレーター準備
         simulators = {}
@@ -102,7 +97,6 @@ class StrategySimulator:
             dates = list(set(dates + d.dates(start_date, end_date)))
 
         # 日付ごとにシミュレーション
-        targets = []
         dates = sorted(dates, key=lambda x: utils.to_datetime_by_term(x, tick))
         for date in dates:
             # 休日はスキップ
@@ -111,20 +105,9 @@ class StrategySimulator:
                 continue
 
             self.log("=== [%s] ===" % date)
+            self.log("targets: %s" % codes)
 
-            # この日の対象銘柄
-            targets = self.get_targets(args, targets, date)
-
-            # 保有銘柄を対象に追加
-            for code, simulator in simulators.items():
-                if simulator.position.get_num() > 0:
-                    targets.append(code)
-
-            targets = list(set(targets))
-
-            self.log("targets: %s" % targets)
-
-            for code in targets:
+            for code in codes:
                 # M&Aのチェックのために期間を区切ってデータを渡す(M&Aチェックが重いから)
                 start = utils.to_format_by_term(utils.to_datetime_by_term(date, tick) - utils.relativeterm(args.validate_term, tick), tick)
                 manda = self.manda(stocks[code], code, start, date)
