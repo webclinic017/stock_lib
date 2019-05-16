@@ -123,7 +123,7 @@ def add_manda_stats(data):
     data["pct_change"] = data["close"].pct_change()
     data["stock_split"]             = (data["pct_change"] < -0.45) * 1
     data["reverse_stock_split"]     = (data["pct_change"] > 2.0) * 1
-    data["manda"]                   = ((data["stock_split"] == 1) & (data["reverse_stock_split"] == 1)) * 1
+    data["manda"]                   = ((data["stock_split"] == 1) | (data["reverse_stock_split"] == 1)) * 1
 
     return data
 

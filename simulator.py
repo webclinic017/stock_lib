@@ -149,7 +149,8 @@ class SimulatorData:
         self.rule = rule
 
     def split(self, start_date, end_date):
-        return self.split_from(start_date).split_to(end_date)
+        data = self.split_from(start_date).split_to(end_date)
+        return data
 
     def split_from(self, start_date):
         d = self.daily[self.daily["date"] >= start_date]

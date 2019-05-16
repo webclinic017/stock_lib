@@ -47,10 +47,6 @@ class StrategySimulator:
             targets = [args.code]
         return targets
 
-    def manda(self, data, end, tick):
-        term = 65 if tick else 25 # closingが動作する程度の期間にする
-        return data.split_to(end).daily["manda"].iloc[-term:].isin([1]).any()
-
     def log(self, message):
         if self.verbose:
              print(message)
@@ -73,7 +69,6 @@ class StrategySimulator:
         stocks = data["data"]
         index = data["index"]
         tick = args.tick
-        codes = stocks.keys()
 
         # シミュレーター準備
         simulators = {}
@@ -82,16 +77,22 @@ class StrategySimulator:
         strategy_settings = self.strategy_settings[:-1] + [strategy_setting] # 最後の設定を変えて検証
         simulator_setting.strategy = self.strategy_creator(args).create(strategy_settings)
         for code in stocks.keys():
+            if stocks[code].split(start_date, end_date).daily["manda"].isin([1]).any(): # M&Aがあった銘柄はスキップ
+                self.log("skip. M&A. %s" % code)
+                continue
             simulators[code] = Simulator(simulator_setting)
 
         # 日付のリストを取得
         dates = []
-        for d in stocks.values():
-            dates = list(set(dates + d.dates(start_date, end_date)))
+        dates_dict = {}
+        for code in stocks.keys():
+            dates_dict[code] = stocks[code].dates(start_date, end_date)
+            dates = list(set(dates + dates_dict[code]))
 
         # 日付ごとにシミュレーション
         dates = sorted(dates, key=lambda x: utils.to_datetime_by_term(x, tick))
-        self.log("targets: %s" % codes)
+        self.log("targets: %s" % simulators.keys())
+
         for date in dates:
             # 休日はスキップ
             if not utils.is_weekday(utils.to_datetime_by_term(date, tick)):
@@ -100,24 +101,18 @@ class StrategySimulator:
 
             self.log("=== [%s] ===" % date)
 
-            for code in codes:
-                manda = self.manda(stocks[code], date, tick)
-                if manda:
-                    self.log("[%s] is manda" % code)
-                    continue
-
+            for code in simulators.keys():
                 # 対象日までのデータの整形
-                d = stocks[code]
-
-                if len(stocks[code].at(date)) > 0:
+                if date in dates_dict[code]:
                     self.log("[%s]" % code)
-                    simulators[code].simulate_by_date(date, d, index)
+                    simulators[code].simulate_by_date(date, stocks[code], index)
                 else:
                     self.log("[%s] is less data: %s" % (code, date))
+
         # 手仕舞い
         if len(dates) > 0:
             recorder = TradeRecorder(strategy.get_prefix(args))
-            for code in codes:
+            for code in simulators.keys():
                 split_data = stocks[code].split(dates[0], dates[-1])
                 if len(split_data.daily) == 0:
                     continue
@@ -127,7 +122,7 @@ class StrategySimulator:
 
         # 統計 ====================================
         stats = {}
-        for code in codes:
+        for code in simulators.keys():
             stats[code] = simulators[code].stats
 
         return self.get_results(stats, start_date, end_date)
