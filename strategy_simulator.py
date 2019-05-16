@@ -47,8 +47,9 @@ class StrategySimulator:
             targets = [args.code]
         return targets
 
-    def manda(self, data, start, end):
-        return data.split(start, end).daily["manda"].isin([1]).any()
+    def manda(self, data, end, tick):
+        term = 65 if tick else 25 # closingが動作する程度の期間にする
+        return data.split_to(end).daily["manda"].iloc[-term:].isin([1]).any()
 
     def log(self, message):
         if self.verbose:
@@ -100,9 +101,7 @@ class StrategySimulator:
             self.log("=== [%s] ===" % date)
 
             for code in codes:
-                # M&Aのチェックのために期間を区切ってデータを渡す(M&Aチェックが重いから)
-                start = utils.to_format_by_term(utils.to_datetime_by_term(date, tick) - utils.relativeterm(args.validate_term, tick), tick)
-                manda = self.manda(stocks[code], start, date)
+                manda = self.manda(stocks[code], date, tick)
                 if manda:
                     self.log("[%s] is manda" % code)
                     continue
@@ -118,7 +117,7 @@ class StrategySimulator:
         # 手仕舞い
         if len(dates) > 0:
             recorder = TradeRecorder(strategy.get_prefix(args))
-            for code in stocks.keys():
+            for code in codes:
                 split_data = stocks[code].split(dates[0], dates[-1])
                 if len(split_data.daily) == 0:
                     continue
@@ -128,7 +127,7 @@ class StrategySimulator:
 
         # 統計 ====================================
         stats = {}
-        for code in stocks.keys():
+        for code in codes:
             stats[code] = simulators[code].stats
 
         return self.get_results(stats, start_date, end_date)

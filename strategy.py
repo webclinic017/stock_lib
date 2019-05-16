@@ -200,11 +200,10 @@ def create_simulator_setting_by_json(args):
 # 売買ルール
 class Rule:
     def __init__(self, callback):
-        self._callback = callback
+        self.callback = callback
 
     def apply(self, data):
-        results = self._callback(data)
-        return results
+        return self.callback(data)
 
 # 売買戦略
 class Strategy:
@@ -259,16 +258,16 @@ class StrategyCreator:
         self.closing = closing
 
     def create_new_rules(self, data):
-        return self.new
+        return simulator.Order(0, [lambda x: True]) if self.new is None else self.new(data)
 
     def create_taking_rules(self, data):
-        return self.taking
+        return simulator.Order(0, [lambda x: True]) if self.taking is None else self.taking(data)
 
     def create_stop_loss_rules(self, data):
-        return self.stop_loss
+        return simulator.Order(0, [lambda x: True]) if self.stop_loss is None else self.stop_loss(data)
 
     def create_closing_rules(self, data):
-        return self.closing
+        return simulator.Order(0, [lambda x: True]) if self.closing is None else self.closing(data)
 
     def create(self):
         new_rules = [lambda x: self.create_new_rules(x)]

@@ -149,10 +149,16 @@ class SimulatorData:
         self.rule = rule
 
     def split(self, start_date, end_date):
+        return self.split_from(start_date).split_to(end_date)
+
+    def split_from(self, start_date):
+        d = self.daily[self.daily["date"] >= start_date]
+        w = self.weekly[self.weekly["date"] >= start_date]
+        return SimulatorData(self.code, d, w, self.rule)
+
+    def split_to(self, end_date):
         d = self.daily[self.daily["date"] <= end_date]
-        d = d[d["date"] >= start_date]
-        w = self.weekly[self.weekly["date"] <= end_date]
-        w = w[w["date"] >= start_date]
+        w = self.weekly[self.weekly["date"] < end_date] # weeklyは最新の足は確定していないので最新のは除外する
         return SimulatorData(self.code, d, w, self.rule)
 
     def dates(self, start_date, end_date):
@@ -175,7 +181,6 @@ class SimulatorSetting:
         self.error_rate = 0.00
         self.virtual_trade = True # 仮想取引 Falseにすると注文をスタックしていく
         self.short_trade = False
-        self.auto_stop_loss = False
         self.stop_loss_rate = 0.02
         self.taking_rate = 0.005
 
@@ -295,10 +300,10 @@ class SimulatorStats:
             return 0
         return numpy.average(self.loss_rate()) / self.lose_trade_num()
 
-    def reword_ratio():
+    def reword_ratio(self):
         return self.average_profit_rate() * self.win_rate()
 
-    def risk_ratio():
+    def risk_ratio(self):
         return abs(self.average_loss_rate) * (1 - self.win_rate())
 
     # リワードリスクレシオ
@@ -403,10 +408,6 @@ class Simulator:
 
         self.log(" new: %s yen x %s, total %s, ave %s, assets %s" % (value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value)))
 
-        if self.setting.auto_stop_loss:
-            order = Order(num, [lambda x: x["position"].gain(x["value"]) < - (pos * self.setting.stop_loss_rate)], is_reverse_limit=True) # 損失が総資産の2%以上なら即損切
-            self.log(" - auto_stop_loss_order: num %s" % (num))
-
         return True
 
     # 返済
@@ -491,75 +492,6 @@ class Simulator:
     def closing_signal(self, strategy, data, index, rate=1.0):
         return self.apply_all_rules(data, index, strategy.closing_rules, rate=rate)
 
-    def get_stats(self): 
-        stats = dict()
-        stats["assets"] = int(self.assets)
-        stats["gain"] = stats["assets"] - self.setting.assets
-        stats["return"] = float((stats["assets"] - self.setting.assets) / float(self.setting.assets))
-        stats["win_rate"] = float(self.stats.win_rate())
-        stats["drawdown"] = float(self.stats.max_drawdown())
-        stats["max_unavailable_assets"] = self.stats.max_unavailable_assets()
-        stats["trade"] = int(self.stats.trade_num())
-        stats["win_trade"] = int(self.stats.win_trade_num())
-        # 平均利益率
-        stats["average_profit_rate"] = self.stats.average_profit_rate()
-        # 平均損失率
-        stats["average_loss_rate"] = self.stats.average_loss_rate()
-        # リワードリスクレシオ
-        stats["rewordriskratio"] = self.stats.rewordriskratio()
-
-        # トレード履歴
-        stats["trade_history"] = self.stats.trade_history
-
-        if self.setting.debug:
-            stats["logs"] = self.logs
-
-        return stats
-
-    def create_term_data(self, date, data):
-        assert type(data) is SimulatorData, "data is not SimulatorData."
-
-        weekly = data.weekly[data.weekly["date"] <= date].iloc[:-1] # weeklyは最新の足は確定していないので最新のは除外する
-
-        daily = data.daily[data.daily["date"] <= date]
-        term_data = SimulatorData(data.code, daily, weekly, data.rule)
-
-        return term_data
-
-    def simulate(self, dates, data, index):
-        assert type(data) is SimulatorData, "data is not SimulatorData."
-
-        print(dates)
-        for date in dates:
-            total_assets = self.simulate_by_date(date, data, index)
-
-        # 統計取得のために全部手仕舞う
-        self.closing(data.daily["close"].iloc[-1])
-
-        stats = self.get_stats()
-
-        self.log("result assets: %s" % stats["assets"])
-
-        return stats
-
-    # 高速化
-    def simulate_by_date(self, date, data, index):
-        term_data = self.create_term_data(date, data)
-
-        term_index = {}
-        for k, v in index.items():
-            term_index[k] = v[v["date"] <= date]
-
-        today = data.daily[data.daily["date"] == date]
-
-        assert len(today) > 0, "not found %s data" % date
-
-        price = today["open"].iloc[-1].item()
-        self.log("date: %s, price %s" % (date, price))
-
-        self.trade(self.setting.strategy, price, term_data, term_index)
-        return self.total_assets(price)
-
     def new_signals(self, strategy, data, index):
         for order in self.new_signal(strategy, data, index):
             self.log(" - new_order: num %s" % (order.num))
@@ -601,19 +533,69 @@ class Simulator:
             self.new_orders = []
             self.repay_orders = []
 
+    def get_stats(self): 
+        stats = dict()
+        stats["assets"] = int(self.assets)
+        stats["gain"] = stats["assets"] - self.setting.assets
+        stats["return"] = float((stats["assets"] - self.setting.assets) / float(self.setting.assets))
+        stats["win_rate"] = float(self.stats.win_rate())
+        stats["drawdown"] = float(self.stats.max_drawdown())
+        stats["max_unavailable_assets"] = self.stats.max_unavailable_assets()
+        stats["trade"] = int(self.stats.trade_num())
+        stats["win_trade"] = int(self.stats.win_trade_num())
+        # 平均利益率
+        stats["average_profit_rate"] = self.stats.average_profit_rate()
+        # 平均損失率
+        stats["average_loss_rate"] = self.stats.average_loss_rate()
+        # リワードリスクレシオ
+        stats["rewordriskratio"] = self.stats.rewordriskratio()
+
+        # トレード履歴
+        stats["trade_history"] = self.stats.trade_history
+
+        if self.setting.debug:
+            stats["logs"] = self.logs
+
+        return stats
+
+    def simulate(self, dates, data, index):
+        assert type(data) is SimulatorData, "data is not SimulatorData."
+
+        print(dates)
+        for date in dates:
+            self.simulate_by_date(date, data, index)
+
+        # 統計取得のために全部手仕舞う
+        self.closing(data.daily["close"].iloc[-1])
+
+        stats = self.get_stats()
+
+        self.log("result assets: %s" % stats["assets"])
+
+        return stats
+
+    # 高速化
+    def simulate_by_date(self, date, data, index):
+        term_data = data.split_to(date)
+
+        term_index = {}
+        for k, v in index.items():
+            term_index[k] = v[v["date"] <= date]
+
+        today = term_data.daily.iloc[-1]
+
+        assert len(today) > 0, "not found %s data" % date
+
+        price = today["open"].item()
+        self.log("date: %s, price %s" % (date, price))
+
+        self.trade(self.setting.strategy, price, term_data, term_index)
+
     def virtual_trade(self, price, data, trade_data):
         # 仮想トレードなら注文をキューから取得
         new_orders = self.new_order(price)
         repay_orders = []
         if self.position.get_num() > 0:
-            # 自動損切の注文処理（longなら安値、shortなら高値）
-            if self.setting.auto_stop_loss:
-                if self.setting.short_trade:
-                    value = self.reverse_limit_price(data.daily["high"].iloc[-1])
-                    repay_orders += self.reverse_limit_repay_order(price, value)
-                else:
-                    value = self.reverse_limit_price(data.daily["low"].iloc[-1])
-                    repay_orders += self.reverse_limit_repay_order(price, value)
             repay_orders += self.repay_order(price)
 
         # 新規注文実行
@@ -640,8 +622,10 @@ class Simulator:
     # トレード
     def trade(self, strategy, price, data, index):
         assert type(data) is SimulatorData, "data is not SimulatorData."
-        # stats
+
         date = data.daily["date"].iloc[-1]
+
+        # stats
         self.trade_recorder.set_columns(data.daily.columns)
         trade_data = self.stats.create_trade_data()
         trade_data["date"]              = date
@@ -649,10 +633,10 @@ class Simulator:
         trade_data["available_assets"]  = self.assets
 
         # 判断に必要なデータ数がない
-        if len(data.daily) < self.setting.min_data_length or price == 0:
-            self.log("less data. skip trade. [%s - %s]" % (data.daily["date"].iloc[0], data.daily["date"].iloc[-1]))
+        if price == 0 or len(data.daily) < self.setting.min_data_length:
+            self.log("less data. skip trade. [%s - %s]" % (data.daily["date"].iloc[0], date))
             self.stats.trade_history.append(trade_data)
-            return self.total_assets(0)
+            return
 
         # ポジションの保有期間を増やす
         if self.position.get_num() > 0:
