@@ -140,6 +140,7 @@ def load_strategy(args, combination_setting=None):
     return load_strategy_creator(args, combination_setting).create(settings)
 
 def load_strategy_creator(args, combination_setting=None):
+    combination_setting = CombinationSetting() if combination_setting is None else combination_setting
     if args.production:
         if args.daytrade:
             from strategies.production.daytrade import CombinationStrategy
@@ -609,39 +610,46 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
         ]
 
 class CombinationChecker:
-    def __init__(self, combination_strategy):
-        self.new_combinations = utils.combinations(range(len(combination_strategy.new())))
-        self.taking_combinations = utils.combinations(range(len(combination_strategy.taking())))
-        self.stop_loss_combinations = utils.combinations(range(len(combination_strategy.stop_loss())))
-        self.closing_combinations = utils.combinations(range(len(combination_strategy.closing())))
 
-        self.combinations_dict = {
-            "new": (self.new_combinations, combination_strategy.new),
-            "taking": (self.taking_combinations, combination_strategy.taking),
-            "closing": (self.closing_combinations, combination_strategy.closing),
-            "stop_loss": (self.stop_loss_combinations, combination_strategy.stop_loss),
+    def get_replaced_source(self, condition):
+        source = inspect.getsource(condition)
+        closure_vars = inspect.getclosurevars(condition)
+
+        for name, value in closure_vars.nonlocals.items():
+            source = source.replace(name, "\"%s\"" % str(value))
+
+        return source
+
+    def get_source(self, conditions):
+        sources = list(map(lambda x: self.get_replaced_source(x), conditions))
+        sources = list(map(lambda x: x.strip("\n"), sources))
+        sources = list(map(lambda x: x.strip(","), sources))
+        sources = list(map(lambda x: x.strip(), sources))
+        return sources
+
+    def get_strategy_sources(self, combination_strategy, setting):
+        new, taking, stop_loss = [], [], []
+        for i, seed in enumerate(setting["seed"]):
+            combination_strategy.conditions_by_seed(seed)
+            s = setting["setting"][i]
+            new         = new       + [utils.combination(s["new"], combination_strategy.new_conditions)]
+            taking      = taking    + [utils.combination(s["taking"], combination_strategy.taking_conditions)]
+            stop_loss   = stop_loss + [utils.combination(s["stop_loss"], combination_strategy.stop_loss_conditions)]
+
+        conditions = {
+            "new": new,
+            "taking": taking,
+            "stop_loss": stop_loss
         }
 
-    def get_strategy_source_by_index(self, index, method):
-        source = inspect.getsource(method)
-        pattern = r"d: .*[,$\n]"
-        source = re.findall(pattern, source)
-        return source[index].strip("\n")
+        results = {}
 
-    def get_strategy_source(self, combinations, method):
-        source = inspect.getsource(method)
-        pattern = r"d: .*[,$\n]"
-        source = re.findall(pattern, source)
-        a = numpy.array([source[i].strip("\n") for i in combinations[0]])
-        b = numpy.array([source[i].strip("\n") for i in combinations[1]])
-        return a, b
+        for name, condition in conditions.items():
+            sources = {"all": [], "any": []}
+            for a, b in condition:
+                sources["all"] = self.get_source(a)
+                sources["any"] = self.get_source(b)
+            results[name] = sources
 
-    def get_strategy_sources(self, setting):
-        results = []
-        for k, v in self.combinations_dict.items():
-           combinations = v[0][setting["setting"][k]]
-           a, b = self.get_strategy_source(combinations, v[1])
-           results.append({"key":k, "all": a, "any": b, "combinations": combinations})
         return results
-
 

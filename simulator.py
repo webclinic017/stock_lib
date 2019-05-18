@@ -305,7 +305,7 @@ class SimulatorStats:
         return self.average_profit_rate() * self.win_rate()
 
     def risk_ratio(self):
-        return abs(self.average_loss_rate) * (1 - self.win_rate())
+        return abs(self.average_loss_rate()) * (1 - self.win_rate())
 
     # リワードリスクレシオ
     def rewordriskratio(self):
