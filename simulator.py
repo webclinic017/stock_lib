@@ -428,6 +428,7 @@ class Simulator:
 
     # 全部売る
     def closing(self, value, data=None):
+        self.log(" - closing: price %s" % (value))
         num = self.position.get_num()
         gain = self.position.gain_rate(value)
         if self.repay(value, num) and data is not None:
