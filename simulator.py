@@ -409,7 +409,6 @@ class Simulator:
         if num <= 0:
             return False
 
-        pos = self.total_assets(self.position.get_value())
         self.assets += self.position.new(num, value)
         self.commission()
 
@@ -423,7 +422,6 @@ class Simulator:
         if (num <= 0 or self.position.get_num() <= 0):
             return False
 
-        pos = self.total_assets(self.position.get_value())
         gain_rate = self.position.gain_rate(value)
         gain = self.position.gain(value)
         self.assets += self.position.repay(num, value)
