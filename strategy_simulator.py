@@ -127,6 +127,20 @@ class StrategySimulator:
 
         return self.get_results(stats, start_date, end_date)
 
+
+    def agg(self, stats, target):
+        results = {}
+        for s in stats.values():
+            for history in s.trade_history:
+                date = history["date"]
+                if date is None:
+                    continue
+                if date in results.keys():
+                    results[date] += history[target]
+                else:
+                    results[date] = history[target]
+        return results
+
     def get_results(self, stats, start_date, end_date):
         # 統計 =======================================
         wins = list(filter(lambda x: sum(x[1].gain_rate()) > 0, stats.items()))
@@ -135,16 +149,16 @@ class StrategySimulator:
         lose_codes = list(map(lambda x: x[0], lose))
         codes = win_codes + lose_codes
         gain = list(map(lambda x: sum(x[1].gain()), stats.items()))
-        position_size = list(map(lambda x: x[1].size(), stats.items()))
-        position_size = list(filter(lambda x: x != 0, sum(position_size, [])))
+        position_size = self.agg(stats, "size").values()
+        position_size = list(filter(lambda x: x != 0, position_size,))
         position_term = list(map(lambda x: x[1].term(), stats.items()))
         position_term = list(filter(lambda x: x != 0, sum(position_term, [])))
-        max_unavailable_assets = list(map(lambda x: x[1].max_unavailable_assets(), stats.items()))
+        max_unavailable_assets = self.agg(stats, "unavailable_assets").values()
 
         if self.verbose:
             print(start_date, end_date, "assets:", self.simulator_setting.assets, "gain:", gain, sum(gain))
-            for code, s in sorted(stats.items(), key=lambda x: x[1].gain()):
-                print("[%s] return: %s, drawdown: %s, trade: %s, win: %s" % (code, s.gain_rate(), s.max_drawdown(), s.trade_num(), s.win_trade_num()))
+            for code, s in sorted(stats.items(), key=lambda x: sum(x[1].gain())):
+                print("[%s] return: %s, drawdown: %s, trade: %s, win: %s" % (code, sum(s.gain()), s.max_drawdown(), s.trade_num(), s.win_trade_num()))
 
         s = stats.values()
         results = {
@@ -161,7 +175,7 @@ class StrategySimulator:
             "max_position_size": max(position_size) if len(position_size) > 0 else 0,
             "position_term": round(numpy.average(position_term)) if len(position_term) > 0 else 0,
             "max_position_term": max(position_term) if len(position_term) > 0 else 0,
-            "max_unavailable_assets": max(max_unavailable_assets) if len(max_unavailable_assets) > 0 else 0,
+            "max_unavailable_assets": max(max_unavailable_assets) if len(s) > 0 and len(max_unavailable_assets) else 0,
         }
 
         return results

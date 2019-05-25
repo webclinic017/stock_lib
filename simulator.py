@@ -198,7 +198,7 @@ class SimulatorStats:
             "gain": None,
             "gain_rate": None,
             "assets": None,
-            "available_assets": None,
+            "unavailable_assets": None,
             "term": 0,
             "size": 0
         }
@@ -250,7 +250,7 @@ class SimulatorStats:
         return max(self.assets())
 
     def unavailable_assets(self):
-        return list(map(lambda x: x["assets"] - x["available_assets"], self.trade_history))
+        return list(map(lambda x: x["unavailable_assets"], self.trade_history))
 
     def max_unavailable_assets(self):
         if len(self.unavailable_assets()) == 0:
@@ -630,9 +630,9 @@ class Simulator:
         # stats
         self.trade_recorder.set_columns(data.daily.columns)
         trade_data = self.stats.create_trade_data()
-        trade_data["date"]              = date
-        trade_data["assets"]            = self.total_assets(price)
-        trade_data["available_assets"]  = self.assets
+        trade_data["date"]                = date
+        trade_data["assets"]              = self.total_assets(price)
+        trade_data["unavailable_assets"]  = trade_data["assets"] - self.assets
 
         # 判断に必要なデータ数がない
         if price == 0 or len(data.daily) < self.setting.min_data_length:
