@@ -9,7 +9,6 @@ import utils
 class Position:
     def __init__(self, num = 0, value = 0, term = 0, initial = None, system="actual", method="long", min_unit=None):
         assert min_unit is not None, "min_unit is None."
-        print(min_unit)
         self.num = int(num)
         self.value = []
         self.initial = initial
