@@ -8,13 +8,13 @@ import simulator
 import itertools
 import time as t
 from loader import Loader
+from loader import Bitcoin
 from collections import namedtuple
 from simulator import SimulatorData
 from simulator import SimulatorSetting
 from argparse import ArgumentParser
 
 class LoadSettings:
-    with_stats = False
     weekly = True
 
 def add_options(parser):
@@ -26,9 +26,9 @@ def add_options(parser):
     parser.add_argument("--short", action="store_true", default=False, dest="short", help="空売り戦略")
     parser.add_argument("--tick", action="store_true", default=False, dest="tick", help="ティックデータを使う")
     parser.add_argument("--realtime", action="store_true", default=False, dest="realtime", help="リアルタイムデータを使う")
-    parser.add_argument("--with_stats", action="store_true", default=False, dest="with_stats", help="統計データ込みで読み込む")
     parser.add_argument("--stop_loss_rate", action="store", default=None, dest="stop_loss_rate", help="損切レート")
     parser.add_argument("--taking_rate", action="store", default=None, dest="taking_rate", help="利食いレート")
+    parser.add_argument("--min_unit", action="store", default=None, dest="min_unit", help="最低単元")
     parser.add_argument("--ignore_weekly", action="store_true", default=False, dest="ignore_weekly", help="週足統計を無視")
 
     # strategy
@@ -88,7 +88,7 @@ def load_simulator_data(code, start_date, end_date, args, load_settings=None, ti
         rule = "30T"
     else:
         start = utils.to_format(utils.to_datetime(start_date) - utils.relativeterm(6))
-        data = Loader.load_with_realtime(code, start, end_date, with_stats=load_settings.with_stats)
+        data = Loader.load_with_realtime(code, start, end_date)
         rule = "W"
 
     if data is None:
@@ -104,9 +104,8 @@ def add_stats(code, data, rule, load_settings=None):
         load_settings = LoadSettings()
 
     try:
-        if not load_settings.with_stats:
-            data = utils.add_stats(data)
-            data = utils.add_cs_stats(data)
+        data = utils.add_stats(data)
+        data = utils.add_cs_stats(data)
         weekly = Loader.resample(data, rule=rule)
         if load_settings.weekly:
             weekly = utils.add_stats(weekly)
@@ -185,6 +184,7 @@ def create_simulator_setting(args, use_json=True):
     simulator_setting = create_simulator_setting_by_json(args) if use_json else SimulatorSetting()
     simulator_setting.stop_loss_rate = simulator_setting.stop_loss_rate if args.stop_loss_rate is None else float(args.stop_loss_rate)
     simulator_setting.taking_rate = simulator_setting.taking_rate if args.taking_rate is None else float(args.taking_rate)
+    simulator_setting.min_unit = simulator_setting.min_unit if args.min_unit is None else float(args.min_unit)
     simulator_setting.short_trade = args.short
     return simulator_setting
 
@@ -195,6 +195,7 @@ def create_simulator_setting_by_json(args):
         return simulator_setting
     simulator_setting.stop_loss_rate = setting_dict["stop_loss_rate"] if "stop_loss_rate" in setting_dict.keys() else simulator_setting.stop_loss_rate
     simulator_setting.taking_rate = setting_dict["taking_rate"] if "taking_rate" in setting_dict.keys() else simulator_setting.taking_rate
+    simulator_setting.min_unit = setting_dict["min_unit"] if "min_unit" in setting_dict.keys() else simulator_setting.min_unit
     simulator_setting.short_trade = args.short
     return simulator_setting
 # ========================================================================
@@ -344,7 +345,7 @@ class StrategyUtil:
             line = data.data.daily["resistance"].iloc[-1]
             goal = (line - price)
 
-        goal = 0 if goal < 0 else goal * (order + 100)
+        goal = 0 if goal < 0 else goal * (order + 1)
         return goal
 
     # 損失リスク
@@ -362,7 +363,7 @@ class StrategyUtil:
         if risk < 0:
             return 0
 
-        risk = risk * (order + 100)
+        risk = risk * (order + 1)
         return risk
 
     # 上限
@@ -398,23 +399,22 @@ class StrategyUtil:
         return any(conditions)
 
     # 最大ポジションサイズ
-    def max_order(self, max_risk, risk):
+    def max_order(self, data, max_risk, risk):
         if risk == 0:
             return 0
-        max_order = int(max_risk / risk) * 100
+        max_order = int((max_risk / risk) / data.setting.min_unit)
         return max_order
 
     # ポジションサイズ
     def order(self, data, max_risk, risk, max_position_size):
         current = data.position.get_num()
-        max_order = self.max_order(max_risk, risk)
+        max_order = self.max_order(data, max_risk, risk)
         max_order = max_order if max_order < max_position_size else max_position_size
-        max_order = int((max_order - current)) # 保有できる最大まで
-        max_order = int(max_order) if self.attention(data) else int(max_order / 2) # 最後負けトレードなら半分ずつ
-        max_order = int(math.ceil(max_order / 100) * 100) # 端数を切り上げ
-        order = 100 if self.caution(data) else max_order # 不安要素があれば、最小単位から
+        max_order = max_order - current # 保有できる最大まで
+        max_order = max_order if self.attention(data) else max_order / 2 # 最後負けトレードなら半分ずつ
+        order = 1 if self.caution(data) else int(max_order) # 不安要素があれば、最小単位から
 
-        if order < 100:
+        if order < 1:
             order = 0
 
         return order
@@ -438,7 +438,7 @@ class StrategyUtil:
 class CombinationSetting:
     simple = False
     position_sizing = False
-    max_position_size = 500
+    max_position_size = 5
     sorted_conditions = True
     monitor_size = 3
     condition_size = 5
@@ -471,7 +471,7 @@ class Combination(StrategyCreator, StrategyUtil):
     def create_new_rules(self, data):
         risk = self.risk(data)
         max_risk = self.max_risk(data)
-        max_order = self.max_order(max_risk, risk)
+        max_order = self.max_order(data, max_risk, risk)
         max_order = max_order if max_order < self.setting.max_position_size else self.setting.max_position_size
 
         conditions = [
@@ -480,7 +480,7 @@ class Combination(StrategyCreator, StrategyUtil):
             self.apply_common(data, self.common.new)
         ]
 
-        order = self.order(data, max_risk, risk, self.setting.max_position_size) if self.setting.position_sizing else 100
+        order = self.order(data, max_risk, risk, self.setting.max_position_size) if self.setting.position_sizing else 1
 
         if not self.setting.simple:
             conditions = conditions + [self.apply(data, self.conditions.new)]
@@ -507,7 +507,7 @@ class Combination(StrategyCreator, StrategyUtil):
             conditions = [self.apply_common(data, self.common.stop_loss)]
         else:
             conditions = [
-                utils.rate(data.position.get_value(), data.data.daily["close"].iloc[-1]) < -self.stop_loss_rate(data, self.setting.max_position_size), # 1単元で最大の損切ラインを適用
+                data.position.gain_rate(data.data.daily["close"].iloc[-1]) < -self.stop_loss_rate(data, self.setting.max_position_size), # 1単元で最大の損切ラインを適用
                 self.apply_common(data, self.common.stop_loss) and self.apply(data, self.conditions.stop_loss),
             ]
         if any(conditions):

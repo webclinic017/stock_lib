@@ -111,14 +111,11 @@ class StrategySimulator:
 
         # 手仕舞い
         if len(dates) > 0:
-            recorder = TradeRecorder(strategy.get_prefix(args))
             for code in simulators.keys():
                 split_data = stocks[code].split(dates[0], dates[-1])
                 if len(split_data.daily) == 0:
                     continue
-                simulators[code].closing(split_data.daily["close"].iloc[-1], data=split_data.daily)
-                recorder.concat(simulators[code].trade_recorder)
-            recorder.output("%s_%s" % (start_date, end_date), append=True)
+                simulators[code].closing(dates[-1], split_data.daily["close"].iloc[-1])
 
         # 統計 ====================================
         stats = {}

@@ -37,12 +37,16 @@ class Index:
     def list(self):
         return list(self.code_map.keys()) + list(self.exchange_map.keys())
 
+class Bitcoin:
+    exchanges = ["bitmex"]
+
 class Loader:
     workspace_dir = os.path.expanduser("~/workspace")
 
     trade_dir = "%s/stocktrade" % workspace_dir
     base_dir = "%s/stock_data" % workspace_dir
     tick_dir = "%s/stock_tick" % workspace_dir
+    bitcoin_dir = "%s/bitcoin" % workspace_dir
     stock_dir = "%s/stocks" % base_dir
     ranking_dir = "%s/ranking" % base_dir
     settings_dir = "%s/settings" % base_dir
@@ -70,6 +74,35 @@ class Loader:
             data.columns = ["code", "high", "low", "price", "volume", "update_time"]
         except:
             data = None
+        return data
+
+    @staticmethod
+    def load_bitcoin_ohlc(code, start_date, end_date, with_filter=True, strict=False, time=None):
+        start = utils.to_datetime(start_date)
+        end = utils.to_datetime(end_date)
+        current = start
+        data = None
+        while current <= end:
+            current = utils.to_datetime(utils.to_format(current + relativedelta(days=1), output_format="%Y-%m-%d"))
+            try:
+                data_ = pandas.read_csv(Loader.bitcoin_dir + "/" + str(code) + "/" + utils.to_format(current) + ".csv")
+            except:
+                continue
+            data = data_ if (data is None) else pandas.concat([data, data_])
+
+        if data is None:
+          return None
+        data = Loader.format(data, float, date_format="%Y-%m-%d %H:%M:%S")
+        data["low"] = data[["low", "open", "close"]].apply(min, axis=1)
+        data["high"] = data[["high", "open", "close"]].apply(max, axis=1)
+        if with_filter:
+          end_time = "23:59:59" if time is None else utils.format("%s %s" % (end_date, time), output_format="%H:%M:%S")
+          filtered = Loader.filter(data, "%s 00:00:00" % start_date, "%s %s" % (end_date, end_time), strict)
+          if len(filtered) == 0:
+            return None
+          return filtered
+        return data
+
         return data
 
     @staticmethod
@@ -113,7 +146,7 @@ class Loader:
         return data
 
     @staticmethod
-    def load_tick(code, start_date, end_date, with_filter=True, strict=False, with_stats=False, time=None):
+    def load_tick(code, start_date, end_date, with_filter=True, strict=False, time=None):
         start = utils.to_datetime(start_date)
         end = utils.to_datetime(end_date)
         current = start
@@ -123,10 +156,6 @@ class Loader:
             current = utils.to_datetime(utils.to_format(current + relativedelta(months=1), output_format="%Y-%m-01"))
             try:
                 data_ = pandas.read_csv(Loader.tick_dir + "/" + month + "/" + str(code) + ".csv", header=None)
-                if with_stats:
-                    stats = pandas.read_csv(Loader.tick_dir + "/" + month + "/" + str(code) + "_stats.csv")
-                    stats = stats.drop("date", axis=1)
-                    data_ = pandas.concat([data_, stats], axis=1)
             except:
                 continue
             data = data_ if (data is None) else pandas.concat([data, data_])
@@ -143,7 +172,7 @@ class Loader:
         return data
 
     @staticmethod
-    def load_tick_ohlc(code, start_date, end_date, rule="5T", time=None):
+    def load_stock_tick_ohlc(code, start_date, end_date, rule="5T", time=None):
         daily = Loader.load(code, start_date, end_date)
         columns = ["code", "date", "time", "price", "volume"]
         columns_dict = {}
@@ -175,6 +204,14 @@ class Loader:
         return ohlc
 
     @staticmethod
+    def load_tick_ohlc(code, start_date, end_date, rule="5T", time=None):
+        if code in Bitcoin().exchanges:
+            data = Loader.load_bitcoin_ohlc(code, start_date, end_date, time=time)
+        else:
+            data = Loader.load_stock_tick_ohlc(code, start_date, end_date, rule=rule, time=time)
+        return data
+
+    @staticmethod
     def tick_format(data):
         data.columns = ['code', 'date', 'time', 'price', "volume"]
         data["time"] = data["time"] / 1000
@@ -192,25 +229,7 @@ class Loader:
         return years
 
     @staticmethod
-    def load_stats(code, start_date, end_date, with_filter=True, strict=False, with_stats=False):
-        years = Loader.years(start_date, end_date)
-        data = None
-        for year in years:
-          try:
-            data_ = pandas.read_csv(Loader.stock_dir + '/' + str(code) + '/' + str(year) +  '_stats.csv')
-          except:
-            continue
-          data = data_ if (data is None) else pandas.concat([data, data_])
-        if data is None:
-          return None
-        if with_filter:
-          filtered = Loader.filter(data, start_date, end_date, strict)
-          if len(filtered) == 0:
-            return None
-          return filtered
-
-    @staticmethod
-    def load(code, start_date, end_date, with_filter=True, strict=False, with_stats=False):
+    def load(code, start_date, end_date, with_filter=True, strict=False):
         years = Loader.years(start_date, end_date)
         data = None
         for year in years:
@@ -218,10 +237,6 @@ class Loader:
             data_ = pandas.read_csv(Loader.stock_dir + '/' + str(code) + '/' + str(year) +  '.csv', header=None)
             data_ = data_.iloc[:,0:6]
             data_ = Loader.format(data_, "int")
-            if with_stats:
-                stats = pandas.read_csv(Loader.stock_dir + '/' + str(code) + '/' + str(year) +  '_stats.csv')
-                stats = stats.drop("date", axis=1)
-                data_ = pandas.concat([data_, stats], axis=1)
           except:
             continue
           data = data_ if (data is None) else pandas.concat([data, data_])
@@ -279,10 +294,10 @@ class Loader:
         return data
 
     @staticmethod
-    def loads(codes, start_date, end_date, strict=False, with_code=True, with_stats=False):
+    def loads(codes, start_date, end_date, strict=False, with_code=True):
         data = {} if with_code else []
         for code in codes:
-            d = Loader.load(code, start_date, end_date, strict=strict, with_stats=with_stats)
+            d = Loader.load(code, start_date, end_date, strict=strict)
             if d is None:
                 continue
             if with_code:
@@ -293,9 +308,9 @@ class Loader:
         return data
 
     @staticmethod
-    def load_with_realtime(code, start_date, end_date, with_stats=False):
+    def load_with_realtime(code, start_date, end_date):
         if str(code).isdigit():
-            data = Loader.load(code, start_date, end_date, with_stats=with_stats)
+            data = Loader.load(code, start_date, end_date)
         else:
             data = Loader.load_index(code, start_date, end_date)
 
@@ -306,7 +321,7 @@ class Loader:
             return data
 
         realtime = Loader.load_realtime(code, end_date)
-        if realtime is not None and with_stats == False:
+        if realtime is not None:
             data = data[data["date"] < end_date]
             open_date = "%s 09:00:00" % end_date
             realtime = realtime[realtime["date"] >= open_date]

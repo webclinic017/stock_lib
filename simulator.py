@@ -7,7 +7,9 @@ import utils
 
 # 売買の状態
 class Position:
-    def __init__(self, num = 0, value = 0, term = 0, initial = None, system="actual", method="long"):
+    def __init__(self, num = 0, value = 0, term = 0, initial = None, system="actual", method="long", min_unit=None):
+        assert min_unit is not None, "min_unit is None."
+        print(min_unit)
         self.num = int(num)
         self.value = []
         self.initial = initial
@@ -16,25 +18,30 @@ class Position:
         self.term = term # 保有期間
         self.system = system
         self.method = method
+        self.min_unit = min_unit
 
     def add_history(self, num, value):
-        for _ in range(int(num/100)):
+        for _ in range(int(num)):
             self.value.append(value) # 平均取得価格の計算のため
         self.num += num
         if self.get_num() == 0:
           self.term = 0
           self.value = []
 
+    # 現在の評価額
+    def eval(self, value, num):
+        return value * num * self.min_unit
+
     # 新規
     def new(self, num, value):
         self.add_history(num, value)
-        price = -num * value
+        price = -self.eval(value, num)
         return price
 
     # 返済
     def repay(self, num, value):
         assert len(self.value) > 0, "do not repay. not hold."
-        price = num * self.get_value()
+        price = self.eval(self.get_value(), num)
         price = price + self.gain(value)
         self.add_history(-num, value)
         return price
@@ -63,9 +70,9 @@ class Position:
         if self.get_value() is None:
             return 0
         if self.is_short():
-            return (self.get_value() - value) * self.get_num()
+            return self.eval(self.get_value() - value, self.get_num())
         else:
-            return (value - self.get_value()) * self.get_num()
+            return self.eval(value - self.get_value(), self.get_num())
 
     # 損益レシオ
     def gain_rate(self, value):
@@ -184,6 +191,7 @@ class SimulatorSetting:
         self.short_trade = False
         self.stop_loss_rate = 0.02
         self.taking_rate = 0.005
+        self.min_unit = 100
 
 # 統計
 class SimulatorStats:
@@ -315,16 +323,17 @@ class SimulatorStats:
 
 
 class TradeRecorder:
-    def __init__(self, output_dir=""):
+    def __init__(self, min_unit, output_dir=""):
         self.output_dir = "/tmp/trade_recorder/%s" % output_dir
         self.pattern = {"new": [], "repay": [], "gain": []}
         self.columns = None
+        self.min_unit = min_unit
 
     def set_columns(self, columns):
         self.columns = columns
 
     def pattern_num(self, num):
-        return int(num / 100)
+        return int(num / self.min_unit)
 
     def new(self, pattern, num):
         assert self.columns is not None, "columns is None"
@@ -362,13 +371,12 @@ class Simulator:
         system = "credit" if setting.short_trade else "actual"
         method = "short" if setting.short_trade else "long"
         self.setting = setting
-        self.position = position if position is not None else Position(system=system, method=method)
+        self.position = position if position is not None else Position(system=system, method=method, min_unit=self.setting.min_unit)
         self.assets = setting.assets
         self.stats = SimulatorStats()
         self.logs = []
         self.new_orders = []
         self.repay_orders = []
-        self.trade_recorder = TradeRecorder()
 
     def log(self, message):
         if self.setting.debug:
@@ -389,8 +397,7 @@ class Simulator:
 
     # 総資産
     def total_assets(self, value):
-        num = self.position.get_num()
-        holdings = float(value) * int(num)
+        holdings = self.position.eval(value, self.position.get_num())
         return self.assets + holdings
 
     # 新規
@@ -427,15 +434,20 @@ class Simulator:
         return True
 
     # 全部売る
-    def closing(self, value, data=None):
+    def closing(self, date, value, data=None):
         self.log(" - closing: price %s" % (value))
+        trade_data = self.create_trade_data(date, value)
         num = self.position.get_num()
-        gain = self.position.gain_rate(value)
-        if self.repay(value, num) and data is not None:
-            self.trade_recorder.repay(data.iloc[-1], gain, num)
+        gain = self.position.gain(value)
+        gain_rate = self.position.gain_rate(value)
+        if self.repay(value, num):
+            trade_data["repay"] = value
+            trade_data["gain"] = gain
+            trade_data["gain_rate"] = gain_rate
 
         self.new_orders = []
         self.repay_orders = []
+        self.stats.trade_history.append(trade_data)
 
     # 取引手数料
     # TODO 実際のものに合わせる
@@ -568,7 +580,7 @@ class Simulator:
             self.simulate_by_date(date, data, index)
 
         # 統計取得のために全部手仕舞う
-        self.closing(data.daily["close"].iloc[-1])
+        self.closing(dates[-1], data.daily["close"].iloc[-1])
 
         stats = self.get_stats()
 
@@ -603,7 +615,6 @@ class Simulator:
         # 新規注文実行
         for order in new_orders:
             if self.new(order.price, order.num):
-                self.trade_recorder.new(data.daily.iloc[-1], order.num)
                 trade_data["new"] = order.price
 
         # 返済注文実行
@@ -614,11 +625,17 @@ class Simulator:
             gain        = self.position.gain(order.price)
             gain_rate   = self.position.gain_rate(order.price)
             if self.repay(order.price, order.num):
-                self.trade_recorder.repay(data.daily.iloc[-1], gain_rate, order.num)
                 trade_data["repay"] = order.price
                 trade_data["gain"] = gain
                 trade_data["gain_rate"] = gain_rate
 
+        return trade_data
+
+    def create_trade_data(self, date, price):
+        trade_data = self.stats.create_trade_data()
+        trade_data["date"]                = date
+        trade_data["assets"]              = self.total_assets(price)
+        trade_data["unavailable_assets"]  = trade_data["assets"] - self.assets
         return trade_data
 
     # トレード
@@ -628,11 +645,7 @@ class Simulator:
         date = data.daily["date"].iloc[-1]
 
         # stats
-        self.trade_recorder.set_columns(data.daily.columns)
-        trade_data = self.stats.create_trade_data()
-        trade_data["date"]                = date
-        trade_data["assets"]              = self.total_assets(price)
-        trade_data["unavailable_assets"]  = trade_data["assets"] - self.assets
+        trade_data = self.create_trade_data(date, price)
 
         # 判断に必要なデータ数がない
         if price == 0 or len(data.daily) < self.setting.min_data_length:
