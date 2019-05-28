@@ -688,6 +688,7 @@ class Loader:
                 codes.extend(stock["code"].as_matrix().tolist())
 
         codes = codes + Loader.before_ranking_codes(date, "volume", before=0, monitor_size=monitor_size)
+        codes = codes + Loader.before_ranking_codes(date, "volume_ratio", before=0, monitor_size=monitor_size)
 
         print(codes)
         return list(set(codes))
