@@ -15,7 +15,6 @@ class CombinationStrategy(CombinationCreator):
         super().__init__(setting)
 
         self.conditions_by_seed(setting.seed[0])
-        self.ranking_type = random.choice(["volume_ratio"])
 
     def conditions_by_seed(self, seed):
         random.seed(seed)
@@ -25,12 +24,19 @@ class CombinationStrategy(CombinationCreator):
         self.stop_loss_conditions   = random.sample(self.conditions_all, self.setting.condition_size)
 
     def subject(self, date):
-        stocks = Loader.before_ranking(date, self.ranking_type)
-        if stocks is None:
+        volume = Loader.before_ranking(date, "volume")
+        stocks = Loader.before_ranking(date, "volume_ratio")
+        if stocks is None or volume is None:
             return []
 
+        codes = volume[volume["key"] >= 100]["code"].as_matrix().tolist()
+        stocks = stocks[stocks["code"].isin(codes)] # 出来高10万以上の銘柄に絞る
+
         num = self.setting.monitor_size
-        codes = stocks["code"].iloc[:num].as_matrix().tolist()
+        stocks = stocks.iloc[:num]
+        codes = stocks["code"].as_matrix().tolist()
+
+        assert len(codes) == num, "codes length too large"
 
         return codes
 
