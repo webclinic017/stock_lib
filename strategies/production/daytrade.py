@@ -38,8 +38,6 @@ class CombinationStrategy(CombinationCreator):
 
         assert len(codes) == num, "codes length too large"
 
-        print(codes)
-
         return codes
 
     def common(self, setting):
