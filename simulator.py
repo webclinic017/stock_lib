@@ -144,6 +144,21 @@ class Order:
         }
         return all(list(map(lambda x:x(data), self.conditions)))
 
+class MarketOrder(Order):
+    def __init__(self, num, is_short=False):
+        conditions = [lambda x: True]
+        super().__init__(num, conditions)
+
+class LimitOrder(Order):
+    def __init__(self, num, price, is_short=False, is_repay=False):
+        conditions = [lambda x: x <= price if is_short else x >= price] if is_repay else [lambda x: x >= price if is_short else x <= price]
+        super().__init__(num, conditions, is_limit=True, price=price)
+
+class ReverseLimitOrder(Order):
+    def __init__(self, num, price, is_short=False, is_repay=False):
+        conditions = [lambda x: x >= price if is_short else x <= price] if is_repay else [lambda x: x <= price if is_short else x >= price]
+        super().__init__(num, conditions, is_reverse_limit=True, price=price)
+
 # ルール適用用データ
 class AppliableData:
     def __init__(self, data, index, position, assets, setting, stats, rate):

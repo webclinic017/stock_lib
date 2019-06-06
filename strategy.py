@@ -486,7 +486,7 @@ class Combination(StrategyCreator, StrategyUtil):
             conditions = conditions + [self.apply(data, self.conditions.new)]
 
         if all(conditions):
-            return simulator.Order(order, [lambda x: True])
+            return simulator.MarketOrder(order)
 
         return None
 
@@ -499,7 +499,7 @@ class Combination(StrategyCreator, StrategyUtil):
                 self.apply_common(data, self.common.taking),
                 self.apply(data, self.conditions.taking)
             ]
-        return simulator.Order(data.position.get_num(), [lambda x: True]) if all(conditions) else None
+        return simulator.MarketOrder(data.position.get_num()) if all(conditions) else None
 
     # 損切
     def create_stop_loss_rules(self, data):
@@ -511,7 +511,7 @@ class Combination(StrategyCreator, StrategyUtil):
                 self.apply_common(data, self.common.stop_loss) and self.apply(data, self.conditions.stop_loss),
             ]
         if any(conditions):
-            return simulator.Order(data.position.get_num(), [lambda x: True])
+            return simulator.MarketOrder(data.position.get_num())
         return None
 
     # 手仕舞い
@@ -523,7 +523,7 @@ class Combination(StrategyCreator, StrategyUtil):
                 self.apply_common(data, self.common.closing) and self.apply(data, self.conditions.closing),
             ]
         if any(conditions):
-            return simulator.Order(data.position.get_num(), [lambda x: True])
+            return simulator.MarketOrder(data.position.get_num())
 
         return None
 
