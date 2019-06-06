@@ -137,9 +137,9 @@ class Order:
     def increment_term(self):
         self.term += 1
 
-    def signal(self, value, position):
+    def signal(self, price, position):
         data = {
-            "value": value,
+            "price": price,
             "position": position
         }
         return all(list(map(lambda x:x(data), self.conditions)))
@@ -151,12 +151,12 @@ class MarketOrder(Order):
 
 class LimitOrder(Order):
     def __init__(self, num, price, is_short=False, is_repay=False):
-        conditions = [lambda x: x <= price if is_short else x >= price] if is_repay else [lambda x: x >= price if is_short else x <= price]
+        conditions = [lambda x: x["price"] <= price if is_short else x["price"] >= price] if is_repay else [lambda x: x["price"] >= price if is_short else x["price"] <= price]
         super().__init__(num, conditions, is_limit=True, price=price)
 
 class ReverseLimitOrder(Order):
     def __init__(self, num, price, is_short=False, is_repay=False):
-        conditions = [lambda x: x >= price if is_short else x <= price] if is_repay else [lambda x: x <= price if is_short else x >= price]
+        conditions = [lambda x: x["price"] >= price if is_short else x["price"] <= price] if is_repay else [lambda x: x["price"] <= price if is_short else x["price"] >= price]
         super().__init__(num, conditions, is_reverse_limit=True, price=price)
 
 # ルール適用用データ
@@ -474,46 +474,46 @@ class Simulator:
     def commission(self):
         self.assets -= self.setting.commission
 
-    def exec_order(self, condition, orders, price, is_market=True):
-        signals = list(filter(lambda x: condition(x), orders)) # 条件を満たした注文
+    def exec_order(self, condition, orders, price=None):
+        hit_orders = list(filter(lambda x: condition(x), orders)) # 条件を満たした注文
 
         # 注文の価格を設定
-        if is_market:
-            for i in range(len(signals)):
-                signals[i].price = price
+        if price is not None:
+            for i in range(len(hit_orders)):
+                hit_orders[i].price = price
 
         remain = list(filter(lambda x: not condition(x), orders)) # 残っている注文
-        return signals, remain
+        return hit_orders, remain
 
     def new_order(self, price):
         execution = lambda x: x.signal(price, self.position) and x.is_market()
-        signals, self.new_orders = self.exec_order(execution, self.new_orders, price)
-        return signals
+        hit_orders, self.new_orders = self.exec_order(execution, self.new_orders, price)
+        return hit_orders
 
     def limit_new_order(self, price):
         execution = lambda x: x.signal(price, self.position) and x.is_limit
-        signals, self.new_orders = self.exec_order(execution, self.new_orders, price, is_market=False)
-        return signals
+        hit_orders, self.new_orders = self.exec_order(execution, self.new_orders)
+        return hit_orders
 
     def reverse_limit_new_order(self, price):
         execution = lambda x: x.signal(price, self.position) and x.is_reverse_limit
-        signals, self.new_orders = self.exec_order(execution, self.new_orders, price, is_market=False)
-        return signals
+        hit_orders, self.new_orders = self.exec_order(execution, self.new_orders)
+        return hit_orders
 
     def repay_order(self, price):
         execution = lambda x: x.signal(price, self.position) and x.is_market()
-        signals, self.repay_orders = self.exec_order(execution, self.repay_orders, price)
-        return signals
+        hit_orders, self.repay_orders = self.exec_order(execution, self.repay_orders, price)
+        return hit_orders
 
     def limit_repay_order(self, price):
         execution = lambda x: x.signal(price, self.position) and x.is_limit
-        signals, self.repay_orders = self.exec_order(execution, self.repay_orders, price, is_market=False)
-        return signals
+        hit_orders, self.repay_orders = self.exec_order(execution, self.repay_orders)
+        return hit_orders
 
     def reverse_limit_repay_order(self, price):
         execution = lambda x: x.signal(price, self.position) and x.is_reverse_limit
-        signals, self.repay_orders = self.exec_order(execution, self.repay_orders, price, is_market=False)
-        return signals
+        hit_orders, self.repay_orders = self.exec_order(execution, self.repay_orders)
+        return hit_orders
 
     # 損切りの逆指値価格
     def reverse_limit_price(self, price, assets=None):
@@ -542,24 +542,24 @@ class Simulator:
 
     def new_signals(self, strategy, data, index):
         for order in self.new_signal(strategy, data, index):
-            self.log(" - new_order: num %s" % (order.num))
-            self.new_orders.append(order)
+            self.log(" - new_order: num %s, price %s" % (order.num, order.price))
+            self.new_orders = [order]
 
     def repay_signals(self, strategy, data, index):
         for order in self.taking_signal(strategy, data, index):
             if order.num > 0:
-                self.log(" - taking_order: num %s" % (order.num))
-            self.repay_orders.append(order)
+                self.log(" - taking_order: num %s, price %s" % (order.num, order.price))
+            self.repay_orders = [order]
 
         for order in self.stop_loss_signal(strategy, data, index):
             if order.num > 0:
-                self.log(" - stop_loss_order: num %s" % (order.num))
-            self.repay_orders.append(order)
+                self.log(" - stop_loss_order: num %s, price %s" % (order.num, order.price))
+            self.repay_orders = [order]
 
         for order in self.closing_signal(strategy, data, index):
             if order.num > 0:
-                self.log(" - closing_order: num %s" % (order.num))
-            self.repay_orders.append(order)
+                self.log(" - closing_order: num %s, price %s" % (order.num, order.price))
+            self.repay_orders = [order]
 
     def signals(self, strategy, data, index):
         # 新規ルールに当てはまる場合買う
@@ -639,36 +639,90 @@ class Simulator:
 
         self.trade(self.setting.strategy, price, term_data, term_index)
 
-    def virtual_trade(self, price, data, trade_data):
+    # 指値の条件に使うデータ
+    def limit(self):
+        return "high" if self.setting.short_trade else "low"
+
+    def reverse_limit(self):
+        return "low" if self.setting.short_trade else "high"
+
+    # 指値の約定価格
+    def new_agreed_price(self, data, order):
+        if order.is_market():
+            return order.price
+
+        limit = self.limit() if order.is_limit else self.reverse_limit()
+        open_price = data.daily["open"].iloc[-1]
+        best_price = data.daily[limit].iloc[-1]
+        if order.is_short:
+            worst_price = order.price if order.price > open_price else open_price
+        else:
+            worst_price = order.price if order.price < open_price else open_price
+
+        return worst_price
+
+
+    def repay_agreed_price(self, data, order):
+        if order.is_market():
+            return order.price
+
+        limit = self.reverse_limit() if order.is_limit else self.limit()
+        open_price = data.daily["open"].iloc[-1]
+        best_price = data.daily[limit].iloc[-1]
+        if order.is_short:
+            worst_price = order.price if order.price < open_price else open_price
+        else:
+            worst_price = order.price if order.price > open_price else open_price
+        return worst_price
+
+    def open_trade(self, price, data, trade_data):
         # 仮想トレードなら注文をキューから取得
-        new_limit = "high" if self.setting.short_trade else "low"
-        repay_limit = "low" if self.setting.short_trade else "high"
 
         new_orders = []
         new_orders += self.new_order(price)
-        new_orders += self.limit_new_order(data.daily[new_limit].iloc[-1])
-        new_orders += self.reverse_limit_new_order(data.daily[new_limit].iloc[-1])
 
         repay_orders = []
         if self.position.get_num() > 0:
             repay_orders += self.repay_order(price)
-            repay_orders += self.limit_repay_order(data.daily[repay_limit].iloc[-1])
-            repay_orders += self.reverse_limit_repay_order(data.daily[repay_limit].iloc[-1])
 
+        return self.virtual_trade(data, new_orders, repay_orders, trade_data)
+
+    def intraday_trade(self, price, data, trade_data):
+        # 仮想トレードなら注文をキューから取得
+        limit = self.limit()
+        reverse_limit = self.reverse_limit()
+
+        limit_price = data.daily[limit].iloc[-1]
+        reverse_limit_price = data.daily[reverse_limit].iloc[-1]
+
+        new_orders = []
+        new_orders += self.limit_new_order(limit_price)
+        new_orders += self.reverse_limit_new_order(reverse_limit_price)
+
+        repay_orders = []
+        if self.position.get_num() > 0:
+            repay_orders += self.limit_repay_order(reverse_limit_price)
+            repay_orders += self.reverse_limit_repay_order(limit_price)
+
+        return self.virtual_trade(data, new_orders, repay_orders, trade_data)
+
+    def virtual_trade(self, data, new_orders, repay_orders, trade_data):
         # 新規注文実行
         for order in new_orders:
-            if self.new(order.price, order.num):
-                trade_data["new"] = order.price
+            agreed_price = self.new_agreed_price(data, order)
+            if self.new(agreed_price, order.num):
+                trade_data["new"] = agreed_price
 
         # 返済注文実行
         for order in repay_orders:
             if self.position.get_num() <= 0:
                 self.repay_orders = [] # ポジションがなくなってたら以降の注文はキャンセル
                 break
-            gain        = self.position.gain(order.price)
-            gain_rate   = self.position.gain_rate(order.price)
-            if self.repay(order.price, order.num):
-                trade_data["repay"] = order.price
+            agreed_price = self.repay_agreed_price(data, order)
+            gain        = self.position.gain(agreed_price)
+            gain_rate   = self.position.gain_rate(agreed_price)
+            if self.repay(agreed_price, order.num):
+                trade_data["repay"] = agreed_price
                 trade_data["gain"] = gain
                 trade_data["gain_rate"] = gain_rate
 
@@ -700,11 +754,19 @@ class Simulator:
         if self.position.get_num() > 0:
             self.position.increment_term()
 
+        # 注文の保持期間を増やす
+        for i in range(len(self.new_orders)):
+            self.new_orders[i].increment_term()
+
+        for i in range(len(self.repay_orders)):
+            self.repay_orders[i].increment_term()
+
         # 寄り付き====================================================================
         if self.setting.virtual_trade:
-            trade_data = self.virtual_trade(price, data, trade_data)
+            trade_data = self.open_trade(price, data, trade_data)
+            trade_data = self.intraday_trade(price, data, trade_data)
 
-        ## 引け後=====================================================================
+        # 注文を出す
         self.signals(strategy, data, index)
 
         # トレード履歴
