@@ -19,6 +19,7 @@ class LoadSettings:
 
 def add_options(parser):
     parser.add_argument("--code", type=str, action="store", default=None, dest="code", help="code")
+    parser.add_argument("--use_limit", action="store_true", default=False, dest="use_limit", help="指値を使う")
     parser.add_argument("--position_sizing", action="store_true", default=False, dest="position_sizing", help="ポジションサイジング")
     parser.add_argument("--max_position_size", action="store", default=None, dest="max_position_size", help="最大ポジションサイズ")
     parser.add_argument("--monitor_size", action="store", default=None, dest="monitor_size", help="監視銘柄数")
@@ -164,6 +165,7 @@ def load_strategy_creator(args, combination_setting=None):
 # args > json > default の優先度
 def create_combination_setting(args, use_json=True):
     combination_setting = create_combination_setting_by_json(args) if use_json else CombinationSetting()
+    combination_setting.use_limit = args.use_limit if args.use_limit else combination_setting.use_limit
     combination_setting.position_sizing = args.position_sizing if args.position_sizing else combination_setting.position_sizing
     combination_setting.max_position_size = combination_setting.max_position_size if args.max_position_size is None else int(args.max_position_size)
     combination_setting.monitor_size = combination_setting.monitor_size if args.monitor_size is None else int(args.monitor_size)
@@ -174,6 +176,7 @@ def create_combination_setting_by_json(args):
     setting_dict, _ = load_strategy_setting(args)
     if setting_dict is None:
         return combination_setting
+    combination_setting.use_limit = setting_dict["use_limit"] if "use_limit" in setting_dict.keys() else combination_setting.use_limit
     combination_setting.position_sizing = setting_dict["position_sizing"] if "position_sizing" in setting_dict.keys() else combination_setting.position_sizing
     combination_setting.max_position_size = setting_dict["max_position_size"] if "max_position_size" in setting_dict.keys() else combination_setting.max_position_size
     combination_setting.monitor_size = setting_dict["monitor_size"] if "monitor_size" in setting_dict.keys() else combination_setting.monitor_size
@@ -437,6 +440,7 @@ class StrategyUtil:
 
 class CombinationSetting:
     simple = False
+    use_limit = False
     position_sizing = False
     max_position_size = 5
     sorted_conditions = True
@@ -486,8 +490,10 @@ class Combination(StrategyCreator, StrategyUtil):
             conditions = conditions + [self.apply(data, self.conditions.new)]
 
         if all(conditions):
-            return simulator.MarketOrder(order)
-#            return simulator.LimitOrder(order, self.price(data))
+            if self.setting.use_limit:
+                return simulator.LimitOrder(order, self.price(data))
+            else:
+                return simulator.MarketOrder(order)
 
         return None
 
@@ -502,8 +508,10 @@ class Combination(StrategyCreator, StrategyUtil):
             ]
         if all(conditions):
             order = data.position.get_num()
-            return simulator.MarketOrder(order)
-#            return simulator.LimitOrder(order, self.price(data))
+            if self.setting.use_limit:
+                return simulator.LimitOrder(order, self.price(data))
+            else:
+                return simulator.MarketOrder(order)
         return None
 
     # 損切
@@ -517,8 +525,10 @@ class Combination(StrategyCreator, StrategyUtil):
             ]
         if any(conditions):
             order = data.position.get_num()
-            return simulator.MarketOrder(order)
-#            return simulator.ReverseLimitOrder(order, self.price(data))
+            if self.setting.use_limit:
+                return simulator.ReverseLimitOrder(order, self.price(data))
+            else:
+                return simulator.MarketOrder(order)
         return None
 
     # 手仕舞い
