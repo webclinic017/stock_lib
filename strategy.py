@@ -475,6 +475,7 @@ class Combination(StrategyCreator, StrategyUtil):
     def create_new_rules(self, data):
         risk = self.risk(data)
         max_risk = self.max_risk(data)
+
         max_order = self.max_order(data, max_risk, risk)
         max_order = max_order if max_order < self.setting.max_position_size else self.setting.max_position_size
 

@@ -425,17 +425,18 @@ class Simulator:
     # 新規
     def new(self, value, num):
         value = value * (1 + random.uniform(0.0, self.setting.error_rate))
-        if (self.assets - value * num) <= 0:
+        if (self.assets - self.position.eval(value, num)) <= 0:
             # 資産が足りなければスルー
             self.log(" - assets_not_enough: num %s, value %s" % (num, value))
             return False
         if num <= 0:
             return False
 
-        self.assets += self.position.new(num, value)
+        cost = self.position.new(num, value)
+        self.assets += cost
         self.commission()
 
-        self.log(" new: %s yen x %s, total %s, ave %s, assets %s" % (value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value)))
+        self.log(" new: %s yen x %s, total %s, ave %s, assets %s, cost %s" % (value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost))
 
         return True
 
@@ -447,10 +448,11 @@ class Simulator:
 
         gain_rate = self.position.gain_rate(value)
         gain = self.position.gain(value)
-        self.assets += self.position.repay(num, value)
+        cost = self.position.repay(num, value)
+        self.assets += cost
         self.commission()
 
-        self.log(" repay: %s yen x %s, total %s, ave %s, assets %s : gain %s" % (value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), gain))
+        self.log(" repay: %s yen x %s, total %s, ave %s, assets %s, cost %s : gain %s" % (value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost, gain))
         return True
 
     # 全部売る
@@ -606,7 +608,7 @@ class Simulator:
 
         return stats
 
-    def simulate(self, dates, data, index):
+    def simulate(self, dates, data, index={}):
         assert type(data) is SimulatorData, "data is not SimulatorData."
 
         print(dates)
@@ -623,7 +625,7 @@ class Simulator:
         return stats
 
     # 高速化
-    def simulate_by_date(self, date, data, index):
+    def simulate_by_date(self, date, data, index={}):
         term_data = data.split_to(date)
 
         term_index = {}

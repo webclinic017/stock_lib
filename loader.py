@@ -354,8 +354,9 @@ class Loader:
         try:
             if not str(code).isdigit():
                 index = Index()
-                code = index.map()[code]
-                code = code.replace("/", "")
+                if code in index.map():
+                    code = index.map()[code]
+                    code = code.replace("/", "")
             path = '%s/%s/%s.csv' % (Loader.realtime_dir, date, code)
             data = pandas.read_csv(path, header=None)
             data = Loader.format(data, "float", replace=" ", how=how, columns=['date', 'high', 'low', 'price', 'volume', 'update_time'], date_format="%Y-%m-%d %H:%M:%S")
