@@ -162,7 +162,7 @@ class StrategySimulator:
             "codes": codes,
             "win": win_codes,
             "lose": lose_codes,
-            "gain": round(sum(gain)),
+            "gain": sum(gain),
             "return": round(sum(gain) / self.simulator_setting.assets, 2),
             "drawdown": round(numpy.average(list(map(lambda x: x.max_drawdown(), s))).item() if len(s) > 0 else 0, 2),
             "max_drawdown": round(max(list(map(lambda x: x.max_drawdown(), s))) if len(s) > 0 else 0, 2),
