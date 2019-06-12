@@ -230,7 +230,8 @@ class SimulatorStats:
             "assets": None,
             "unavailable_assets": None,
             "term": 0,
-            "size": 0
+            "size": 0,
+            "canceled": False
         }
         return trade_data
 
@@ -343,6 +344,8 @@ class SimulatorStats:
         risk = self.risk_ratio()
         return reword / risk if risk > 0 else reword
 
+    def canceled(self):
+        return self.trade_history[-1]["canceled"]
 
 class TradeRecorder:
     def __init__(self, min_unit, output_dir=""):
@@ -569,19 +572,25 @@ class Simulator:
         # 返済注文
         self.repay_signals(strategy, data, index)
         # 注文の整理
-        self.order_adjust()
+        return self.order_adjust()
 
     def order_adjust(self):
+        canceled = False
         # ポジションがなければ返済シグナルは捨てる
         if self.position.get_num() <= 0 and len(self.repay_orders) > 0:
             self.log("[cancel] repay order")
             self.repay_orders = []
+            canceled = True
 
         # 新規・返済が同時に出ている場合何もしない
         if len(self.new_orders) > 0 and len(self.repay_orders) > 0:
             self.log("[cancel] new/repay order")
             self.new_orders = []
             self.repay_orders = []
+            canceled = True
+
+        return canceled
+
 
     def get_stats(self): 
         stats = dict()
@@ -769,7 +778,7 @@ class Simulator:
             trade_data = self.intraday_trade(price, data, trade_data)
 
         # 注文を出す
-        self.signals(strategy, data, index)
+        trade_data["canceled"] = self.signals(strategy, data, index)
 
         # トレード履歴
         trade_data["size"] = self.position.get_num()
