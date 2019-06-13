@@ -19,6 +19,16 @@ class Bitmex:
         else:
             self.url = "https://testnet.bitmex.com/api/v1"
 
+    def quote(self):
+        url = self.url + "/quote"
+        params = {
+            "symbol": "XBTUSD",
+            "count": 100,
+            "reverse": True,
+        }
+        query = urllib.parse.urlencode(params)
+        return self.client.get(url + "?" + query)
+
     def wallet(self):
         url = self.url + "/user/walletSummary"
         return self.client.get(url)

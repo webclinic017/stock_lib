@@ -352,26 +352,26 @@ class Loader:
     @staticmethod
     def load_realtime(code, date, how="any"):
         try:
-            if not str(code).isdigit():
-                index = Index()
-                if code in index.map():
-                    code = index.map()[code]
-                    code = code.replace("/", "")
+            if code in Index().map():
+                code = Index().map()[code]
+                code = code.replace("/", "")
             path = '%s/%s/%s.csv' % (Loader.realtime_dir, date, code)
             data = pandas.read_csv(path, header=None)
             data = Loader.format(data, "float", replace=" ", how=how, columns=['date', 'high', 'low', 'price', 'volume', 'update_time'], date_format="%Y-%m-%d %H:%M:%S")
             data["volume"] = utils.diff(data["volume"].as_matrix() / 1000)
             data["volume"] = list(map(lambda x: 0 if x < 0 else x, data["volume"].as_matrix().tolist()))
         except:
-#            import traceback
-#            traceback.print_exc()
+            import traceback
+            traceback.print_exc()
             data = None
         return data
 
     @staticmethod
-    def load_realtime_ohlc(code, date):
+    def load_realtime_ohlc(code, date, with_zaraba_filter=True):
         data = Loader.load_realtime(code, date)
-        data = Loader.realtime_to_ohlc(data, with_zaraba_filter=True)
+        if data is None:
+            return None
+        data = Loader.realtime_to_ohlc(data, with_zaraba_filter=with_zaraba_filter)
         return data
 
     @staticmethod
@@ -392,9 +392,13 @@ class Loader:
 
     @staticmethod
     def loads_realtime(code, date, days, how="any", time=None):
+        if str(code).isdigit():
+            is_stock = True
+        elif code in Index().list() or code in Bitcoin().exchanges:
+            is_stock = False
+
         # 日本の休日を除外
-        data = Loader.load_realtime(code, date) # 今日の分
-        data = Loader.realtime_to_ohlc(data)
+        data = Loader.load_realtime_ohlc(code, date, with_zaraba_filter=is_stock) # 今日の分
         if time is not None:
             data = data[data["date"] <= "%s %s" % (date, time)]
         length = 1
@@ -402,12 +406,16 @@ class Loader:
         while length < days:
             current = utils.to_format(utils.to_datetime(current) - relativedelta(days=1))
             if utils.is_weekday(utils.to_datetime(current)):
-                d = Loader.load_realtime_minutes(code, current)
+                if is_stock:
+                    d = Loader.load_realtime_minutes(code, current)
+                else:
+                    d = Loader.load_realtime_ohlc(code, current, with_zaraba_filter=is_stock)
                 if d is not None: 
                     d = Loader.resample(d, "5T")
                     data = pandas.concat([d, data])
                 length = length + 1
-        data = Loader.zaraba_filter(data)
+        if is_stock:
+            data = Loader.zaraba_filter(data)
         return data
 
 
