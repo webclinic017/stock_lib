@@ -367,11 +367,11 @@ class Loader:
         return data
 
     @staticmethod
-    def load_realtime_ohlc(code, date, with_zaraba_filter=True):
+    def load_realtime_ohlc(code, date):
         data = Loader.load_realtime(code, date)
         if data is None:
             return None
-        data = Loader.realtime_to_ohlc(data, with_zaraba_filter=with_zaraba_filter)
+        data = Loader.realtime_to_ohlc(data)
         return data
 
     @staticmethod
@@ -398,7 +398,7 @@ class Loader:
             is_stock = False
 
         # 日本の休日を除外
-        data = Loader.load_realtime_ohlc(code, date, with_zaraba_filter=is_stock) # 今日の分
+        data = Loader.load_realtime_ohlc(code, date) # 今日の分
         if time is not None:
             data = data[data["date"] <= "%s %s" % (date, time)]
         length = 1
@@ -409,8 +409,8 @@ class Loader:
                 if is_stock:
                     d = Loader.load_realtime_minutes(code, current)
                 else:
-                    d = Loader.load_realtime_ohlc(code, current, with_zaraba_filter=is_stock)
-                if d is not None: 
+                    d = Loader.load_realtime_ohlc(code, current)
+                if d is not None:
                     d = Loader.resample(d, "5T")
                     data = pandas.concat([d, data])
                 length = length + 1

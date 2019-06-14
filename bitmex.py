@@ -93,6 +93,7 @@ class Bitmex:
           "orderQty": size,
           "stopPx": price,
           "ordType": "Stop",
+          "execInst": "LastPrice",
         }
         return self.client.post(url, params)
 
@@ -125,6 +126,7 @@ class Bitmex:
           "orderQty": size,
           "stopPx": price,
           "ordType": "Stop",
+          "execInst": "LastPrice",
         }
         return self.client.post(url, params)
 
