@@ -33,7 +33,7 @@ def add_options(parser):
     parser.add_argument("--ignore_weekly", action="store_true", default=False, dest="ignore_weekly", help="週足統計を無視")
 
     # strategy
-    parser.add_argument("--daytrade", action="store_true", default=False, dest="daytrade", help="デイトレ")
+    parser.add_argument("--before_ranking", action="store_true", default=False, dest="before_ranking", help="ランキングトレード")
     parser.add_argument("--open_close", action="store_true", default=False, dest="open_close", help="寄せ引け")
     return parser
 
@@ -51,16 +51,16 @@ def get_prefix(args, ignore_code=False):
     method = "short_" if args.short else ""
 
     target = ""
-    if args.daytrade:
-        target = "daytrade_"
+    if args.before_ranking:
+        target = "before_ranking_"
     if args.open_close:
         target = "open_close_"
 
     return "%s%s%s%s%s" % (prefix, code, target, tick, method)
 
 def get_strategy_name(args):
-    if args.daytrade:
-        return "daytrade"
+    if args.before_ranking:
+        return "before_ranking"
     elif args.open_close:
         return "open_close"
     else:
@@ -142,8 +142,8 @@ def load_strategy(args, combination_setting=None):
 def load_strategy_creator(args, combination_setting=None):
     combination_setting = CombinationSetting() if combination_setting is None else combination_setting
     if args.production:
-        if args.daytrade:
-            from strategies.production.daytrade import CombinationStrategy
+        if args.before_ranking:
+            from strategies.production.before_ranking import CombinationStrategy
             return CombinationStrategy(combination_setting)
         elif args.open_close:
             from strategies.production.open_close import CombinationStrategy
@@ -152,8 +152,8 @@ def load_strategy_creator(args, combination_setting=None):
            from strategies.production.combination import CombinationStrategy
            return CombinationStrategy(combination_setting)
     else:
-        if args.daytrade:
-            from strategies.daytrade import CombinationStrategy
+        if args.before_ranking:
+            from strategies.before_ranking import CombinationStrategy
             return CombinationStrategy(combination_setting)
         elif args.open_close:
             from strategies.open_close import CombinationStrategy
