@@ -31,17 +31,17 @@ class StrategySimulator:
     def select_codes(self, args, start_date, end_date):
         codes = []
         daterange = {}
-        start = utils.to_datetime_by_term(start_date, tick=args.tick)
-        end = utils.to_datetime_by_term(end_date, tick=args.tick) + utils.relativeterm(1, tick=True)
+        start = utils.to_datetime_by_term(start_date, with_time=args.daytrade)
+        end = utils.to_datetime_by_term(end_date, with_time=args.daytrade) + utils.relativeterm(1, with_time=True)
         for date in utils.daterange(start, end):
-            codes = self.get_targets(args, codes, utils.to_format_by_term(date, args.tick))
+            codes = self.get_targets(args, codes, utils.to_format_by_term(date, args.daytrade))
             daterange = self.append_daterange(codes, date, daterange)
         validate_codes = codes
         return codes, validate_codes, daterange
 
     def get_targets(self, args, targets, date):
         if args.code is None:
-            date = utils.to_format(utils.to_datetime_by_term(date, args.tick))
+            date = utils.to_format(utils.to_datetime_by_term(date, args.daytrade))
             targets = list(set(targets + self.strategy_creator(args).subject(date)))
         else:
             targets = [args.code]
@@ -68,7 +68,7 @@ class StrategySimulator:
         args = data["args"]
         stocks = data["data"]
         index = data["index"]
-        tick = args.tick
+        daytrade = args.daytrade
 
         # シミュレーター準備
         simulators = {}
@@ -90,12 +90,12 @@ class StrategySimulator:
             dates = list(set(dates + dates_dict[code]))
 
         # 日付ごとにシミュレーション
-        dates = sorted(dates, key=lambda x: utils.to_datetime_by_term(x, tick))
+        dates = sorted(dates, key=lambda x: utils.to_datetime_by_term(x, daytrade))
         self.log("targets: %s" % simulators.keys())
 
         for date in dates:
             # 休日はスキップ
-            if not utils.is_weekday(utils.to_datetime_by_term(date, tick)):
+            if not utils.is_weekday(utils.to_datetime_by_term(date, daytrade)):
                 self.log("%s is not weekday" % date)
                 continue
 

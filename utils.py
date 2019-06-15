@@ -616,20 +616,20 @@ def format(date, input_format="%Y-%m-%d", output_format="%Y-%m-%d"):
 def to_format(date, output_format="%Y-%m-%d"):
     return date.strftime(output_format)
 
-def to_format_by_term(date, tick=False):
-    if tick:
+def to_format_by_term(date, with_time=False):
+    if with_time:
         return to_format(date, output_format="%Y-%m-%d %H:%M:%S")
     else:
         return to_format(date)
 
-def relativeterm(term, tick=False):
-    if tick:
+def relativeterm(term, with_time=False):
+    if with_time:
         return relativedelta(days=term)
     else:
         return relativedelta(months=term)
 
-def to_datetime_by_term(date, tick=False):
-    if tick:
+def to_datetime_by_term(date, with_time=False):
+    if with_time:
         return to_datetime(date, input_format="%Y-%m-%d %H:%M:%S")
     else:
         return to_datetime(date)

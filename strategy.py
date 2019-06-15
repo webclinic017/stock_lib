@@ -25,7 +25,7 @@ def add_options(parser):
     parser.add_argument("--monitor_size", action="store", default=None, dest="monitor_size", help="監視銘柄数")
     parser.add_argument("--production", action="store_true", default=False, dest="production", help="本番向け") # 実行環境の選択
     parser.add_argument("--short", action="store_true", default=False, dest="short", help="空売り戦略")
-    parser.add_argument("--tick", action="store_true", default=False, dest="tick", help="ティックデータを使う")
+    parser.add_argument("--daytrade", action="store_true", default=False, dest="daytrade", help="ティックデータを使う")
     parser.add_argument("--realtime", action="store_true", default=False, dest="realtime", help="リアルタイムデータを使う")
     parser.add_argument("--stop_loss_rate", action="store", default=None, dest="stop_loss_rate", help="損切レート")
     parser.add_argument("--taking_rate", action="store", default=None, dest="taking_rate", help="利食いレート")
@@ -46,7 +46,7 @@ def get_prefix(args, ignore_code=False):
 
     prefix = "production_" if args.production else ""
 
-    tick = "tick_" if args.tick else ""
+    daytrade = "daytrade_" if args.daytrade else ""
 
     method = "short_" if args.short else ""
 
@@ -56,7 +56,7 @@ def get_prefix(args, ignore_code=False):
     if args.open_close:
         target = "open_close_"
 
-    return "%s%s%s%s%s" % (prefix, code, target, tick, method)
+    return "%s%s%s%s%s" % (prefix, code, target, daytrade, method)
 
 def get_strategy_name(args):
     if args.before_ranking:
@@ -83,7 +83,7 @@ def load_simulator_data(code, start_date, end_date, args, load_settings=None, ti
             if len(data) >= 250: # weekleyのstats生成で必要な分
                 break
         rule = "30T"
-    elif args.tick:
+    elif args.daytrade:
         start = utils.to_format(utils.to_datetime(start_date) - utils.relativeterm(1, True))
         data = Loader.load_tick_ohlc(code, start, end_date, time=time)
         rule = "30T"

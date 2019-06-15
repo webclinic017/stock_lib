@@ -704,9 +704,9 @@ class Loader:
 
     @staticmethod
     def before_ranking(date, ranking_type, before=1):
-        d = utils.to_datetime(date) - utils.relativeterm(before, tick=True)
+        d = utils.to_datetime(date) - utils.relativeterm(before, with_time=True)
         while not utils.is_weekday(d):
-            d = d - utils.relativeterm(1, tick=True)
+            d = d - utils.relativeterm(1, with_time=True)
         d = utils.to_format(d)
         stocks = Loader.ranking(d, ranking_type)
         return stocks
