@@ -171,10 +171,9 @@ class AppliableData:
         self.rate = rate # 取引レート
 
 class SimulatorData:
-    def __init__(self, code, daily, weekly, rule):
+    def __init__(self, code, daily, rule):
         self.code = code
         self.daily = daily
-        self.weekly = weekly
         self.rule = rule
 
     def split(self, start_date, end_date):
@@ -183,13 +182,11 @@ class SimulatorData:
 
     def split_from(self, start_date):
         d = self.daily[self.daily["date"] >= start_date]
-        w = self.weekly[self.weekly["date"] >= start_date]
-        return SimulatorData(self.code, d, w, self.rule)
+        return SimulatorData(self.code, d, self.rule)
 
     def split_to(self, end_date):
         d = self.daily[self.daily["date"] <= end_date]
-        w = self.weekly[self.weekly["date"] < end_date] # weeklyは最新の足は確定していないので最新のは除外する
-        return SimulatorData(self.code, d, w, self.rule)
+        return SimulatorData(self.code, d, self.rule)
 
     def dates(self, start_date, end_date):
         d = self.daily[self.daily["date"] >= start_date]
@@ -200,6 +197,10 @@ class SimulatorData:
     def at(self, date):
         return self.daily[self.daily["date"] == date]
 
+    def index(self, begin, end):
+        d = self.daily.iloc[begin:end]
+        return SimulatorData(self.code, d, self.rule)
+
 # シミュレーター設定
 class SimulatorSetting:
     def __init__(self):
@@ -209,11 +210,13 @@ class SimulatorSetting:
         self.commission = 150
         self.debug = False
         self.error_rate = 0.00
-        self.virtual_trade = True # 仮想取引 Falseにすると注文をスタックしていく
+        self.virtual_trade = True # 仮想取引 Falseにすると注文を処理しない
         self.short_trade = False
         self.stop_loss_rate = 0.02
         self.taking_rate = 0.005
         self.min_unit = 100
+        self.trade_step = 1
+        self.use_before_stick = False
 
 # 統計
 class SimulatorStats:
@@ -520,6 +523,42 @@ class Simulator:
         hit_orders, self.repay_orders = self.exec_order(execution, self.repay_orders)
         return hit_orders
 
+    # 指値の条件に使うデータ
+    def limit(self):
+        return "high" if self.setting.short_trade else "low"
+
+    def reverse_limit(self):
+        return "low" if self.setting.short_trade else "high"
+
+    # 指値の約定価格
+    def new_agreed_price(self, data, order):
+        if order.is_market():
+            return order.price
+
+        limit = self.limit() if order.is_limit else self.reverse_limit()
+        open_price = data.daily["open"].iloc[-1]
+        best_price = data.daily[limit].iloc[-1]
+        if order.is_short:
+            worst_price = order.price if order.price > open_price else open_price
+        else:
+            worst_price = order.price if order.price < open_price else open_price
+
+        return worst_price
+
+
+    def repay_agreed_price(self, data, order):
+        if order.is_market():
+            return order.price
+
+        limit = self.reverse_limit() if order.is_limit else self.limit()
+        open_price = data.daily["open"].iloc[-1]
+        best_price = data.daily[limit].iloc[-1]
+        if order.is_short:
+            worst_price = order.price if order.price < open_price else open_price
+        else:
+            worst_price = order.price if order.price > open_price else open_price
+        return worst_price
+
     # 損切りの逆指値価格
     def reverse_limit_price(self, price, assets=None):
         # 注文の価格を設定
@@ -645,46 +684,10 @@ class Simulator:
 
         assert len(today) > 0, "not found %s data" % date
 
-        price = today["open"].item()
+        price = today["open"].item() # 約定価格
         self.log("date: %s, price %s" % (date, price))
 
         self.trade(self.setting.strategy, price, term_data, term_index)
-
-    # 指値の条件に使うデータ
-    def limit(self):
-        return "high" if self.setting.short_trade else "low"
-
-    def reverse_limit(self):
-        return "low" if self.setting.short_trade else "high"
-
-    # 指値の約定価格
-    def new_agreed_price(self, data, order):
-        if order.is_market():
-            return order.price
-
-        limit = self.limit() if order.is_limit else self.reverse_limit()
-        open_price = data.daily["open"].iloc[-1]
-        best_price = data.daily[limit].iloc[-1]
-        if order.is_short:
-            worst_price = order.price if order.price > open_price else open_price
-        else:
-            worst_price = order.price if order.price < open_price else open_price
-
-        return worst_price
-
-
-    def repay_agreed_price(self, data, order):
-        if order.is_market():
-            return order.price
-
-        limit = self.reverse_limit() if order.is_limit else self.limit()
-        open_price = data.daily["open"].iloc[-1]
-        best_price = data.daily[limit].iloc[-1]
-        if order.is_short:
-            worst_price = order.price if order.price < open_price else open_price
-        else:
-            worst_price = order.price if order.price > open_price else open_price
-        return worst_price
 
     def open_trade(self, price, data, trade_data):
         # 仮想トレードなら注文をキューから取得
@@ -752,6 +755,10 @@ class Simulator:
 
         date = data.daily["date"].iloc[-1]
 
+        # step == 0なら注文
+        time = int(date.minute)
+        step = time % self.setting.trade_step
+
         # stats
         trade_data = self.create_trade_data(date, price)
 
@@ -773,15 +780,17 @@ class Simulator:
             self.repay_orders[i].increment_term()
 
         # 寄り付き====================================================================
-        if self.setting.virtual_trade:
+        if self.setting.virtual_trade: # 注文の約定チェック
             trade_data = self.open_trade(price, data, trade_data)
             trade_data = self.intraday_trade(price, data, trade_data)
 
         # 注文を出す
-        trade_data["canceled"] = self.signals(strategy, data, index)
+        if step == 0:
+            term_data = data.index(0, -1) if self.setting.use_before_stick else data
+            self.log("[order stick] %s:%s" % (term_data.daily["date"].iloc[-1], term_data.daily["open"].iloc[-1]))
+            trade_data["canceled"] = self.signals(strategy, term_data, index)
 
         # トレード履歴
         trade_data["size"] = self.position.get_num()
         trade_data["term"] = self.position.get_term()
         self.stats.trade_history.append(trade_data)
-

@@ -3,8 +3,6 @@
 def select(data, target="daily"):
     if target == "daily":
         return data.data.daily
-    elif target == "weekly":
-        return data.data.weekly
     return data.data.daily
 
 def average_conditions():

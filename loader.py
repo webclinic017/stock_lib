@@ -367,11 +367,11 @@ class Loader:
         return data
 
     @staticmethod
-    def load_realtime_ohlc(code, date):
+    def load_realtime_ohlc(code, date, rule="5T"):
         data = Loader.load_realtime(code, date)
         if data is None:
             return None
-        data = Loader.realtime_to_ohlc(data)
+        data = Loader.realtime_to_ohlc(data, rule=rule)
         return data
 
     @staticmethod
@@ -391,14 +391,14 @@ class Loader:
         return data
 
     @staticmethod
-    def loads_realtime(code, date, days, how="any", time=None):
+    def loads_realtime(code, date, days, how="any", time=None, rule="5T"):
         if str(code).isdigit():
             is_stock = True
         elif code in Index().list() or code in Bitcoin().exchanges:
             is_stock = False
 
         # 日本の休日を除外
-        data = Loader.load_realtime_ohlc(code, date) # 今日の分
+        data = Loader.load_realtime_ohlc(code, date, rule=rule) # 今日の分
         if time is not None:
             data = data[data["date"] <= "%s %s" % (date, time)]
         length = 1
@@ -411,7 +411,7 @@ class Loader:
                 else:
                     d = Loader.load_realtime_ohlc(code, current)
                 if d is not None:
-                    d = Loader.resample(d, "5T")
+                    d = Loader.resample(d, rule=rule)
                     data = pandas.concat([d, data])
                 length = length + 1
         if is_stock:

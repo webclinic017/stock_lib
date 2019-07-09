@@ -14,9 +14,6 @@ from simulator import SimulatorData
 from simulator import SimulatorSetting
 from argparse import ArgumentParser
 
-class LoadSettings:
-    weekly = True
-
 def add_options(parser):
     parser.add_argument("--code", type=str, action="store", default=None, dest="code", help="code")
     parser.add_argument("--use_limit", action="store_true", default=False, dest="use_limit", help="指値を使う")
@@ -30,7 +27,8 @@ def add_options(parser):
     parser.add_argument("--stop_loss_rate", action="store", default=None, dest="stop_loss_rate", help="損切レート")
     parser.add_argument("--taking_rate", action="store", default=None, dest="taking_rate", help="利食いレート")
     parser.add_argument("--min_unit", action="store", default=None, dest="min_unit", help="最低単元")
-    parser.add_argument("--ignore_weekly", action="store_true", default=False, dest="ignore_weekly", help="週足統計を無視")
+    parser.add_argument("--rule", action="store", default=None, dest="rule", help="足の単位")
+    parser.add_argument("--trade_step", type=int, action="store", default=None, dest="trade_step", help="注文の間隔")
 
     # strategy
     parser.add_argument("--before_ranking", action="store_true", default=False, dest="before_ranking", help="ランキングトレード")
@@ -71,48 +69,37 @@ def get_filename(args, ignore_code=False):
     filename = "%ssimulate_setting.json" % prefix
     return filename
 
-def load_simulator_data(code, start_date, end_date, args, load_settings=None, time=None):
-    if load_settings is None:
-        load_settings = LoadSettings()
-
+def load_simulator_data(code, start_date, end_date, args, time=None):
     if args.realtime:
+        rule = "5T" if args.rule is None else args.rule
         start = utils.to_datetime(start_date) - utils.relativeterm(3, True)
         days = (utils.to_datetime(end_date) - start).days
         for i in range(5):
-            data = Loader.loads_realtime(code, end_date, days+i, time=time)
+            data = Loader.loads_realtime(code, end_date, days+i, time=time, rule=rule)
             if len(data) >= 250: # weekleyのstats生成で必要な分
                 break
-        rule = "30T"
     elif args.daytrade:
+        rule = "5T" if args.rule is None else args.rule
         start = utils.to_format(utils.to_datetime(start_date) - utils.relativeterm(1, True))
-        data = Loader.load_tick_ohlc(code, start, end_date, time=time)
-        rule = "30T"
+        data = Loader.load_tick_ohlc(code, start, end_date, time=time, rule=rule)
     else:
+        rule = "D"
         start = utils.to_format(utils.to_datetime(start_date) - utils.relativeterm(6))
         data = Loader.load_with_realtime(code, start, end_date)
-        rule = "W"
 
     if data is None:
         print("%s: %s is None" % (start_date, code))
         return None
 
-    simulator_data = add_stats(code, data, rule, load_settings=load_settings)
+    simulator_data = add_stats(code, data, rule)
     print("loaded:", utils.timestamp(), code, data["date"].iloc[0], data["date"].iloc[-1])
     return simulator_data
 
-def add_stats(code, data, rule, load_settings=None):
-    if load_settings is None:
-        load_settings = LoadSettings()
-
+def add_stats(code, data, rule):
     try:
         data = utils.add_stats(data)
         data = utils.add_cs_stats(data)
-        weekly = Loader.resample(data, rule=rule)
-        if load_settings.weekly:
-            weekly = utils.add_stats(weekly)
-            weekly = utils.add_cs_stats(weekly)
-
-        return SimulatorData(code, data, weekly, rule)
+        return SimulatorData(code, data, rule)
     except Exception as e:
         print("load_error: %s" % e)
         return None
@@ -189,6 +176,8 @@ def create_simulator_setting(args, use_json=True):
     simulator_setting.taking_rate = simulator_setting.taking_rate if args.taking_rate is None else float(args.taking_rate)
     simulator_setting.min_unit = simulator_setting.min_unit if args.min_unit is None else float(args.min_unit)
     simulator_setting.short_trade = args.short
+    simulator_setting.trade_step = simulator_setting.trade_step if args.trade_step is None else args.trade_step
+    simulator_setting.use_before_stick = args.daytrade
     return simulator_setting
 
 def create_simulator_setting_by_json(args):
