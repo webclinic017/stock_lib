@@ -456,7 +456,7 @@ class Combination(StrategyCreator, StrategyUtil):
         allow = all(drawdown_conditions)
 
         if not allow and data.setting.debug:
-            print("over drawdown: ", drawdown_conditions)
+            print("over drawdown: ", drawdown_conditions, len(drawdown_diff), sum(drawdown_sum))
 
         return allow
 
