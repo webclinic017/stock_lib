@@ -350,6 +350,9 @@ class SimulatorStats:
     def canceled(self):
         return self.trade_history[-1]["canceled"]
 
+    def orders(self):
+        return list(filter(lambda x: x["new"] is not None or x["repay"] is not None, self.trade_history))
+
 class TradeRecorder:
     def __init__(self, min_unit, output_dir=""):
         self.output_dir = "/tmp/trade_recorder/%s" % output_dir
