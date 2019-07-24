@@ -228,6 +228,7 @@ class SimulatorStats:
             "date": None,
             "new": None,
             "repay": None,
+            "signal": None,
             "gain": None,
             "gain_rate": None,
             "assets": None,
@@ -351,6 +352,9 @@ class SimulatorStats:
         return self.trade_history[-1]["canceled"]
 
     def orders(self):
+        return list(filter(lambda x: x["signal"] == "new" or x["signal"] == "repay", self.trade_history))
+
+    def executed(self):
         return list(filter(lambda x: x["new"] is not None or x["repay"] is not None, self.trade_history))
 
 class TradeRecorder:
@@ -794,6 +798,7 @@ class Simulator:
             trade_data["canceled"] = self.signals(strategy, term_data, index)
 
         # トレード履歴
+        trade_data["signal"] = "new" if len(self.new_orders) > 0 else "repay" if len(self.repay_orders) > 0 else None
         trade_data["size"] = self.position.get_num()
         trade_data["term"] = self.position.get_term()
         self.stats.trade_history.append(trade_data)
