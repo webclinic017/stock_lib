@@ -499,7 +499,7 @@ class Combination(StrategyCreator, StrategyUtil):
         if all(conditions):
             order = data.position.get_num()
             if self.setting.use_limit:
-                return simulator.LimitOrder(order, self.price(data))
+                return simulator.LimitOrder(order, self.price(data), is_repay=True)
             else:
                 return simulator.MarketOrder(order)
         return None
@@ -516,7 +516,7 @@ class Combination(StrategyCreator, StrategyUtil):
         if any(conditions):
             order = data.position.get_num()
             if self.setting.use_limit:
-                return simulator.ReverseLimitOrder(order, self.price(data))
+                return simulator.ReverseLimitOrder(order, self.price(data), is_repay=True)
             else:
                 return simulator.MarketOrder(order)
         return None
