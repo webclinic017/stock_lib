@@ -500,6 +500,10 @@ class Simulator:
         remain = list(filter(lambda x: not condition(x), orders)) # 残っている注文
         return hit_orders, remain
 
+
+    # TODO _order系に出来があったかどうかのチェックを入れる
+    # 出来がなければhit_ordersをまたキューに入れなおす
+    # 出来高が注文数より少ない場合はhit_ordersのordersを現在の出来高にし、残りをキューに入れ直す
     def new_order(self, price):
         execution = lambda x: x.signal(price, self.position) and x.is_market()
         hit_orders, self.new_orders = self.exec_order(execution, self.new_orders, price)
