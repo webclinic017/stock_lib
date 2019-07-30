@@ -156,7 +156,7 @@ class LimitOrder(Order):
 
 class ReverseLimitOrder(Order):
     def __init__(self, num, price, is_short=False, is_repay=False):
-        conditions = [lambda x: x["price"] > price if is_short else x["price"] < price] if is_repay else [lambda x: x["price"] < price if is_short else x["price"] > price]
+        conditions = [lambda x: x["price"] >= price if is_short else x["price"] <= price] if is_repay else [lambda x: x["price"] <= price if is_short else x["price"] >= price]
         super().__init__(num, conditions, is_reverse_limit=True, price=price)
 
 # ルール適用用データ
