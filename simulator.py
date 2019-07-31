@@ -546,14 +546,11 @@ class Simulator:
         if order.is_market():
             return order.price
 
-        limit = self.limit() if order.is_limit else self.reverse_limit()
-        open_price = data.daily["open"].iloc[-1]
-        best_price = data.daily[limit].iloc[-1]
-        if order.is_short:
-            worst_price = order.price if order.price > open_price else open_price
+        if order.is_limit:
+            worst_price = order.price
         else:
-            worst_price = order.price if order.price < open_price else open_price
-
+            limit = self.reverse_limit()
+            worst_price = data.daily[limit].iloc[-1]
         return worst_price
 
 
@@ -561,13 +558,11 @@ class Simulator:
         if order.is_market():
             return order.price
 
-        limit = self.reverse_limit() if order.is_limit else self.limit()
-        open_price = data.daily["open"].iloc[-1]
-        best_price = data.daily[limit].iloc[-1]
-        if order.is_short:
-            worst_price = order.price if order.price < open_price else open_price
+        if order.is_limit:
+            worst_price = order.price
         else:
-            worst_price = order.price if order.price > open_price else open_price
+            limit = self.limit()
+            worst_price = data.daily[limit].iloc[-1]
         return worst_price
 
     # 損切りの逆指値価格
