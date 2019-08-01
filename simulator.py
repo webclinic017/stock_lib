@@ -229,13 +229,15 @@ class SimulatorStats:
             "new": None,
             "repay": None,
             "signal": None,
+            "new_order": None,
+            "repay_order": None,
             "gain": None,
             "gain_rate": None,
             "assets": None,
             "unavailable_assets": None,
             "term": 0,
             "size": 0,
-            "canceled": False
+            "canceled": None
         }
         return trade_data
 
@@ -349,7 +351,24 @@ class SimulatorStats:
         return reword / risk if risk > 0 else reword
 
     def canceled(self):
-        return self.trade_history[-1]["canceled"]
+        return self.trade_history[-1]["canceled"] is not None
+
+    def new_canceled(self):
+        return self.trade_history[-1]["canceled"] == "new"
+
+    def repay_canceled(self):
+        return self.trade_history[-1]["canceled"] == "repay"
+
+    def all_canceled(self):
+        return self.trade_history[-1]["canceled"] == "all"
+
+    def new_orders(self):
+        order = self.trade_history[-1]["new_order"]
+        return [] if order is None else [order]
+
+    def repay_orders(self):
+        order = self.trade_history[-1]["repay_order"]
+        return [] if order is None else [order]
 
     def orders(self):
         return list(filter(lambda x: x["signal"] == "new" or x["signal"] == "repay", self.trade_history))
@@ -591,51 +610,61 @@ class Simulator:
         return self.apply_all_rules(data, index, strategy.closing_rules, rate=rate)
 
     def new_signals(self, strategy, data, index):
+        signal = None
         for order in self.new_signal(strategy, data, index):
             self.log(" - new_order: num %s, price %s" % (order.num, order.price))
             self.new_orders = [order]
+            signal = order
+
+        return signal
 
     def repay_signals(self, strategy, data, index):
+        signal = None
         for order in self.taking_signal(strategy, data, index):
             if order.num > 0:
                 self.log(" - taking_order: num %s, price %s" % (order.num, order.price))
             self.repay_orders = [order]
+            signal = order
 
         for order in self.stop_loss_signal(strategy, data, index):
             if order.num > 0:
                 self.log(" - stop_loss_order: num %s, price %s" % (order.num, order.price))
             self.repay_orders = [order]
+            signal = order
 
         for order in self.closing_signal(strategy, data, index):
             if order.num > 0:
                 self.log(" - closing_order: num %s, price %s" % (order.num, order.price))
             self.repay_orders = [order]
+            signal = order
 
-    def signals(self, strategy, data, index):
+        return signal
+
+    def signals(self, strategy, data, index, trade_data):
         # 新規ルールに当てはまる場合買う
-        self.new_signals(strategy, data, index)
+        trade_data["new_order"] = self.new_signals(strategy, data, index)
         # 返済注文
-        self.repay_signals(strategy, data, index)
+        trade_data["repay_order"] = self.repay_signals(strategy, data, index)
         # 注文の整理
-        return self.order_adjust()
+        trade_data = self.order_adjust(trade_data)
 
-    def order_adjust(self):
-        canceled = False
+        return trade_data
+
+    def order_adjust(self, trade_data):
         # ポジションがなければ返済シグナルは捨てる
         if self.position.get_num() <= 0 and len(self.repay_orders) > 0:
             self.log("[cancel] repay order")
             self.repay_orders = []
-            canceled = True
+            trade_data["canceled"] = "repay"
 
         # 新規・返済が同時に出ている場合何もしない
         if len(self.new_orders) > 0 and len(self.repay_orders) > 0:
             self.log("[cancel] new/repay order")
             self.new_orders = []
             self.repay_orders = []
-            canceled = True
+            trade_data["canceled"] = "all"
 
-        return canceled
-
+        return trade_data
 
     def get_stats(self): 
         stats = dict()
@@ -794,7 +823,7 @@ class Simulator:
         if step == 0:
             term_data = data.index(0, -1) if self.setting.use_before_stick else data
             self.log("[order stick] %s:%s" % (term_data.daily["date"].iloc[-1], term_data.daily["open"].iloc[-1]))
-            trade_data["canceled"] = self.signals(strategy, term_data, index)
+            trade_data = self.signals(strategy, term_data, index, trade_data)
 
         # トレード履歴
         trade_data["signal"] = "new" if len(self.new_orders) > 0 else "repay" if len(self.repay_orders) > 0 else None
