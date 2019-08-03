@@ -4,6 +4,8 @@ import numpy
 import random
 import pandas
 import utils
+import copy
+import math
 
 # 売買の状態
 class Position:
@@ -508,7 +510,19 @@ class Simulator:
     def commission(self):
         self.assets -= self.setting.commission
 
-    def exec_order(self, condition, orders, price=None):
+    # 注文を分割する
+    def split_order(self, order, num):
+        hit = copy.copy(order)
+        remain = copy.copy(order)
+
+        hit.num = num
+        remain.num = remain.num - num
+
+        self.log("[split order] hit: %s, remain: %s" % (hit.num, remain.num))
+
+        return [hit, remain]
+
+    def exec_order(self, condition, orders, price=None, volume=None):
         hit_orders = list(filter(lambda x: condition(x), orders)) # 条件を満たした注文
 
         # 注文の価格を設定
@@ -517,6 +531,17 @@ class Simulator:
                 hit_orders[i].price = price
 
         remain = list(filter(lambda x: not condition(x), orders)) # 残っている注文
+
+        # 出来の確認をする
+        if volume is not None:
+            if volume <= 0:
+                return [], orders # 条件を満たしていても出来なし
+            # 注文の数量より出来が少ない場合は[出来有, 出来無]に分ける
+            part = list(map(lambda x: self.split_order(x, volume) if volume < x.num else [x, None], hit_orders))
+            hit_part = list(map(lambda x: x[0], part))
+            remain_part = list(filter(lambda x: x is not None, map(lambda x: x[1], part)))
+            return hit_part, remain + remain_part
+
         return hit_orders, remain
 
 
@@ -528,14 +553,14 @@ class Simulator:
         hit_orders, self.new_orders = self.exec_order(execution, self.new_orders, price)
         return hit_orders
 
-    def limit_new_order(self, price):
+    def limit_new_order(self, price, volume):
         execution = lambda x: x.signal(price, self.position) and x.is_limit
-        hit_orders, self.new_orders = self.exec_order(execution, self.new_orders)
+        hit_orders, self.new_orders = self.exec_order(execution, self.new_orders, volume=volume)
         return hit_orders
 
-    def reverse_limit_new_order(self, price):
+    def reverse_limit_new_order(self, price, volume):
         execution = lambda x: x.signal(price, self.position) and x.is_reverse_limit
-        hit_orders, self.new_orders = self.exec_order(execution, self.new_orders)
+        hit_orders, self.new_orders = self.exec_order(execution, self.new_orders, volume=volume)
         return hit_orders
 
     def repay_order(self, price):
@@ -543,14 +568,14 @@ class Simulator:
         hit_orders, self.repay_orders = self.exec_order(execution, self.repay_orders, price)
         return hit_orders
 
-    def limit_repay_order(self, price):
+    def limit_repay_order(self, price, volume):
         execution = lambda x: x.signal(price, self.position) and x.is_limit
-        hit_orders, self.repay_orders = self.exec_order(execution, self.repay_orders)
+        hit_orders, self.repay_orders = self.exec_order(execution, self.repay_orders, volume=volume)
         return hit_orders
 
-    def reverse_limit_repay_order(self, price):
+    def reverse_limit_repay_order(self, price, volume):
         execution = lambda x: x.signal(price, self.position) and x.is_reverse_limit
-        hit_orders, self.repay_orders = self.exec_order(execution, self.repay_orders)
+        hit_orders, self.repay_orders = self.exec_order(execution, self.repay_orders, volume=volume)
         return hit_orders
 
     # 指値の条件に使うデータ
@@ -720,11 +745,12 @@ class Simulator:
         assert len(today) > 0, "not found %s data" % date
 
         price = today["open"].item() # 約定価格
-        self.log("date: %s, price %s" % (date, price))
+        volume = math.ceil(today["volume"].item() * 10)
+        self.log("date: %s, price: %s, volume: %s" % (date, price, volume))
 
-        self.trade(self.setting.strategy, price, term_data, term_index)
+        self.trade(self.setting.strategy, price, volume, term_data, term_index)
 
-    def open_trade(self, price, data, trade_data):
+    def open_trade(self, price, volume, data, trade_data):
         # 仮想トレードなら注文をキューから取得
 
         new_orders = []
@@ -736,7 +762,7 @@ class Simulator:
 
         return self.virtual_trade(data, new_orders, repay_orders, trade_data)
 
-    def intraday_trade(self, price, data, trade_data):
+    def intraday_trade(self, price, volume, data, trade_data):
         # 仮想トレードなら注文をキューから取得
         limit = self.limit()
         reverse_limit = self.reverse_limit()
@@ -745,13 +771,13 @@ class Simulator:
         reverse_limit_price = data.daily[reverse_limit].iloc[-1]
 
         new_orders = []
-        new_orders += self.limit_new_order(limit_price)
-        new_orders += self.reverse_limit_new_order(reverse_limit_price)
+        new_orders += self.limit_new_order(limit_price, volume)
+        new_orders += self.reverse_limit_new_order(reverse_limit_price, volume)
 
         repay_orders = []
         if self.position.get_num() > 0:
-            repay_orders += self.limit_repay_order(reverse_limit_price)
-            repay_orders += self.reverse_limit_repay_order(limit_price)
+            repay_orders += self.limit_repay_order(reverse_limit_price, volume)
+            repay_orders += self.reverse_limit_repay_order(limit_price, volume)
 
         return self.virtual_trade(data, new_orders, repay_orders, trade_data)
 
@@ -785,7 +811,7 @@ class Simulator:
         return trade_data
 
     # トレード
-    def trade(self, strategy, price, data, index):
+    def trade(self, strategy, price, volume, data, index):
         assert type(data) is SimulatorData, "data is not SimulatorData."
 
         date = data.daily["date"].iloc[-1]
@@ -816,8 +842,8 @@ class Simulator:
 
         # 寄り付き====================================================================
         if self.setting.virtual_trade: # 注文の約定チェック
-            trade_data = self.open_trade(price, data, trade_data)
-            trade_data = self.intraday_trade(price, data, trade_data)
+            trade_data = self.open_trade(price, volume, data, trade_data)
+            trade_data = self.intraday_trade(price, volume, data, trade_data)
 
         # 注文を出す
         if step == 0:

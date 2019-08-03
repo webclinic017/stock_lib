@@ -2,6 +2,7 @@
 import os
 import shutil
 import pickle
+import redis
 
 class Cache:
     def __init__(self, cache_dir="/tmp"):
@@ -34,3 +35,19 @@ class Cache:
     def remove_dir(self):
         if os.path.exists(self.dir()):
             shutil.rmtree(self.dir())
+
+class Redis:
+    def __init__(self):
+        self.client = redis.Redis(host="localhost", port=6379, db=0)
+
+    def exists(self, name):
+        return self.client.exists(name)
+
+    def create(self, name, data):
+        return self.client.set(name, pickle.dumps(data))
+
+    def get(self, name):
+        return pickle.loads(self.client.get(name))
+
+    def remove(self, name):
+        return self.client.delete(name)
