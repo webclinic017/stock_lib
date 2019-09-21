@@ -111,10 +111,10 @@ def load_strategy_setting(args):
 
     # 個別銘柄の設定がなければ共通の設定を読む
     if args.code is not None and setting_dict is None:
+        print("%s setting is not found" % args.code)
         filename = get_filename(args, ignore_code=True)
         setting_dict = Loader.simulate_setting(filename)
         print(filename, setting_dict)
-
 
     if setting_dict is None:
         strategy_setting = []

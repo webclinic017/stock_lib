@@ -699,6 +699,10 @@ class Loader:
         codes = codes + Loader.before_ranking_codes(date, "volume", before=0, monitor_size=monitor_size)
         codes = codes + Loader.before_ranking_codes(date, "volume_ratio", before=0, monitor_size=monitor_size)
 
+        daytrade_portfolio = Loader.daytrade_portfolio()
+        print(daytrade_portfolio)
+        codes = codes + daytrade_portfolio["code"].iloc[:monitor_size].as_matrix().tolist()
+
         print(codes)
         return list(set(codes))
 
@@ -796,6 +800,16 @@ class Loader:
             return None
 
     @staticmethod
+    def daytrade_portfolio():
+        try:
+            data = pandas.read_csv("simulate_settings/daytrade_portfolio.csv", header=None)
+            data.columns = ["code", "optimize_gain", "validate_gain", "sum", "diff", "score"]
+            data = data.sort_values(by=["score"], ascending=False)
+            return data
+        except:
+            return None
+
+    @staticmethod
     def eodhistoricaldata_api_token():
         try:
             f = open("settings/eodhistoricaldata.txt", "r")
@@ -811,7 +825,7 @@ class Loader:
             data = json.load(f)
             return data["data"]
         except:
-           import traceback
-           traceback.print_exc()
-           data = None
+            import traceback
+            traceback.print_exc()
+            data = None
 
