@@ -151,6 +151,7 @@ class StrategySimulator:
         position_term = list(map(lambda x: x[1].term(), stats.items()))
         position_term = list(filter(lambda x: x != 0, sum(position_term, [])))
         max_unavailable_assets = self.agg(stats, "unavailable_assets").values()
+        sum_contract_price = list(map(lambda x: x[1].sum_contract_price(), stats.items()))
 
         if self.verbose:
             print(start_date, end_date, "assets:", self.simulator_setting.assets, "gain:", gain, sum(gain))
@@ -173,6 +174,7 @@ class StrategySimulator:
             "position_term": round(numpy.average(position_term).item()) if len(position_term) > 0 else 0,
             "max_position_term": max(position_term) if len(position_term) > 0 else 0,
             "max_unavailable_assets": max(max_unavailable_assets) if len(s) > 0 and len(max_unavailable_assets) else 0,
+            "sum_contract_price": sum(sum_contract_price) if len(s) > 0 else 0,
         }
 
         return results

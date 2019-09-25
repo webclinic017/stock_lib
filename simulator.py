@@ -239,7 +239,8 @@ class SimulatorStats:
             "unavailable_assets": None,
             "term": 0,
             "size": 0,
-            "canceled": None
+            "canceled": None,
+            "contract_price": None
         }
         return trade_data
 
@@ -295,6 +296,12 @@ class SimulatorStats:
         if len(self.unavailable_assets()) == 0:
             return 0
         return max(self.unavailable_assets())
+
+    def contract_price(self):
+        return list(map(lambda x: x["contract_price"], self.trade_history))
+
+    def sum_contract_price(self):
+        return sum(list(filter(lambda x: x is not None, self.contract_price())))
 
     def drawdown(self):
         assets = numpy.array(self.assets())
@@ -855,4 +862,6 @@ class Simulator:
         trade_data["signal"] = "new" if len(self.new_orders) > 0 else "repay" if len(self.repay_orders) > 0 else None
         trade_data["size"] = self.position.get_num()
         trade_data["term"] = self.position.get_term()
+        trade_data["contract_price"] = list(filter(lambda x: x is not None, [trade_data["new"], trade_data["repay"]]))
+        trade_data["contract_price"] = None if len(trade_data["contract_price"]) == 0 else trade_data["contract_price"][0] * trade_data["size"] * self.setting.min_unit
         self.stats.trade_history.append(trade_data)
