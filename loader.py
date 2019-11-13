@@ -361,8 +361,8 @@ class Loader:
             data["volume"] = utils.diff(data["volume"].as_matrix() / 1000)
             data["volume"] = list(map(lambda x: 0 if x < 0 else x, data["volume"].as_matrix().tolist()))
         except:
-            import traceback
-            traceback.print_exc()
+#            import traceback
+#            traceback.print_exc()
             data = None
         return data
 

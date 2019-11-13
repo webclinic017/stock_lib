@@ -173,7 +173,7 @@ class StrategySimulator:
             "max_position_size": max(position_size) if len(position_size) > 0 else 0,
             "position_term": round(numpy.average(position_term).item()) if len(position_term) > 0 else 0,
             "max_position_term": max(position_term) if len(position_term) > 0 else 0,
-            "max_unavailable_assets": max(max_unavailable_assets) if len(s) > 0 and len(max_unavailable_assets) else 0,
+            "max_unavailable_assets": max(max_unavailable_assets) if len(s) > 0 and len(max_unavailable_assets) > 0 else 0,
             "sum_contract_price": sum(sum_contract_price) if len(s) > 0 else 0,
         }
 
