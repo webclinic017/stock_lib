@@ -3,24 +3,28 @@ import numpy
 import utils
 import simulator
 import random
+import strategy
 from strategy import CombinationCreator
 from loader import Loader
 
 class CombinationStrategy(CombinationCreator):
     def __init__(self, setting):
-        setting.condition_size = 1
         setting.sorted_conditions = False
         super().__init__(setting)
 
         self.conditions_by_seed(setting.seed[0], setting.ensemble)
 
-    def conditions_by_seed(self, seed, strategies):
+    def conditions_by_seed(self, seed, files):
         random.seed(seed)
+
+        strategies = strategy.create_ensemble_strategies(files)
+
         new         = list(map(lambda x: x.new_rules[0].callback, strategies))
         taking      = list(map(lambda x: x.taking_rules[0].callback, strategies))
         stop_loss   = list(map(lambda x: x.stop_loss_rules[0].callback, strategies))
 
         conditions_all = new + taking + stop_loss
+
         self.new_conditions         = random.sample(conditions_all, self.setting.condition_size)
         self.taking_conditions      = random.sample(conditions_all, self.setting.condition_size)
         self.stop_loss_conditions   = random.sample(conditions_all, self.setting.condition_size)
