@@ -575,10 +575,10 @@ class Loader:
         return data
 
     @staticmethod
-    def simulate_setting(filename=None):
+    def simulate_setting(filename=None, path="simulate_settings/"):
         filename = "simulate_setting.json" if filename is None else filename
         try:
-            f = open("simulate_settings/%s" % (filename), "r")
+            f = open("%s%s" % (path, filename), "r")
             data = json.load(f)
         except:
             data = None

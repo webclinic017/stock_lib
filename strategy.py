@@ -7,6 +7,7 @@ import utils
 import simulator
 import itertools
 import time as t
+import glob
 from loader import Loader
 from loader import Bitcoin
 from collections import namedtuple
@@ -29,10 +30,12 @@ def add_options(parser):
     parser.add_argument("--min_unit", action="store", default=None, dest="min_unit", help="最低単元")
     parser.add_argument("--rule", action="store", default=None, dest="rule", help="足の単位")
     parser.add_argument("--trade_step", type=int, action="store", default=None, dest="trade_step", help="注文の間隔")
+    parser.add_argument("--ensemble_dir", action="store", default=None, dest="ensemble_dir", help="アンサンブルディレクトリ")
 
     # strategy
     parser.add_argument("--before_ranking", action="store_true", default=False, dest="before_ranking", help="ランキングトレード")
     parser.add_argument("--open_close", action="store_true", default=False, dest="open_close", help="寄せ引け")
+    parser.add_argument("--ensemble", action="store_true", default=False, dest="ensemble", help="アンサンブル")
     return parser
 
 def create_parser():
@@ -48,26 +51,79 @@ def get_prefix(args, ignore_code=False):
 
     method = "short_" if args.short else ""
 
-    target = ""
-    if args.before_ranking:
-        target = "before_ranking_"
-    if args.open_close:
-        target = "open_close_"
+    target = get_strategy_name(args)
+    target = "" if target == "combination" else "%s_" % target
 
     return "%s%s%s%s%s" % (prefix, code, target, daytrade, method)
+
+def get_filename(args, ignore_code=False):
+    prefix = get_prefix(args, ignore_code=ignore_code)
+    filename = "%ssimulate_setting.json" % prefix
+    return filename
 
 def get_strategy_name(args):
     if args.before_ranking:
         return "before_ranking"
     elif args.open_close:
         return "open_close"
+    elif args.ensemble:
+        return "ensemble"
     else:
         return "combination"
 
-def get_filename(args, ignore_code=False):
-    prefix = get_prefix(args, ignore_code=ignore_code)
-    filename = "%ssimulate_setting.json" % prefix
-    return filename
+def load_strategy_creator(args, combination_setting=None, ignore_ensemble=False):
+    combination_setting = CombinationSetting() if combination_setting is None else combination_setting
+    if args.production:
+        if args.before_ranking:
+            from strategies.production.before_ranking import CombinationStrategy
+            return CombinationStrategy(combination_setting)
+        elif args.open_close:
+            from strategies.production.open_close import CombinationStrategy
+            return CombinationStrategy(combination_setting)
+        elif args.ensemble and not ignore_ensemble:
+            from strategies.production.ensemble import CombinationStrategy
+            return CombinationStrategy(combination_setting)
+        else:
+            from strategies.production.combination import CombinationStrategy
+            return CombinationStrategy(combination_setting)
+    else:
+        if args.before_ranking:
+            from strategies.before_ranking import CombinationStrategy
+            return CombinationStrategy(combination_setting)
+        elif args.open_close:
+            from strategies.open_close import CombinationStrategy
+            return CombinationStrategy(combination_setting)
+        elif args.ensemble and not ignore_ensemble:
+            from strategies.ensemble import CombinationStrategy
+            return CombinationStrategy(combination_setting)
+        else:
+            from strategies.combination import CombinationStrategy
+            return CombinationStrategy(combination_setting)
+
+def load_strategy_setting(args):
+    filename = get_filename(args)
+    return load_strategy_setting_by_filename(args, filename)
+
+def load_strategy_setting_by_filename(args, filename, path=None):
+    setting_dict = Loader.simulate_setting(filename) if path is None else Loader.simulate_setting(filename, path)
+    print(filename, setting_dict)
+
+    # 個別銘柄の設定がなければ共通の設定を読む
+    if args.code is not None and setting_dict is None:
+        print("%s setting is not found" % args.code)
+        filename = get_filename(args, ignore_code=True)
+        setting_dict = Loader.simulate_setting(filename)
+        print(filename, setting_dict)
+
+    if setting_dict is None:
+        strategy_setting = []
+    else:
+        strategy_setting = list(map(lambda x: create_setting_by_dict(x), setting_dict["setting"]))
+    return setting_dict, strategy_setting
+
+def load_strategy(args, combination_setting=None):
+    _, settings = load_strategy_setting(args)
+    return load_strategy_creator(args, combination_setting).create(settings)
 
 def load_simulator_data(code, start_date, end_date, args, time=None):
     if args.realtime:
@@ -104,50 +160,12 @@ def add_stats(code, data, rule):
         print("load_error: %s" % e)
         return None
 
-def load_strategy_setting(args):
-    filename = get_filename(args)
-    setting_dict = Loader.simulate_setting(filename)
-    print(filename, setting_dict)
-
-    # 個別銘柄の設定がなければ共通の設定を読む
-    if args.code is not None and setting_dict is None:
-        print("%s setting is not found" % args.code)
-        filename = get_filename(args, ignore_code=True)
-        setting_dict = Loader.simulate_setting(filename)
-        print(filename, setting_dict)
-
-    if setting_dict is None:
-        strategy_setting = []
-    else:
-        strategy_setting = list(map(lambda x: create_setting_by_dict(x), setting_dict["setting"]))
-    return setting_dict, strategy_setting
-
-def load_strategy(args, combination_setting=None):
-    _, settings = load_strategy_setting(args)
-    return load_strategy_creator(args, combination_setting).create(settings)
-
-def load_strategy_creator(args, combination_setting=None):
-    combination_setting = CombinationSetting() if combination_setting is None else combination_setting
-    if args.production:
-        if args.before_ranking:
-            from strategies.production.before_ranking import CombinationStrategy
-            return CombinationStrategy(combination_setting)
-        elif args.open_close:
-            from strategies.production.open_close import CombinationStrategy
-            return CombinationStrategy(combination_setting)
-        else:
-           from strategies.production.combination import CombinationStrategy
-           return CombinationStrategy(combination_setting)
-    else:
-        if args.before_ranking:
-            from strategies.before_ranking import CombinationStrategy
-            return CombinationStrategy(combination_setting)
-        elif args.open_close:
-            from strategies.open_close import CombinationStrategy
-            return CombinationStrategy(combination_setting)
-        else:
-            from strategies.combination import CombinationStrategy
-            return CombinationStrategy(combination_setting)
+def create_ensemble_strategies(args, directory):
+    files = glob.glob("%s/*" % directory)
+    settings = list(map(lambda x: load_strategy_setting_by_filename(args, x, ""), files))
+    settings = list(map(lambda x: (create_combination_setting_by_dict(args, x[0]), x[1]), settings))
+    ensembles = list(map(lambda x: load_strategy_creator(args, x[0], ignore_ensemble=True).create(x[1]), settings))
+    return ensembles
 
 # args > json > default の優先度
 def create_combination_setting(args, use_json=True):
@@ -156,11 +174,15 @@ def create_combination_setting(args, use_json=True):
     combination_setting.position_sizing = args.position_sizing if args.position_sizing else combination_setting.position_sizing
     combination_setting.max_position_size = combination_setting.max_position_size if args.max_position_size is None else int(args.max_position_size)
     combination_setting.monitor_size = combination_setting.monitor_size if args.monitor_size is None else int(args.monitor_size)
+    combination_setting.ensemble = [] if args.ensemble_dir is None else create_ensemble_strategies(args, args.ensemble_dir)
     return combination_setting
 
 def create_combination_setting_by_json(args):
-    combination_setting = CombinationSetting()
     setting_dict, _ = load_strategy_setting(args)
+    return create_combination_setting_by_dict(args, setting_dict)
+
+def create_combination_setting_by_dict(args, setting_dict):
+    combination_setting = CombinationSetting()
     if setting_dict is None:
         return combination_setting
     combination_setting.use_limit = setting_dict["use_limit"] if "use_limit" in setting_dict.keys() else combination_setting.use_limit
@@ -168,6 +190,7 @@ def create_combination_setting_by_json(args):
     combination_setting.max_position_size = setting_dict["max_position_size"] if "max_position_size" in setting_dict.keys() else combination_setting.max_position_size
     combination_setting.monitor_size = setting_dict["monitor_size"] if "monitor_size" in setting_dict.keys() else combination_setting.monitor_size
     combination_setting.seed = setting_dict["seed"] if "seed" in setting_dict.keys() else combination_setting.seed
+    combination_setting.ensemble = create_ensemble_strategies(args, setting_dict["ensemble"]) if "ensemble" in setting_dict.keys() else combination_setting.ensemble
     return combination_setting
 
 def create_simulator_setting(args, use_json=True):
@@ -190,6 +213,7 @@ def create_simulator_setting_by_json(args):
     simulator_setting.min_unit = setting_dict["min_unit"] if "min_unit" in setting_dict.keys() else simulator_setting.min_unit
     simulator_setting.short_trade = args.short
     return simulator_setting
+
 # ========================================================================
 # 売買ルール
 class Rule:
@@ -436,6 +460,7 @@ class CombinationSetting:
     monitor_size = 3
     condition_size = 5
     seed = [t.time()]
+    ensemble = []
 
 class Combination(StrategyCreator, StrategyUtil):
     def __init__(self, conditions, common, setting=None):
@@ -591,7 +616,7 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
 
     def default_common(self):
         rules = [lambda d: True]
-        return StrategyCreator(rules, rules, rules, rules)
+        return StrategyCreator(new=rules, taking=rules, stop_loss=rules, closing=[lambda d: False])
 
     # @return StrategyCreator
     def common(self, setting):
