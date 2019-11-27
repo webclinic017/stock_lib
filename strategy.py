@@ -61,6 +61,20 @@ def get_filename(args, ignore_code=False):
     filename = "%ssimulate_setting.json" % prefix
     return filename
 
+class StrategyType:
+    BEFORE_RANKING="before_ranking"
+    OPEN_CLOSE="open_close"
+    ENSEMBLE="ensemble"
+    COMBINATION="combination"
+
+    def list(self):
+        return [
+            BEFORE_RANKING,
+            OPEN_CLOSE,
+            ENSEMBLE,
+            COMBINATION
+        ]
+
 def get_strategy_name(args):
     strategy_types = StrategyType()
     if args.before_ranking:
@@ -72,49 +86,7 @@ def get_strategy_name(args):
     else:
         return strategy_types.COMBINATION
 
-class StrategyType:
-    BEFORE_RANKING="before_ranking"
-    OPEN_CLOSE="open_close"
-    ENSEMBLE="ensemble"
-    COMBINATION="combination"
-
-class StrategyCreatorSetting:
-    def __init__(self, filename):
-        self.strategy_type = self.get_strategy_name(filename)
-        self.is_production = "production" in filename
-        self.setting_dict = Loader.simulate_setting(filename, "")
-        self.strategy_setting = create_strategy_setting(self.setting_dict)
-        self.combination_setting = create_combination_setting_by_dict(self.setting_dict)
-
-    def get_strategy_name(self, filename):
-        strategy_types = StrategyType()
-        if strategy_types.BEFORE_RANKING in filename:
-            return strategy_types.BEFORE_RANKING
-        elif strategy_types.OPEN_CLOSE in filename:
-            return strategy_types.OPEN_CLOSE
-        elif strategy_types.ENSEMBLE in filename:
-            return strategy_types.ENSEMBLE
-        elif strategy_types.COMBINATION in filename:
-            return strategy_types.COMBINATION
-        else:
-            return strategy_types.COMBINATION
-
-def load_strategy_creator(args, combination_setting=None):
-    combination_setting = CombinationSetting() if combination_setting is None else combination_setting
-    strategy_type = get_strategy_name(args)
-    return load_strategy_creator_by_type(strategy_type, args.production, combination_setting)
-
-def load_strategy_setting(args):
-    filename = get_filename(args)
-
-    setting_dict, strategy_setting = load_strategy_setting_by_filename(filename)
-
-    # 個別銘柄の設定がなければ共通の設定を読む
-    if args.code is not None and setting_dict is None:
-        filename = get_filename(args, ignore_code=True)
-        setting_dict = Loader.simulate_setting(filename)
-
-    return setting_dict, strategy_setting
+# load ================================================
 
 def load_strategy_creator_by_type(strategy_type, is_production, combination_setting, ignore_ensemble=False):
     strategy_types = StrategyType()
@@ -145,12 +117,29 @@ def load_strategy_creator_by_type(strategy_type, is_production, combination_sett
             from strategies.combination import CombinationStrategy
             return CombinationStrategy(combination_setting)
 
-def create_strategy_setting(setting_dict):
-    if setting_dict is None:
-        strategy_setting = []
-    else:
-        strategy_setting = list(map(lambda x: create_setting_by_dict(x), setting_dict["setting"]))
-    return strategy_setting
+def load_strategy_creator(args, combination_setting=None):
+    combination_setting = CombinationSetting() if combination_setting is None else combination_setting
+    strategy_type = get_strategy_name(args)
+    return load_strategy_creator_by_type(strategy_type, args.production, combination_setting)
+
+def load_strategy_setting(args):
+    filename = get_filename(args)
+
+    setting_dict, strategy_setting = load_strategy_setting_by_filename(filename)
+
+    # 個別銘柄の設定がなければ共通の設定を読む
+    if args.code is not None and setting_dict is None:
+        filename = get_filename(args, ignore_code=True)
+        setting_dict = Loader.simulate_setting(filename)
+
+    return setting_dict, strategy_setting
+
+def load_strategy_creator_by_setting(create_setting, ignore_ensemble=False):
+    load_strategy_creator_by_type(
+        create_setting.strategy_type,
+        create_setting.is_production,
+        create_setting.combination_setting,
+        ignore_ensemble)
 
 def load_strategy_setting_by_filename(filename):
     setting_dict = Loader.simulate_setting(filename)
@@ -198,9 +187,18 @@ def add_stats(code, data, rule):
         print("load_error: %s" % e)
         return None
 
+# create ================================================
+
+def create_strategy_setting(setting_dict):
+    if setting_dict is None:
+        strategy_setting = []
+    else:
+        strategy_setting = list(map(lambda x: create_setting_by_dict(x), setting_dict["setting"]))
+    return strategy_setting
+
 def create_ensemble_strategies(files):
-    settings = list(map(lambda x: StrategyCreatorSetting(x), files))
-    ensembles = list(map(lambda x: load_strategy_creator_by_type(x.strategy_type, x.is_production, x.combination_setting, ignore_ensemble=True).create(x.strategy_setting), settings))
+    settings = list(map(lambda x: StrategyCreateSetting(x), files))
+    ensembles = list(map(lambda x: load_strategy_creator_by_setting(x, ignore_ensemble=True).create(x.strategy_setting), settings))
     return ensembles
 
 def ensemble_files(directory):
@@ -307,6 +305,21 @@ class StrategySetting():
 
     def to_dict(self):
         return strategy_setting_to_dict(self)
+
+class StrategyCreateSetting:
+    def __init__(self, filename):
+        self.strategy_type = self.get_strategy_name(filename)
+        self.is_production = "production" in filename
+        self.setting_dict = Loader.simulate_setting(filename, "")
+        self.strategy_setting = create_strategy_setting(self.setting_dict)
+        self.combination_setting = create_combination_setting_by_dict(self.setting_dict)
+
+    def get_strategy_name(self, filename):
+        strategy_types = StrategyType()
+        for t in strategy_types.list():
+            if t in filename:
+                return t
+        return strategy_types.COMBINATION
 
 class StrategyCreator:
     def __init__(self, new=None, taking=None, stop_loss=None, closing=None):
