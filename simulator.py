@@ -233,6 +233,7 @@ class SimulatorStats:
             "signal": None,
             "new_order": None,
             "repay_order": None,
+            "closing_order": None,
             "gain": None,
             "gain_rate": None,
             "assets": None,
@@ -379,6 +380,10 @@ class SimulatorStats:
         order = self.trade_history[-1]["repay_order"]
         return [] if order is None else [order]
 
+    def closing_orders(self):
+        order = self.trade_history[-1]["closing_order"]
+        return [] if order is None else [order]
+
     def orders(self):
         return list(filter(lambda x: x["signal"] == "new" or x["signal"] == "repay", self.trade_history))
 
@@ -440,6 +445,7 @@ class Simulator:
         self.logs = []
         self.new_orders = []
         self.repay_orders = []
+        self.closing_orders = []
 
     def log(self, message):
         if self.setting.debug:
@@ -585,6 +591,11 @@ class Simulator:
         hit_orders, self.repay_orders = self.exec_order(execution, self.repay_orders, volume=volume)
         return hit_orders
 
+    def closing_order(self, price):
+        execution = lambda x: x.signal(price, self.position) and x.is_market()
+        hit_orders, self.closing_orders = self.exec_order(execution, self.closing_orders, price)
+        return hit_orders
+
     # 指値の条件に使うデータ
     def limit(self):
         return "high" if self.setting.short_trade else "low"
@@ -664,19 +675,23 @@ class Simulator:
             self.repay_orders = [order]
             signal = order
 
+        return signal
+
+    def closing_signals(self, strategy, data, index):
         for order in self.closing_signal(strategy, data, index):
             if order.num > 0:
                 self.log(" - closing_order: num %s, price %s" % (order.num, order.price))
-            self.repay_orders = [order]
-            signal = order
-
-        return signal
+            self.closing_orders = [order]
+            return order
+        return None
 
     def signals(self, strategy, data, index, trade_data):
         # 新規ルールに当てはまる場合買う
         trade_data["new_order"] = self.new_signals(strategy, data, index)
         # 返済注文
         trade_data["repay_order"] = self.repay_signals(strategy, data, index)
+        # 手仕舞い注文
+        trade_data["closing_order"] = self.closing_signals(strategy, data, index)
         # 注文の整理
         trade_data = self.order_adjust(trade_data)
 
@@ -769,6 +784,13 @@ class Simulator:
 
         return self.virtual_trade(data, new_orders, repay_orders, trade_data)
 
+    def close_trade(self, price, volume, data, trade_data):
+        closing_orders = []
+        if self.position.get_num() > 0:
+            closing_orders += self.closing_order(price)
+
+        return self.virtual_trade(data, [], closing_orders, trade_data)
+
     def intraday_trade(self, price, volume, data, trade_data):
         # 仮想トレードなら注文をキューから取得
         limit = self.limit()
@@ -857,6 +879,11 @@ class Simulator:
             term_data = data.index(0, -1) if self.setting.use_before_stick else data
             self.log("[order stick] %s:%s" % (term_data.daily["date"].iloc[-1], term_data.daily["open"].iloc[-1]))
             trade_data = self.signals(strategy, term_data, index, trade_data)
+
+        # 引け========================================================================
+        if self.setting.virtual_trade:
+            close = data.daily["close"].iloc[-1].item()
+            trade_data = self.close_trade(close, volume, data, trade_data)
 
         # トレード履歴
         trade_data["signal"] = "new" if len(self.new_orders) > 0 else "repay" if len(self.repay_orders) > 0 else None
