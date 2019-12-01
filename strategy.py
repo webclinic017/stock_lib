@@ -69,10 +69,10 @@ class StrategyType:
 
     def list(self):
         return [
-            BEFORE_RANKING,
-            OPEN_CLOSE,
-            ENSEMBLE,
-            COMBINATION
+            self.BEFORE_RANKING,
+            self.OPEN_CLOSE,
+            self.ENSEMBLE,
+            self.COMBINATION
         ]
 
 def get_strategy_name(args):
@@ -135,7 +135,7 @@ def load_strategy_setting(args):
     return setting_dict, strategy_setting
 
 def load_strategy_creator_by_setting(create_setting, ignore_ensemble=False):
-    load_strategy_creator_by_type(
+    return load_strategy_creator_by_type(
         create_setting.strategy_type,
         create_setting.is_production,
         create_setting.combination_setting,

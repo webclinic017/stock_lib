@@ -15,19 +15,21 @@ class CombinationStrategy(CombinationCreator):
         self.conditions_by_seed(setting.seed[0], setting.ensemble)
 
     def conditions_by_seed(self, seed, files):
-        random.seed(seed)
 
         strategies = strategy.create_ensemble_strategies(files)
 
-        new         = list(map(lambda x: x.new_rules[0].callback, strategies))
-        taking      = list(map(lambda x: x.taking_rules[0].callback, strategies))
-        stop_loss   = list(map(lambda x: x.stop_loss_rules[0].callback, strategies))
+        new_rules         = list(map(lambda x: x.new_rules[0].callback, strategies))
+        taking_rules      = list(map(lambda x: x.taking_rules[0].callback, strategies))
+        stop_loss_rules   = list(map(lambda x: x.stop_loss_rules[0].callback, strategies))
 
-        conditions_all = new + taking + stop_loss
+        conditions_all = new_rules + taking_rules + stop_loss_rules
 
-        self.new_conditions         = random.sample(conditions_all, self.setting.condition_size)
-        self.taking_conditions      = random.sample(conditions_all, self.setting.condition_size)
-        self.stop_loss_conditions   = random.sample(conditions_all, self.setting.condition_size)
+        size = len(strategies) if len(strategies) < self.setting.condition_size else self.setting.condition_size
+
+        random.seed(seed)
+        self.new_conditions         = random.sample(conditions_all, size)
+        self.taking_conditions      = random.sample(conditions_all, size)
+        self.stop_loss_conditions   = random.sample(conditions_all, size)
 
     def subject(self, date):
         return ["nikkei"]
