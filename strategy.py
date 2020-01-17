@@ -484,7 +484,6 @@ class CombinationSetting:
     use_limit = False
     position_sizing = False
     max_position_size = 5
-    sorted_conditions = True
     condition_size = 5
     seed = [t.time()]
     ensemble = []
@@ -590,12 +589,6 @@ class Combination(StrategyCreator, StrategyUtil):
 class CombinationCreator(StrategyCreator, StrategyUtil):
     def __init__(self, setting=None):
         self.setting = CombinationSetting() if setting is None else setting
-        if self.setting.sorted_conditions:
-            # 条件のインデックスの組み合わせを生成
-            self.new_combinations = utils.combinations(list(range(len(self.new()))))
-            self.taking_combinations = utils.combinations(list(range(len(self.taking()))))
-            self.stop_loss_combinations = utils.combinations(list(range(len(self.stop_loss()))))
-            self.closing_combinations = utils.combinations(list(range(len(self.closing()))))
 
     def ranges(self):
         return [
@@ -606,18 +599,9 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
         ]
 
     def create(self, settings):
-        condition = self.sorted_conditions(settings[0]) if self.setting.sorted_conditions else self.conditions(settings[0])
+        condition = self.conditions(settings[0])
         c = StrategyConditions().by_array(condition)
         return Combination(c, self.common(settings), self.setting).create()
-
-    # ソート済みのリストから条件を取得
-    def sorted_conditions(self, setting):
-        return [
-            self.conditions_by_index(self.new(), self.new_combinations[setting.new]),
-            self.conditions_by_index(self.taking(), self.taking_combinations[setting.taking]),
-            self.conditions_by_index(self.stop_loss(), self.stop_loss_combinations[setting.stop_loss]),
-            self.conditions_by_index(self.closing(), self.closing_combinations[setting.closing]),
-        ]
 
     # インデックスから直接条件を生成
     def conditions(self, setting):

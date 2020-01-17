@@ -9,11 +9,8 @@ from loader import Loader
 
 class CombinationStrategy(CombinationCreator):
     def __init__(self, setting):
-        self.conditions_all         = conditions.all()
-        setting.sorted_conditions = False
-
         super().__init__(setting)
-
+        self.conditions_all         = conditions.all()
         self.conditions_by_seed(setting.seed[0])
 
     def conditions_by_seed(self, seed):

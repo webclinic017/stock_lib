@@ -9,9 +9,7 @@ from loader import Loader
 
 class CombinationStrategy(CombinationCreator):
     def __init__(self, setting):
-        setting.sorted_conditions = False
         super().__init__(setting)
-
         self.conditions_by_seed(setting.seed[0], setting.ensemble)
 
     def conditions_by_seed(self, seed, files):
