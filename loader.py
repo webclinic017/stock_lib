@@ -686,7 +686,7 @@ class Loader:
             return None
 
     @staticmethod
-    def realtime_sheet_stocks(date, monitor_size=3):
+    def realtime_sheet_stocks(date):
         codes = []
         stocks = [
             Loader.ordered_stocks(),
@@ -695,13 +695,6 @@ class Loader:
         for stock in stocks:
             if stock is not None:
                 codes.extend(stock["code"].as_matrix().tolist())
-
-        codes = codes + Loader.before_ranking_codes(date, "volume", before=0, monitor_size=monitor_size)
-        codes = codes + Loader.before_ranking_codes(date, "volume_ratio", before=0, monitor_size=monitor_size)
-
-        daytrade_portfolio = Loader.daytrade_portfolio()
-        print(daytrade_portfolio)
-        codes = codes + daytrade_portfolio["code"].iloc[:monitor_size].as_matrix().tolist()
 
         print(codes)
         return list(set(codes))

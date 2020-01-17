@@ -20,7 +20,6 @@ def add_options(parser):
     parser.add_argument("--use_limit", action="store_true", default=False, dest="use_limit", help="指値を使う")
     parser.add_argument("--position_sizing", action="store_true", default=False, dest="position_sizing", help="ポジションサイジング")
     parser.add_argument("--max_position_size", action="store", default=None, dest="max_position_size", help="最大ポジションサイズ")
-    parser.add_argument("--monitor_size", action="store", default=None, dest="monitor_size", help="監視銘柄数")
     parser.add_argument("--production", action="store_true", default=False, dest="production", help="本番向け") # 実行環境の選択
     parser.add_argument("--short", action="store_true", default=False, dest="short", help="空売り戦略")
     parser.add_argument("--daytrade", action="store_true", default=False, dest="daytrade", help="ティックデータを使う")
@@ -33,8 +32,6 @@ def add_options(parser):
     parser.add_argument("--ensemble_dir", action="store", default=None, dest="ensemble_dir", help="アンサンブルディレクトリ")
 
     # strategy
-    parser.add_argument("--before_ranking", action="store_true", default=False, dest="before_ranking", help="ランキングトレード")
-    parser.add_argument("--open_close", action="store_true", default=False, dest="open_close", help="寄せ引け")
     parser.add_argument("--ensemble", action="store_true", default=False, dest="ensemble", help="アンサンブル")
     return parser
 
@@ -62,26 +59,18 @@ def get_filename(args, ignore_code=False):
     return filename
 
 class StrategyType:
-    BEFORE_RANKING="before_ranking"
-    OPEN_CLOSE="open_close"
     ENSEMBLE="ensemble"
     COMBINATION="combination"
 
     def list(self):
         return [
-            self.BEFORE_RANKING,
-            self.OPEN_CLOSE,
             self.ENSEMBLE,
             self.COMBINATION
         ]
 
 def get_strategy_name(args):
     strategy_types = StrategyType()
-    if args.before_ranking:
-        return strategy_types.BEFORE_RANKING
-    elif args.open_close:
-        return strategy_types.OPEN_CLOSE
-    elif args.ensemble:
+    if args.ensemble:
         return strategy_types.ENSEMBLE
     else:
         return strategy_types.COMBINATION
@@ -91,26 +80,14 @@ def get_strategy_name(args):
 def load_strategy_creator_by_type(strategy_type, is_production, combination_setting, ignore_ensemble=False):
     strategy_types = StrategyType()
     if is_production:
-        if strategy_types.BEFORE_RANKING == strategy_type:
-            from strategies.production.before_ranking import CombinationStrategy
-            return CombinationStrategy(combination_setting)
-        elif strategy_types.OPEN_CLOSE == strategy_type:
-            from strategies.production.open_close import CombinationStrategy
-            return CombinationStrategy(combination_setting)
-        elif strategy_types.ENSEMBLE == strategy_type and not ignore_ensemble:
+        if strategy_types.ENSEMBLE == strategy_type and not ignore_ensemble:
             from strategies.production.ensemble import CombinationStrategy
             return CombinationStrategy(combination_setting)
         else:
             from strategies.production.combination import CombinationStrategy
             return CombinationStrategy(combination_setting)
     else:
-        if strategy_types.BEFORE_RANKING == strategy_type:
-            from strategies.before_ranking import CombinationStrategy
-            return CombinationStrategy(combination_setting)
-        elif strategy_types.OPEN_CLOSE == strategy_type:
-            from strategies.open_close import CombinationStrategy
-            return CombinationStrategy(combination_setting)
-        elif strategy_types.ENSEMBLE == strategy_type and not ignore_ensemble:
+        if strategy_types.ENSEMBLE == strategy_type and not ignore_ensemble:
             from strategies.ensemble import CombinationStrategy
             return CombinationStrategy(combination_setting)
         else:
@@ -211,7 +188,6 @@ def create_combination_setting(args, use_json=True):
     combination_setting.use_limit = args.use_limit if args.use_limit else combination_setting.use_limit
     combination_setting.position_sizing = args.position_sizing if args.position_sizing else combination_setting.position_sizing
     combination_setting.max_position_size = combination_setting.max_position_size if args.max_position_size is None else int(args.max_position_size)
-    combination_setting.monitor_size = combination_setting.monitor_size if args.monitor_size is None else int(args.monitor_size)
     combination_setting.ensemble = [] if args.ensemble_dir is None else ensemble_files(args.ensemble_dir)
     return combination_setting
 
@@ -226,7 +202,6 @@ def create_combination_setting_by_dict(setting_dict):
     combination_setting.use_limit = setting_dict["use_limit"] if "use_limit" in setting_dict.keys() else combination_setting.use_limit
     combination_setting.position_sizing = setting_dict["position_sizing"] if "position_sizing" in setting_dict.keys() else combination_setting.position_sizing
     combination_setting.max_position_size = setting_dict["max_position_size"] if "max_position_size" in setting_dict.keys() else combination_setting.max_position_size
-    combination_setting.monitor_size = setting_dict["monitor_size"] if "monitor_size" in setting_dict.keys() else combination_setting.monitor_size
     combination_setting.seed = setting_dict["seed"] if "seed" in setting_dict.keys() else combination_setting.seed
     combination_setting.ensemble = ensemble_files(setting_dict["ensemble"]) if "ensemble" in setting_dict.keys() else combination_setting.ensemble
     return combination_setting
@@ -497,7 +472,7 @@ class StrategyUtil:
     def term(self, data):
         return 1 if data.position.get_term()  == 0 else data.position.get_term()
 
-    # 1単元で最大の損切ラインを適用
+    # 保有数最大で最大の損切ラインを適用
     def stop_loss_rate(self, data, max_position_size):
         position_rate = data.position.get_num() / max_position_size
         return data.setting.stop_loss_rate * position_rate
@@ -510,7 +485,6 @@ class CombinationSetting:
     position_sizing = False
     max_position_size = 5
     sorted_conditions = True
-    monitor_size = 3
     condition_size = 5
     seed = [t.time()]
     ensemble = []
@@ -588,7 +562,7 @@ class Combination(StrategyCreator, StrategyUtil):
             conditions = [self.apply_common(data, self.common.stop_loss)]
         else:
             conditions = [
-                data.position.gain_rate(data.data.daily["close"].iloc[-1]) < -self.stop_loss_rate(data, self.setting.max_position_size), # 1単元で最大の損切ラインを適用
+                data.position.gain_rate(data.data.daily["close"].iloc[-1]) < -self.stop_loss_rate(data, self.setting.max_position_size), # 保有数最大で最大の損切ラインを適用
                 self.apply_common(data, self.common.stop_loss) and self.apply(data, self.conditions.stop_loss),
             ]
         if any(conditions):
