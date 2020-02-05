@@ -170,7 +170,7 @@ def create_strategy_setting(setting_dict):
     if setting_dict is None:
         strategy_setting = []
     else:
-        strategy_setting = list(map(lambda x: create_setting_by_dict(x), setting_dict["setting"]))
+        strategy_setting = list(map(lambda x: StrategySetting().by_dict(x), setting_dict["setting"]))
     return strategy_setting
 
 def create_ensemble_strategies(files):
@@ -228,117 +228,6 @@ def create_simulator_setting_by_json(args):
     return simulator_setting
 
 # ========================================================================
-# 売買ルール
-class Rule:
-    def __init__(self, callback):
-        self.callback = callback
-
-    def apply(self, data):
-        return self.callback(data)
-
-# 売買戦略
-class Strategy:
-    def __init__(self, new_rules, taking_rules, stop_loss_rules, closing_rules):
-        self.new_rules = list(map(lambda x: Rule(x), new_rules))
-        self.taking_rules = list(map(lambda x: Rule(x), taking_rules))
-        self.stop_loss_rules = list(map(lambda x: Rule(x), stop_loss_rules))
-        self.closing_rules = list(map(lambda x: Rule(x), closing_rules))
-
-def create_setting_by_dict(params):
-     return StrategySetting().by_array([
-        params["new"],
-        params["taking"],
-        params["stop_loss"],
-        params["closing"]
-     ])
-
-def strategy_setting_to_dict(strategy_setting):
-    return {"new": strategy_setting.new, "taking": strategy_setting.taking, "stop_loss": strategy_setting.stop_loss, "closing": strategy_setting.closing}
-
-def strategy_setting_to_array(strategy_setting):
-        return [
-            strategy_setting.new,
-            strategy_setting.taking,
-            strategy_setting.stop_loss,
-            strategy_setting.closing
-        ]
-
-class StrategySetting():
-    def __init__(self):
-        self.new = 0
-        self.taking = 0
-        self.stop_loss = 0
-        self.closing = 0
-
-    def by_array(self, params):
-        self.new = int(params[0])
-        self.taking = int(params[1])
-        self.stop_loss = int(params[2])
-        self.closing = int(params[3])
-        return self
-
-
-    def to_dict(self):
-        return strategy_setting_to_dict(self)
-
-class StrategyCreateSetting:
-    def __init__(self, filename):
-        self.strategy_type = self.get_strategy_name(filename)
-        self.is_production = "production" in filename
-        self.setting_dict = Loader.simulate_setting(filename, "")
-        self.strategy_setting = create_strategy_setting(self.setting_dict)
-        self.combination_setting = create_combination_setting_by_dict(self.setting_dict)
-
-    def get_strategy_name(self, filename):
-        strategy_types = StrategyType()
-        for t in strategy_types.list():
-            if t in filename:
-                return t
-        return strategy_types.COMBINATION
-
-class StrategyCreator:
-    def __init__(self, new=None, taking=None, stop_loss=None, closing=None):
-        self.new = new
-        self.taking = taking
-        self.stop_loss = stop_loss
-        self.closing = closing
-
-    def create_new_rules(self, data):
-        return simulator.Order(0, [lambda x: True]) if self.new is None else self.new(data)
-
-    def create_taking_rules(self, data):
-        return simulator.Order(0, [lambda x: True]) if self.taking is None else self.taking(data)
-
-    def create_stop_loss_rules(self, data):
-        return simulator.Order(0, [lambda x: True]) if self.stop_loss is None else self.stop_loss(data)
-
-    def create_closing_rules(self, data):
-        return simulator.Order(0, [lambda x: True]) if self.closing is None else self.closing(data)
-
-    def create(self):
-        new_rules = [lambda x: self.create_new_rules(x)]
-        taking_rules = [lambda x: self.create_taking_rules(x)]
-        stop_loss_rules = [lambda x: self.create_stop_loss_rules(x)]
-        closing_rules = [lambda x: self.create_closing_rules(x)]
-        return Strategy(new_rules, taking_rules, stop_loss_rules, closing_rules)
-
-    def ranges(self):
-        return []
-
-class StrategyConditions():
-    def __init__(self):
-        self.new = []
-        self.taking = []
-        self.stop_loss = []
-        self.closing = []
-
-    def by_array(self, params):
-        self.new = params[0]
-        self.taking = params[1]
-        self.stop_loss = params[2]
-        self.closing = params[3]
-        return self
-
 
 class StrategyUtil:
     def apply(self, data, conditions):
@@ -477,6 +366,184 @@ class StrategyUtil:
         position_rate = data.position.get_num() / max_position_size
         return data.setting.stop_loss_rate * position_rate
 
+# ========================================================================
+
+# 売買ルール
+class Rule:
+    def __init__(self, callback):
+        self.callback = callback
+
+    def apply(self, data):
+        return self.callback(data)
+
+# ========================================================================
+# 売買戦略
+class Strategy:
+    def __init__(self, new_rules, taking_rules, stop_loss_rules, closing_rules):
+        self.new_rules = list(map(lambda x: Rule(x), new_rules))
+        self.taking_rules = list(map(lambda x: Rule(x), taking_rules))
+        self.stop_loss_rules = list(map(lambda x: Rule(x), stop_loss_rules))
+        self.closing_rules = list(map(lambda x: Rule(x), closing_rules))
+
+class StrategySetting():
+    def __init__(self):
+        self.new = 0
+        self.taking = 0
+        self.stop_loss = 0
+        self.closing = 0
+
+    def by_array(self, params):
+        self.new = int(params[0])
+        self.taking = int(params[1])
+        self.stop_loss = int(params[2])
+        self.closing = int(params[3])
+        return self
+
+    def by_dict(self, params):
+        self.new = int(params["new"])
+        self.taking = int(params["taking"])
+        self.stop_loss = int(params["stop_loss"])
+        self.closing = int(params["closing"])
+        return self
+
+    def to_dict(self):
+        return {
+            "new": self.new,
+            "taking": self.taking,
+            "stop_loss": self.stop_loss,
+            "closing": self.closing
+        }
+
+class StrategyConditions():
+    def __init__(self):
+        self.new = []
+        self.taking = []
+        self.stop_loss = []
+        self.closing = []
+
+    def by_array(self, params):
+        self.new = params[0]
+        self.taking = params[1]
+        self.stop_loss = params[2]
+        self.closing = params[3]
+        return self
+
+# ========================================================================
+
+class StrategyCreator:
+    def __init__(self, new=None, taking=None, stop_loss=None, closing=None):
+        self.new = new
+        self.taking = taking
+        self.stop_loss = stop_loss
+        self.closing = closing
+
+    def create_new_rules(self, data):
+        return simulator.Order(0, [lambda x: True]) if self.new is None else self.new(data)
+
+    def create_taking_rules(self, data):
+        return simulator.Order(0, [lambda x: True]) if self.taking is None else self.taking(data)
+
+    def create_stop_loss_rules(self, data):
+        return simulator.Order(0, [lambda x: True]) if self.stop_loss is None else self.stop_loss(data)
+
+    def create_closing_rules(self, data):
+        return simulator.Order(0, [lambda x: True]) if self.closing is None else self.closing(data)
+
+    def create(self):
+        new_rules = [lambda x: self.create_new_rules(x)]
+        taking_rules = [lambda x: self.create_taking_rules(x)]
+        stop_loss_rules = [lambda x: self.create_stop_loss_rules(x)]
+        closing_rules = [lambda x: self.create_closing_rules(x)]
+        return Strategy(new_rules, taking_rules, stop_loss_rules, closing_rules)
+
+    def ranges(self):
+        return []
+
+class CombinationCreator(StrategyCreator, StrategyUtil):
+    def __init__(self, setting=None):
+        self.setting = CombinationSetting() if setting is None else setting
+
+    def ranges(self):
+        return [
+            list(range(utils.combinations_size(self.new()))),
+            list(range(utils.combinations_size(self.taking()))),
+            list(range(utils.combinations_size(self.stop_loss()))),
+            list(range(utils.combinations_size(self.closing()))),
+        ]
+
+    def create(self, settings):
+        condition = self.conditions(settings[0])
+        c = StrategyConditions().by_array(condition)
+        return Combination(c, self.common(settings), self.setting).create()
+
+    # インデックスから直接条件を生成
+    def conditions(self, setting):
+        return [
+            utils.combination(setting.new, self.new()),
+            utils.combination(setting.taking, self.taking()),
+            utils.combination(setting.stop_loss, self.stop_loss()),
+            utils.combination(setting.closing, self.closing()),
+        ]
+
+    def conditions_by_index(self, conditions, index):
+        a = [conditions[i] for i in index[0]]
+        b = [conditions[i] for i in index[1]]
+        return [a, b]
+
+
+    def subject(self):
+        raise Exception("Need override subject.")
+
+    # 何か追加データが欲しいときはoverrideする
+    def add_data(self, data):
+        return data
+
+    def default_common(self):
+        rules = [lambda d: True]
+        return StrategyCreator(new=rules, taking=rules, stop_loss=rules, closing=[lambda d: False])
+
+    # @return StrategyCreator
+    def common(self, setting):
+        return self.default_common()
+
+    # 継承したクラスから条件のリストから組み合わせを生成する
+    def new(self):
+        return [
+            lambda d: False
+        ]
+
+    def taking(self):
+        return [
+            lambda d: False
+        ]
+
+    def stop_loss(self):
+        return [
+            lambda d: False
+        ]
+
+    def closing(self):
+        return [
+            lambda d: False
+        ]
+
+
+# ensemble用
+class StrategyCreateSetting:
+    def __init__(self, filename):
+        self.strategy_type = self.get_strategy_name(filename)
+        self.is_production = "production" in filename
+        self.setting_dict = Loader.simulate_setting(filename, "")
+        self.strategy_setting = create_strategy_setting(self.setting_dict)
+        self.combination_setting = create_combination_setting_by_dict(self.setting_dict)
+
+    def get_strategy_name(self, filename):
+        strategy_types = StrategyType()
+        for t in strategy_types.list():
+            if t in filename:
+                return t
+        return strategy_types.COMBINATION
+
 ## 指定可能な戦略====================================================================================================================
 
 class CombinationSetting:
@@ -586,72 +653,6 @@ class Combination(StrategyCreator, StrategyUtil):
 
         return None
 
-class CombinationCreator(StrategyCreator, StrategyUtil):
-    def __init__(self, setting=None):
-        self.setting = CombinationSetting() if setting is None else setting
-
-    def ranges(self):
-        return [
-            list(range(utils.combinations_size(self.new()))),
-            list(range(utils.combinations_size(self.taking()))),
-            list(range(utils.combinations_size(self.stop_loss()))),
-            list(range(utils.combinations_size(self.closing()))),
-        ]
-
-    def create(self, settings):
-        condition = self.conditions(settings[0])
-        c = StrategyConditions().by_array(condition)
-        return Combination(c, self.common(settings), self.setting).create()
-
-    # インデックスから直接条件を生成
-    def conditions(self, setting):
-        return [
-            utils.combination(setting.new, self.new()),
-            utils.combination(setting.taking, self.taking()),
-            utils.combination(setting.stop_loss, self.stop_loss()),
-            utils.combination(setting.closing, self.closing()),
-        ]
-
-    def conditions_by_index(self, conditions, index):
-        a = [conditions[i] for i in index[0]]
-        b = [conditions[i] for i in index[1]]
-        return [a, b]
-
-
-    def subject(self):
-        raise Exception("Need override subject.")
-
-    # 何か追加データが欲しいときはoverrideする
-    def add_data(self, data):
-        return data
-
-    def default_common(self):
-        rules = [lambda d: True]
-        return StrategyCreator(new=rules, taking=rules, stop_loss=rules, closing=[lambda d: False])
-
-    # @return StrategyCreator
-    def common(self, setting):
-        return self.default_common()
-
-    def new(self):
-        return [
-            lambda d: False
-        ]
-
-    def taking(self):
-        return [
-            lambda d: False
-        ]
-
-    def stop_loss(self):
-        return [
-            lambda d: False
-        ]
-
-    def closing(self):
-        return [
-            lambda d: False
-        ]
 
 class CombinationChecker:
 
