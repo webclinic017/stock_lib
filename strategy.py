@@ -22,16 +22,18 @@ def add_options(parser):
     parser.add_argument("--max_position_size", action="store", default=None, dest="max_position_size", help="最大ポジションサイズ")
     parser.add_argument("--production", action="store_true", default=False, dest="production", help="本番向け") # 実行環境の選択
     parser.add_argument("--short", action="store_true", default=False, dest="short", help="空売り戦略")
-    parser.add_argument("--daytrade", action="store_true", default=False, dest="daytrade", help="ティックデータを使う")
-    parser.add_argument("--realtime", action="store_true", default=False, dest="realtime", help="リアルタイムデータを使う")
     parser.add_argument("--stop_loss_rate", action="store", default=None, dest="stop_loss_rate", help="損切レート")
     parser.add_argument("--taking_rate", action="store", default=None, dest="taking_rate", help="利食いレート")
     parser.add_argument("--min_unit", action="store", default=None, dest="min_unit", help="最低単元")
+
+    # 消してもいい
+    parser.add_argument("--daytrade", action="store_true", default=False, dest="daytrade", help="ティックデータを使う")
+    parser.add_argument("--realtime", action="store_true", default=False, dest="realtime", help="リアルタイムデータを使う")
     parser.add_argument("--rule", action="store", default=None, dest="rule", help="足の単位")
     parser.add_argument("--trade_step", type=int, action="store", default=None, dest="trade_step", help="注文の間隔")
-    parser.add_argument("--ensemble_dir", action="store", default=None, dest="ensemble_dir", help="アンサンブルディレクトリ")
 
     # strategy
+    parser.add_argument("--ensemble_dir", action="store", default=None, dest="ensemble_dir", help="アンサンブルディレクトリ")
     parser.add_argument("--ensemble", action="store_true", default=False, dest="ensemble", help="アンサンブル")
     return parser
 
@@ -332,25 +334,12 @@ class StrategyUtil:
         return any(conditions)
 
     # 最大ポジションサイズ
-    def max_order(self, data, max_risk, risk):
+    def max_position(self, data, max_risk, risk):
         if risk == 0:
             return 0
-        max_order = int((max_risk / risk) / data.setting.min_unit)
-        return max_order
+        max_position = int((max_risk / risk) / data.setting.min_unit)
+        return max_position
 
-    # ポジションサイズ
-    def order(self, data, max_risk, risk, max_position_size):
-        current = data.position.get_num()
-        max_order = self.max_order(data, max_risk, risk)
-        max_order = max_order if max_order < max_position_size else max_position_size
-        max_order = max_order - current # 保有できる最大まで
-        max_order = max_order if self.attention(data) else max_order / 2 # 最後負けトレードなら半分ずつ
-        order = 1 if self.caution(data) else int(max_order) # 不安要素があれば、最小単位から
-
-        if order < 1:
-            order = 0
-
-        return order
 
     def safety(self, data, term):
         if data.setting.short_trade:
@@ -391,27 +380,38 @@ class StrategySetting():
         self.taking = 0
         self.stop_loss = 0
         self.closing = 0
+        self.x2 = None
+        self.x4 = None
 
+    # spaceからの読込用
     def by_array(self, params):
         self.new = int(params[0])
         self.taking = int(params[1])
         self.stop_loss = int(params[2])
         self.closing = int(params[3])
+        self.x2 = int(params[4]) if len(params) > 4 and params[4] is not None else None
+        self.x4 = int(params[5]) if len(params) > 5 and params[5] is not None else None
         return self
 
+    # 設定からの読込用
     def by_dict(self, params):
         self.new = int(params["new"])
         self.taking = int(params["taking"])
         self.stop_loss = int(params["stop_loss"])
         self.closing = int(params["closing"])
+        self.x2 = int(params["x2"]) if "x2" in params.keys() and params["x2"] is not None else None
+        self.x4 = int(params["x4"]) if "x4" in params.keys() and params["x4"] is not None else None
         return self
 
+    # 設定への書き込み用
     def to_dict(self):
         return {
             "new": self.new,
             "taking": self.taking,
             "stop_loss": self.stop_loss,
-            "closing": self.closing
+            "closing": self.closing,
+            "x2": self.x2,
+            "x4": self.x4
         }
 
 class StrategyConditions():
@@ -420,12 +420,16 @@ class StrategyConditions():
         self.taking = []
         self.stop_loss = []
         self.closing = []
+        self.x2 = []
+        self.x4 = []
 
     def by_array(self, params):
         self.new = params[0]
         self.taking = params[1]
         self.stop_loss = params[2]
         self.closing = params[3]
+        self.x2 = params[4] if len(params) > 4 else []
+        self.x4 = params[5] if len(params) > 5 else []
         return self
 
 # ========================================================================
@@ -469,6 +473,8 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
             list(range(utils.combinations_size(self.taking()))),
             list(range(utils.combinations_size(self.stop_loss()))),
             list(range(utils.combinations_size(self.closing()))),
+            list(range(utils.combinations_size(self.x2()))),
+            list(range(utils.combinations_size(self.x4()))),
         ]
 
     def create(self, settings):
@@ -483,6 +489,8 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
             utils.combination(setting.taking, self.taking()),
             utils.combination(setting.stop_loss, self.stop_loss()),
             utils.combination(setting.closing, self.closing()),
+            [] if setting.x2 is None else utils.combination(setting.x2, self.x2()),
+            [] if setting.x4 is None else utils.combination(setting.x4, self.x4()),
         ]
 
     def conditions_by_index(self, conditions, index):
@@ -527,6 +535,15 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
             lambda d: False
         ]
 
+    def x2(self):
+        return [
+            lambda d: False
+        ]
+
+    def x4(self):
+        return [
+            lambda d: False
+        ]
 
 # ensemble用
 class StrategyCreateSetting:
@@ -583,16 +600,27 @@ class Combination(StrategyCreator, StrategyUtil):
         risk = self.risk(data)
         max_risk = self.max_risk(data)
 
-        max_order = self.max_order(data, max_risk, risk)
-        max_order = max_order if max_order < self.setting.max_position_size else self.setting.max_position_size
+        max_position = self.max_position(data, max_risk, risk)
+        max_position = max_position if max_position < self.setting.max_position_size else self.setting.max_position_size
+
+
+        # 数量
+        order = 1
+        if self.setting.position_sizing:
+            # レバレッジ
+            order = 2 if self.apply(data, self.conditions.x2) else order
+            order = 4 if self.apply(data, self.conditions.x4) else order
+
+            # 最大を超える場合は調整
+            if order + data.position.get_num() > max_position:
+                order = max_position - data.position.get_num()
 
         conditions = [
             self.drawdown_allowable(data), # ドローダウンが問題ない状態
-            data.position.get_num() < max_order, # 最大ポジションサイズ以下
+            data.position.get_num() < max_position, # 最大ポジションサイズ以下
+            order > 0,
             self.apply_common(data, self.common.new)
         ]
-
-        order = self.order(data, max_risk, risk, self.setting.max_position_size) if self.setting.position_sizing else 1
 
         if not self.setting.simple:
             conditions = conditions + [self.apply(data, self.conditions.new)]

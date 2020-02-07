@@ -19,7 +19,8 @@ class CombinationStrategy(CombinationCreator):
         self.new_conditions         = random.sample(self.conditions_all, self.setting.condition_size)
         self.taking_conditions      = random.sample(self.conditions_all, self.setting.condition_size)
         self.stop_loss_conditions   = random.sample(self.conditions_all, self.setting.condition_size)
-
+        self.x2_conditions          = random.sample(self.conditions_all, self.setting.condition_size)
+        self.x4_conditions          = random.sample(self.conditions_all, self.setting.condition_size)
 
     def subject(self, date):
         return ["nikkei"]
@@ -41,6 +42,8 @@ class CombinationStrategy(CombinationCreator):
             default.new         = default.new           + [lambda d: self.apply(utils.combination(setting[i].new, self.new_conditions))]
             default.taking      = default.taking        + [lambda d: self.apply(utils.combination(setting[i].taking, self.taking_conditions))]
             default.stop_loss   = default.stop_loss     + [lambda d: self.apply(utils.combination(setting[i].stop_loss, self.stop_loss_conditions))]
+            default.x2          = default.x2            + [lambda d: self.apply(utils.combination(setting[i].x2, self.x2_conditions))]
+            default.x4          = default.x4            + [lambda d: self.apply(utils.combination(setting[i].x4, self.x4_conditions))]
             self.conditions_by_seed(self.setting.seed[i])
 
         return default
@@ -59,3 +62,8 @@ class CombinationStrategy(CombinationCreator):
             lambda d: False,
         ]
 
+    def x2(self):
+        return self.x2_conditions
+
+    def x4(self):
+        return self.x4_conditions
