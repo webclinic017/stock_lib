@@ -160,6 +160,8 @@ class StrategySimulator:
 
         s = stats.values()
         results = {
+            "start_date": start_date,
+            "end_date": end_date,
             "codes": codes,
             "win": win_codes,
             "lose": lose_codes,
