@@ -163,14 +163,13 @@ class ReverseLimitOrder(Order):
 
 # ルール適用用データ
 class AppliableData:
-    def __init__(self, data, index, position, assets, setting, stats, rate):
+    def __init__(self, data, index, position, assets, setting, stats):
         self.data = data # データ
         self.index = index # 指標データ
         self.position = position # ポジション
         self.assets = assets # 資産
         self.setting = setting # 設定
         self.stats = stats # 統計データ
-        self.rate = rate # 取引レート
 
 class SimulatorData:
     def __init__(self, code, daily, rule):
@@ -453,16 +452,16 @@ class Simulator:
             self.logs.append(message)
 
     # ルールすべてに当てはまるならTrue
-    def apply_all_rules(self, data, index, rules, rate=1.0):
+    def apply_all_rules(self, data, index, rules):
         if len(rules) == 0:
             return False
-        appliable_data = self.create_appliable_data(data, index, rate=rate)
+        appliable_data = self.create_appliable_data(data, index)
         results = list(map(lambda x: x.apply(appliable_data), rules))
         results = list(filter(lambda x: x is not None, results))
         return results
 
-    def create_appliable_data(self, data, index, rate=1.0):
-        return AppliableData(data, index, self.position, self.total_assets(data.daily["close"].iloc[-1].item()), self.setting, self.stats, rate)
+    def create_appliable_data(self, data, index):
+        return AppliableData(data, index, self.position, self.total_assets(data.daily["close"].iloc[-1].item()), self.setting, self.stats)
 
     # 総資産
     def total_assets(self, value):
@@ -640,17 +639,17 @@ class Simulator:
         return value
 
     # 新規シグナル
-    def new_signal(self, strategy, data, index, rate=1.0):
-        return self.apply_all_rules(data, index, strategy.new_rules, rate=rate)
+    def new_signal(self, strategy, data, index):
+        return self.apply_all_rules(data, index, strategy.new_rules)
 
-    def stop_loss_signal(self, strategy, data, index, rate=1.0):
-        return self.apply_all_rules(data, index, strategy.stop_loss_rules, rate=rate)
+    def stop_loss_signal(self, strategy, data, index):
+        return self.apply_all_rules(data, index, strategy.stop_loss_rules)
 
-    def taking_signal(self, strategy, data, index, rate=1.0):
-        return self.apply_all_rules(data, index, strategy.taking_rules, rate=rate)
+    def taking_signal(self, strategy, data, index):
+        return self.apply_all_rules(data, index, strategy.taking_rules)
 
-    def closing_signal(self, strategy, data, index, rate=1.0):
-        return self.apply_all_rules(data, index, strategy.closing_rules, rate=rate)
+    def closing_signal(self, strategy, data, index):
+        return self.apply_all_rules(data, index, strategy.closing_rules)
 
     def new_signals(self, strategy, data, index):
         signal = None
