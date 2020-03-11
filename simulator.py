@@ -119,7 +119,7 @@ class Position:
 # 注文
 class Order:
     def __init__(self, num, conditions, is_short=False, is_reverse_limit=False, is_limit=False, price=None):
-        self.num = num
+        self.num = int(num)
         self.term = 0
         self.price = price
         self.conditions = conditions
