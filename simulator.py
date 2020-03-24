@@ -244,6 +244,12 @@ class SimulatorStats:
         }
         return trade_data
 
+    def append(self, trade_data):
+        self.trade_history.append(trade_data)
+
+    def apply(self, trade_data):
+        self.trade_history = self.trade_history[:-1] + [trade_data]
+
     def size(self):
         return list(map(lambda x: x["size"], self.trade_history))
 
@@ -335,6 +341,26 @@ class SimulatorStats:
     def loss_rate(self):
         return list(filter(lambda x: x < 0, self.gain_rate()))
 
+    def win_streak(self):
+        streak = self.streak()
+        if len(streak) == 0:
+            return 0
+        else:
+            is_win, count = streak[-1]
+            return count if is_win else 0 # 連勝のみ
+
+    def lose_streak(self):
+        streak = self.streak()
+        if len(streak) == 0:
+            return 0
+        else:
+            is_win, count = streak[-1]
+            return count if not is_win else 0 # 連勝のみ
+
+    # 勝敗の連続数
+    def streak(self):
+        return [ (is_win, len(list(l))) for is_win, l in groupby(self.gain(), key=lambda x: x > 0)]
+
     # 平均利益率
     def average_profit_rate(self):
         if self.win_trade_num() == 0:
@@ -389,49 +415,6 @@ class SimulatorStats:
     def executed(self):
         return list(filter(lambda x: x["new"] is not None or x["repay"] is not None, self.trade_history))
 
-class TradeRecorder:
-    def __init__(self, min_unit, output_dir=""):
-        self.output_dir = "/tmp/trade_recorder/%s" % output_dir
-        self.pattern = {"new": [], "repay": [], "gain": []}
-        self.columns = None
-        self.min_unit = min_unit
-
-    def set_columns(self, columns):
-        self.columns = columns
-
-    def pattern_num(self, num):
-        return int(num / self.min_unit)
-
-    def new(self, pattern, num):
-        assert self.columns is not None, "columns is None"
-        for _ in range(self.pattern_num(num)):
-            self.pattern["new"].append(pattern[self.columns].as_matrix().tolist())
-
-    def repay(self, pattern, gain_rate, num):
-        assert self.columns is not None, "columns is None"
-        for _ in range(self.pattern_num(num)):
-            self.pattern["repay"].append(pattern[self.columns].as_matrix().tolist())
-            self.pattern["gain"].append(gain_rate)
-
-    def concat(self, recorder):
-        self.pattern["new"].extend(recorder.pattern["new"])
-        self.pattern["repay"].extend(recorder.pattern["repay"])
-        self.pattern["gain"].extend(recorder.pattern["gain"])
-        self.columns = recorder.columns
-
-    def output(self, name, append=False):
-        if not os.path.exists(self.output_dir):
-            os.makedirs(self.output_dir)
-        mode = "a" if append else "w"
-        new = pandas.DataFrame(self.pattern["new"], columns=self.columns)
-        new.to_csv("%s/new_%s.csv" % (self.output_dir, name), index=None, header=None, mode=mode)
-        repay = pandas.DataFrame(self.pattern["repay"], columns=self.columns)
-        repay.to_csv("%s/repay_%s.csv" % (self.output_dir, name), index=None, header=None, mode=mode)
-        gain = pandas.DataFrame(self.pattern["gain"], columns=["gain"])
-        gain.to_csv("%s/gain_%s.csv" % (self.output_dir, name), index=None, header=None, mode=mode)
-        columns = pandas.DataFrame([], columns=self.columns)
-        columns.to_csv("%s/columns.csv" % self.output_dir, index=None)
-
 # シミュレーター
 class Simulator:
     def __init__(self, setting, position = None):
@@ -445,6 +428,7 @@ class Simulator:
         self.new_orders = []
         self.repay_orders = []
         self.closing_orders = []
+        self.force_stop = False
 
     def log(self, message):
         if self.setting.debug:
@@ -503,19 +487,20 @@ class Simulator:
 
     # 全部売る
     def closing(self, date, value, data=None):
-        self.log(" - closing: price %s" % (value))
         trade_data = self.create_trade_data(date, value)
         num = self.position.get_num()
         gain = self.position.gain(value)
         gain_rate = self.position.gain_rate(value)
         if self.repay(value, num):
+            self.log(" - closing: price %s x %s" % (value, num))
             trade_data["repay"] = value
             trade_data["gain"] = gain
             trade_data["gain_rate"] = gain_rate
 
         self.new_orders = []
         self.repay_orders = []
-        self.stats.trade_history.append(trade_data)
+        self.stats.append(trade_data)
+        self.force_stop = True
 
     # 取引手数料
     # TODO 実際のものに合わせる
@@ -697,6 +682,19 @@ class Simulator:
         return trade_data
 
     def order_adjust(self, trade_data):
+        # 手仕舞いの場合全部キャンセル
+        if self.position.get_num() > 0 and len(self.closing_orders) > 0:
+            self.log("[cancel] new/repay order. force closed")
+            self.new_orders = []
+            self.repay_orders = []
+            self.force_stop = True
+
+        # ポジションがなければ返済シグナルは捨てる
+        if self.position.get_num() <= 0 and len(self.closing_orders) > 0:
+            self.log("[cancel] closing order")
+            self.closing_orders = []
+            trade_data["canceled"] = "closing"
+
         # ポジションがなければ返済シグナルは捨てる
         if self.position.get_num() <= 0 and len(self.repay_orders) > 0:
             self.log("[cancel] repay order")
@@ -759,7 +757,11 @@ class Simulator:
 
         term_index = {}
         for k, v in index.items():
-            term_index[k] = v[v["date"] <= date]
+            if k in ["dow", "nasdaq"]:
+                d = v[v["date"] < date]
+            else:
+                d = v[v["date"] <= date]
+            term_index[k] = d if len(d) > 0 else pandas.DataFrame([[0] * len(d.columns)], columns=d.columns)
 
         today = term_data.daily.iloc[-1]
 
@@ -780,15 +782,9 @@ class Simulator:
         repay_orders = []
         if self.position.get_num() > 0:
             repay_orders += self.repay_order(price)
+            repay_orders += self.closing_order(price)
 
         return self.virtual_trade(data, new_orders, repay_orders, trade_data)
-
-    def close_trade(self, price, volume, data, trade_data):
-        closing_orders = []
-        if self.position.get_num() > 0:
-            closing_orders += self.closing_order(price)
-
-        return self.virtual_trade(data, [], closing_orders, trade_data)
 
     def intraday_trade(self, price, volume, data, trade_data):
         # 仮想トレードなら注文をキューから取得
@@ -854,7 +850,7 @@ class Simulator:
         # 判断に必要なデータ数がない
         if price == 0 or len(data.daily) < self.setting.min_data_length:
             self.log("less data. skip trade. [%s - %s]" % (data.daily["date"].iloc[0], date))
-            self.stats.trade_history.append(trade_data)
+            self.stats.append(trade_data)
             return
 
         # ポジションの保有期間を増やす
@@ -873,21 +869,24 @@ class Simulator:
             trade_data = self.open_trade(price, volume, data, trade_data)
             trade_data = self.intraday_trade(price, volume, data, trade_data)
 
+        # トレード履歴に追加
+        trade_data["size"] = self.position.get_num()
+        trade_data["term"] = self.position.get_term()
+        trade_data["contract_price"] = list(filter(lambda x: x is not None, [trade_data["new"], trade_data["repay"]]))
+        trade_data["contract_price"] = None if len(trade_data["contract_price"]) == 0 else trade_data["contract_price"][0] * trade_data["size"] * self.setting.min_unit
+        self.stats.append(trade_data)
+
+        # 手仕舞い後はもう何もしない
+        if self.force_stop:
+            self.log("force stopped. [%s - %s]" % (data.daily["date"].iloc[0], date))
+            return
+
         # 注文を出す
         if step == 0:
             term_data = data.index(0, -1) if self.setting.use_before_stick else data
             self.log("[order stick] %s:%s" % (term_data.daily["date"].iloc[-1], term_data.daily["open"].iloc[-1]))
             trade_data = self.signals(strategy, term_data, index, trade_data)
 
-        # 引け========================================================================
-        if self.setting.virtual_trade:
-            close = data.daily["close"].iloc[-1].item()
-            trade_data = self.close_trade(close, volume, data, trade_data)
-
-        # トレード履歴
+        # トレード履歴にシグナルを反映
         trade_data["signal"] = "new" if len(self.new_orders) > 0 else "repay" if len(self.repay_orders) > 0 else None
-        trade_data["size"] = self.position.get_num()
-        trade_data["term"] = self.position.get_term()
-        trade_data["contract_price"] = list(filter(lambda x: x is not None, [trade_data["new"], trade_data["repay"]]))
-        trade_data["contract_price"] = None if len(trade_data["contract_price"]) == 0 else trade_data["contract_price"][0] * trade_data["size"] * self.setting.min_unit
-        self.stats.trade_history.append(trade_data)
+        self.stats.apply(trade_data)

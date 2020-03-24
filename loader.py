@@ -314,6 +314,9 @@ class Loader:
         else:
             data = Loader.load_index(code, start_date, end_date)
 
+        if data is None:
+            raise Exception("%s: %s - %s not found" % (code, start_date, end_date))
+
         d = data[data["date"] == end_date]
 
         # 当日分の日足があったらすぐ返す
@@ -603,10 +606,19 @@ class Loader:
         return data
 
     @staticmethod
-    def new_score(date, filename):
+    def new_score_stocks(date, filename):
         try:
-            data = pandas.read_csv("%s/new_score/%s/%s" % (Loader.settings_dir, date, filename), header=None)
+            data = pandas.read_csv("%s/new_score/%s/%s.csv" % (Loader.settings_dir, date, filename), header=None)
             data.columns = ['code', 'price']
+        except:
+            data = None
+        return data
+
+    @staticmethod
+    def new_score():
+        try:
+            data = pandas.read_csv("%s/new_score.csv" % Loader.settings_dir, header=None)
+            data.columns = ['date', 'score']
         except:
             data = None
         return data
@@ -788,16 +800,6 @@ class Loader:
         try:
             data = pandas.read_csv("%s/%s/%s.csv" % (Loader.ranking_dir, ranking_type, d), header=None)
             data.columns = ["code", "price", "key"]
-            return data
-        except:
-            return None
-
-    @staticmethod
-    def daytrade_portfolio():
-        try:
-            data = pandas.read_csv("simulate_settings/daytrade_portfolio.csv", header=None)
-            data.columns = ["code", "optimize_gain", "validate_gain", "sum", "diff", "score"]
-            data = data.sort_values(by=["score"], ascending=False)
             return data
         except:
             return None

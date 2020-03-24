@@ -191,6 +191,10 @@ def add_cs_stats(data):
     data["low_rounddown"]  = (data["low"].shift(1) > data["low"]) * 1
     data["high_rounddown"] = (data["high"].shift(1) > data["low"]) * 1
 
+    # n日以内の高値安値更新
+    data["high_update"] = (data["high"].rolling(5).max() == data["high"]) * 1
+    data["low_update"] = (data["low"].rolling(5).min() == data["low"]) * 1
+
     # ギャップ
     data["yang_gap"] = (data["high"].shift(1) < data["low"]) * 1
     data["yin_gap"]  = (data["low"].shift(1) > data["high"]) * 1
@@ -641,6 +645,12 @@ def is_weekday(date):
 def daterange(start_date, end_date):
     for n in range((end_date - start_date).days):
         yield start_date + timedelta(n)
+
+def daterange_by_month(start_date, end_date):
+    delta = relativedelta(end_date, start_date)
+    months = delta.years * 12 + delta.months
+    for n in range(months):
+        yield start_date + relativedelta(months=n)
 
 # 全組み合わせを取得
 def combinations(conditions):

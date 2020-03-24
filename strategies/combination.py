@@ -4,30 +4,77 @@ import utils
 import simulator
 import conditions
 import random
+import subprocess
+import pandas
 from strategy import CombinationCreator
 from loader import Loader
 
 class CombinationStrategy(CombinationCreator):
     def __init__(self, setting):
         super().__init__(setting)
-        self.conditions_all         = conditions.all()
+        self.weights = setting.weights
         self.conditions_by_seed(setting.seed[0])
+
+#    def subject(self, date):
+#        return ["nikkei"]
+
+    def conditions_index(self):
+        return self.selected_condition_index
+
+    def subject(self, date):
+        try:
+            data = pandas.read_csv("portfolio/new_high/%s.csv" % date, header=None)
+            data.columns = ["code"]
+        except:
+            import traceback
+            traceback.print_exc()
+            data = None
+
+        if data is None:
+            codes = []
+        else:
+            codes = data["code"].as_matrix().tolist()
+        return codes
+
+    def choice(self, conditions, size, weights):
+        conditions_with_index = list(map(lambda x: {"x": x}, list(enumerate(conditions))))
+        choiced = numpy.random.choice(conditions_with_index, size, p=weights, replace=False).tolist()
+        choiced = list(map(lambda x: x["x"], choiced))
+        return list(zip(*choiced))
+
+    def apply_weights(self, method):
+        base = numpy.array([1] * len(self.conditions_all))
+
+        if method in self.weights.keys():
+            for index, weight in self.weights[method].items():
+                base[int(index)] = weight
+
+        weights = base / sum(base)
+        return weights
 
     def conditions_by_seed(self, seed):
         random.seed(seed)
+        numpy.random.seed(seed)
 
-        self.new_conditions         = random.sample(self.conditions_all, self.setting.condition_size)
-        self.taking_conditions      = random.sample(self.conditions_all, self.setting.condition_size)
-        self.stop_loss_conditions   = random.sample(self.conditions_all, self.setting.condition_size)
-        self.x2_conditions          = random.sample(self.conditions_all, self.setting.condition_size)
-        self.x4_conditions          = random.sample(self.conditions_all, self.setting.condition_size)
+        targets = ["daily", "nikkei", "dow"]
+        self.conditions_all         = conditions.all_with_index(targets)
 
-    def subject(self, date):
-        return ["nikkei"]
+        new, self.new_conditions               = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("new"))
+        taking, self.taking_conditions         = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("taking"))
+        stop_loss, self.stop_loss_conditions   = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("stop_loss"))
+        x2, self.x2_conditions                 = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("x2"))
+        x4, self.x4_conditions                 = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("x4"))
+
+        # 選択された条件のインデックスを覚えておく
+#        self.selected_condition_index = list(sum([new, taking, stop_loss, x2, x4], ()))
+        self.selected_condition_index = {
+            "new":new, "taking": taking, "stop_loss": stop_loss, "x2": x2, "x4": x4
+        }
 
     def common(self, setting):
         default = self.default_common()
         default.new = [
+            lambda d: d.index["new_score"]["score"].iloc[-1] > -400
         ]
 
         default.taking = [
@@ -36,6 +83,10 @@ class CombinationStrategy(CombinationCreator):
 
         default.stop_loss = [
             lambda d: d.position.gain(self.price(d)) < 0,
+        ]
+
+        default.closing = [
+            lambda d: d.data.daily["high_update"][-2:].max() == 0 and (d.position.gain(self.price(d)) <= 0 or sum(d.stats.gain()) <= 0),
         ]
 
         for i in range(1, len(setting[1:])):

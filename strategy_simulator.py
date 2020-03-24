@@ -1,13 +1,14 @@
 import sys
 import numpy
 import time
+from datetime import datetime
 
 sys.path.append("lib")
 import checker
 import cache
 import utils
 import strategy
-from simulator import Simulator, TradeRecorder
+from simulator import Simulator
 
 
 class StrategySimulator:
@@ -30,18 +31,23 @@ class StrategySimulator:
 
     def select_codes(self, args, start_date, end_date):
         codes = []
+        validate_codes = []
         daterange = {}
-        start = utils.to_datetime_by_term(start_date, with_time=args.daytrade)
-        end = utils.to_datetime_by_term(end_date, with_time=args.daytrade) + utils.relativeterm(1, with_time=True)
-        for date in utils.daterange(start, end):
-            codes = self.get_targets(args, codes, utils.to_format_by_term(date, args.daytrade))
-            daterange = self.append_daterange(codes, date, daterange)
-        validate_codes = codes
+        start = utils.to_datetime_by_term(start_date)
+        end = utils.to_datetime_by_term(end_date)
+
+        dates = list(utils.daterange_by_month(start, end))
+        ends = list(dates)[1:] + [end]
+        for s, e in zip(dates, dates[1:] + [end]):
+            codes = self.get_targets(args, codes, utils.to_format_by_term(datetime(s.year, s.month, 1)))
+            validate_codes = self.get_targets(args, codes, utils.to_format_by_term(datetime(e.year, e.month, 1)))
+            daterange = self.append_daterange(codes, s, daterange)
+            daterange = self.append_daterange(validate_codes, e, daterange)
         return codes, validate_codes, daterange
 
     def get_targets(self, args, targets, date):
         if args.code is None:
-            date = utils.to_format(utils.to_datetime_by_term(date, args.daytrade))
+            date = utils.to_format(utils.to_datetime_by_term(date))
             targets = list(set(targets + self.strategy_creator(args).subject(date)))
         else:
             targets = [args.code]
@@ -68,14 +74,14 @@ class StrategySimulator:
         args = data["args"]
         stocks = data["data"]
         index = data["index"]
-        daytrade = args.daytrade
 
         # シミュレーター準備
         simulators = {}
         simulator_setting = self.simulator_setting
         simulator_setting.debug = self.verbose
         strategy_settings = self.strategy_settings[:-1] + [strategy_setting] # 最後の設定を変えて検証
-        simulator_setting.strategy = self.strategy_creator(args).create(strategy_settings)
+        strategy_creator = self.strategy_creator(args)
+        simulator_setting.strategy = strategy_creator.create(strategy_settings)
         for code in stocks.keys():
             if stocks[code].split(start_date, end_date).daily["manda"].isin([1]).any(): # M&Aがあった銘柄はスキップ
                 self.log("skip. M&A. %s" % code)
@@ -90,12 +96,12 @@ class StrategySimulator:
             dates = list(set(dates + dates_dict[code]))
 
         # 日付ごとにシミュレーション
-        dates = sorted(dates, key=lambda x: utils.to_datetime_by_term(x, daytrade))
+        dates = sorted(dates, key=lambda x: utils.to_datetime_by_term(x))
         self.log("targets: %s" % simulators.keys())
 
         for date in dates:
             # 休日はスキップ
-            if not utils.is_weekday(utils.to_datetime_by_term(date, daytrade)):
+            if not utils.is_weekday(utils.to_datetime_by_term(date)):
                 self.log("%s is not weekday" % date)
                 continue
 

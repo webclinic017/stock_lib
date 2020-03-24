@@ -8,6 +8,7 @@ import simulator
 import itertools
 import time as t
 import glob
+import pandas
 from loader import Loader
 from loader import Bitcoin
 from collections import namedtuple
@@ -26,12 +27,6 @@ def add_options(parser):
     parser.add_argument("--taking_rate", action="store", default=None, dest="taking_rate", help="利食いレート")
     parser.add_argument("--min_unit", action="store", default=None, dest="min_unit", help="最低単元")
 
-    # 消してもいい
-    parser.add_argument("--daytrade", action="store_true", default=False, dest="daytrade", help="ティックデータを使う")
-    parser.add_argument("--realtime", action="store_true", default=False, dest="realtime", help="リアルタイムデータを使う")
-    parser.add_argument("--rule", action="store", default=None, dest="rule", help="足の単位")
-    parser.add_argument("--trade_step", type=int, action="store", default=None, dest="trade_step", help="注文の間隔")
-
     # strategy
     parser.add_argument("--ensemble_dir", action="store", default=None, dest="ensemble_dir", help="アンサンブルディレクトリ")
     parser.add_argument("--ensemble", action="store_true", default=False, dest="ensemble", help="アンサンブル")
@@ -46,14 +41,12 @@ def get_prefix(args, ignore_code=False):
 
     prefix = "production_" if args.production else ""
 
-    daytrade = "daytrade_" if args.daytrade else ""
-
     method = "short_" if args.short else ""
 
     target = get_strategy_name(args)
     target = "" if target == "combination" else "%s_" % target
 
-    return "%s%s%s%s%s" % (prefix, code, target, daytrade, method)
+    return "%s%s%s%s" % (prefix, code, target, method)
 
 def get_filename(args, ignore_code=False):
     prefix = get_prefix(args, ignore_code=ignore_code)
@@ -132,22 +125,9 @@ def load_strategy(args, combination_setting=None):
     return load_strategy_creator(args, combination_setting).create(settings)
 
 def load_simulator_data(code, start_date, end_date, args, time=None):
-    if args.realtime:
-        rule = "5T" if args.rule is None else args.rule
-        start = utils.to_datetime(start_date) - utils.relativeterm(3, True)
-        days = (utils.to_datetime(end_date) - start).days
-        for i in range(5):
-            data = Loader.loads_realtime(code, end_date, days+i, time=time, rule=rule)
-            if len(data) >= 250: # weekleyのstats生成で必要な分
-                break
-    elif args.daytrade:
-        rule = "5T" if args.rule is None else args.rule
-        start = utils.to_format(utils.to_datetime(start_date) - utils.relativeterm(1, True))
-        data = Loader.load_tick_ohlc(code, start, end_date, time=time, rule=rule)
-    else:
-        rule = "D"
-        start = utils.to_format(utils.to_datetime(start_date) - utils.relativeterm(6))
-        data = Loader.load_with_realtime(code, start, end_date)
+    rule = "D"
+    start = utils.to_format(utils.to_datetime(start_date) - utils.relativeterm(6))
+    data = Loader.load_with_realtime(code, start, end_date)
 
     if data is None:
         print("%s: %s is None" % (start_date, code))
@@ -156,6 +136,19 @@ def load_simulator_data(code, start_date, end_date, args, time=None):
     simulator_data = add_stats(code, data, rule)
     print("loaded:", utils.timestamp(), code, data["date"].iloc[0], data["date"].iloc[-1])
     return simulator_data
+
+def load_index(args, start_date, end_date):
+    index = {}
+
+    for k in ["nikkei", "dow"]:
+        d = Loader.load_index(k, start_date, end_date, with_filter=True, strict=False)
+        d = utils.add_stats(d)
+        d = utils.add_cs_stats(d)
+        index[k] = d
+
+    index["new_score"] = Loader.new_score()
+
+    return index
 
 def add_stats(code, data, rule):
     try:
@@ -206,6 +199,7 @@ def create_combination_setting_by_dict(setting_dict):
     combination_setting.max_position_size = setting_dict["max_position_size"] if "max_position_size" in setting_dict.keys() else combination_setting.max_position_size
     combination_setting.seed = setting_dict["seed"] if "seed" in setting_dict.keys() else combination_setting.seed
     combination_setting.ensemble = ensemble_files(setting_dict["ensemble"]) if "ensemble" in setting_dict.keys() else combination_setting.ensemble
+    combination_setting.weights = setting_dict["weights"] if "weights" in setting_dict.keys() else combination_setting.weights
     return combination_setting
 
 def create_simulator_setting(args, use_json=True):
@@ -214,8 +208,6 @@ def create_simulator_setting(args, use_json=True):
     simulator_setting.taking_rate = simulator_setting.taking_rate if args.taking_rate is None else float(args.taking_rate)
     simulator_setting.min_unit = simulator_setting.min_unit if args.min_unit is None else int(args.min_unit)
     simulator_setting.short_trade = args.short
-    simulator_setting.trade_step = simulator_setting.trade_step if args.trade_step is None else args.trade_step
-    simulator_setting.use_before_stick = args.daytrade
     return simulator_setting
 
 def create_simulator_setting_by_json(args):
@@ -478,7 +470,8 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
         ]
 
     def create(self, settings):
-        condition = self.conditions(settings[0])
+        strategy_setting = StrategySetting() if len(settings) == 0 else settings[0]
+        condition = self.conditions(strategy_setting)
         c = StrategyConditions().by_array(condition)
         return Combination(c, self.common(settings), self.setting).create()
 
@@ -501,6 +494,9 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
 
     def subject(self):
         raise Exception("Need override subject.")
+
+    def conditions_index(self):
+        raise Exception("Need override conditions_index.")
 
     # 何か追加データが欲しいときはoverrideする
     def add_data(self, data):
@@ -569,8 +565,9 @@ class CombinationSetting:
     position_sizing = False
     max_position_size = 5
     condition_size = 5
-    seed = [t.time()]
+    seed = [int(t.time())]
     ensemble = []
+    weights = {}
 
 class Combination(StrategyCreator, StrategyUtil):
     def __init__(self, conditions, common, setting=None):
@@ -579,9 +576,9 @@ class Combination(StrategyCreator, StrategyUtil):
         self.setting = CombinationSetting() if setting is None else setting
 
     def drawdown_allowable(self, data):
-        allowable_dd = data.setting.stop_loss_rate * 3
+        allowable_dd = data.setting.stop_loss_rate
         drawdown = data.stats.drawdown()[-20:]
-        drawdown_diff = list(filter(lambda x: x > allowable_dd, numpy.diff(drawdown))) if len(drawdown) > 1 else []
+        drawdown_diff = list(filter(lambda x: x > allowable_dd, drawdown)) if len(drawdown) > 1 else []
         drawdown_sum = list(filter(lambda x: x > 0, numpy.diff(drawdown))) if len(drawdown) > 1 else []
         drawdown_conditions = [
             len(drawdown_diff) == 0, # 6%ルール条件外(-6%を超えて一定期間たった)
@@ -673,7 +670,8 @@ class Combination(StrategyCreator, StrategyUtil):
             conditions = [self.apply_common(data, self.common.closing)]
         else:
             conditions = [
-                self.apply_common(data, self.common.closing) and self.apply(data, self.conditions.closing),
+                self.apply_common(data, self.common.closing),
+                self.apply(data, self.conditions.closing),
             ]
         if any(conditions):
             order = data.position.get_num()
@@ -686,9 +684,16 @@ class CombinationChecker:
 
     def get_replaced_source(self, condition):
         source = inspect.getsource(condition)
-        closure_vars = inspect.getclosurevars(condition)
+        argspec = inspect.getfullargspec(condition)
 
-        for name, value in closure_vars.nonlocals.items():
+        source = re.sub("^ +lambda d.*: ", "", source)
+
+        args = argspec.args
+        args.remove("d")
+
+        defaults = [] if argspec.defaults is None else argspec.defaults
+
+        for name, value in zip(args, defaults):
             source = source.replace(name, "\"%s\"" % str(value))
 
         return source
