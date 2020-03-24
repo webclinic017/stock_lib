@@ -139,9 +139,10 @@ def load_simulator_data(code, start_date, end_date, args, time=None):
 
 def load_index(args, start_date, end_date):
     index = {}
+    start = utils.to_format(utils.to_datetime(start_date) - utils.relativeterm(6))
 
     for k in ["nikkei", "dow"]:
-        d = Loader.load_index(k, start_date, end_date, with_filter=True, strict=False)
+        d = Loader.load_index(k, start, end_date, with_filter=True, strict=False)
         d = utils.add_stats(d)
         d = utils.add_cs_stats(d)
         index[k] = d
