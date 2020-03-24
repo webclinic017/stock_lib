@@ -39,8 +39,8 @@ class StrategySimulator:
         dates = list(utils.daterange_by_month(start, end))
         ends = list(dates)[1:] + [end]
         for s, e in zip(dates, dates[1:] + [end]):
-            codes = self.get_targets(args, codes, utils.to_format_by_term(datetime(s.year, s.month, 1)))
-            validate_codes = self.get_targets(args, codes, utils.to_format_by_term(datetime(e.year, e.month, 1)))
+            codes = self.get_targets(args, codes, utils.to_format(s))
+            validate_codes = self.get_targets(args, codes, utils.to_format(e))
             daterange = self.append_daterange(codes, s, daterange)
             daterange = self.append_daterange(validate_codes, e, daterange)
         return codes, validate_codes, daterange
