@@ -6,6 +6,7 @@ import conditions
 import random
 import subprocess
 import pandas
+from dateutil.relativedelta import relativedelta
 from strategy import CombinationCreator
 from loader import Loader
 
@@ -21,7 +22,7 @@ class CombinationStrategy(CombinationCreator):
     def conditions_index(self):
         return self.selected_condition_index
 
-    def subject(self, date):
+    def load_portfolio(self, date):
         try:
             data = pandas.read_csv("portfolio/new_high/%s.csv" % date, header=None)
             data.columns = ["code"]
@@ -29,6 +30,15 @@ class CombinationStrategy(CombinationCreator):
             import traceback
             traceback.print_exc()
             data = None
+        return data
+
+    def subject(self, date):
+        data = self.load_portfolio(date)
+        count = 0
+        while data is None and count < 10: # 見つからなければさかのぼって探す
+            d = utils.to_datetime(date) - relativedelta(days=1)
+            data = self.load_portfolio(d)
+            count += 1
 
         if data is None:
             codes = []
