@@ -75,6 +75,14 @@ class CombinationStrategy(CombinationCreator):
             "new":new, "taking": taking, "stop_loss": stop_loss, "x2": x2, "x4": x4
         }
 
+    def closing_conditions(self, d):
+        conditions = [
+            d.data.daily["high_update"][-2:].max() == 0 and (d.position.gain(self.price(d)) <= 0 or sum(d.stats.gain()) <= 0) and d.position.get_num() >= 0,
+            d.data.daily["high_update"][-10:].sum() <= 5
+        ]
+
+        return any(conditions)
+
     def common(self, setting):
         default = self.default_common()
         default.new = [
@@ -90,7 +98,7 @@ class CombinationStrategy(CombinationCreator):
         ]
 
         default.closing = [
-            lambda d: d.data.daily["high_update"][-2:].max() == 0 and (d.position.gain(self.price(d)) <= 0 or sum(d.stats.gain()) <= 0),
+            lambda d: self.closing_conditions(d),
         ]
 
         for i in range(1, len(setting[1:])):
