@@ -747,6 +747,15 @@ class Loader:
             return None
 
     @staticmethod
+    def kabuplus_etf_stock_data():
+        try:
+            data = pandas.read_csv("%s/kabuplus/tosho-etf-stock-prices.csv" % Loader.base_dir, encoding="SHIFT-JIS", header=None)
+            data = data.iloc[1:]
+            return data
+        except:
+            return None
+
+    @staticmethod
     def stock_industry_code():
         try:
             data = pandas.read_csv("settings/stock_industry_code_map.csv", header=None)
