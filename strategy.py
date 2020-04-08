@@ -726,8 +726,8 @@ class CombinationChecker:
         for name, condition in conditions.items():
             sources = {"all": [], "any": []}
             for a, b in condition:
-                sources["all"] = self.get_source(a)
-                sources["any"] = self.get_source(b)
+                sources["all"] = {"source": self.get_source(a), "condition": a}
+                sources["any"] = {"source": self.get_source(b), "condition": b}
             results[name] = sources
 
         return results
