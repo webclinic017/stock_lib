@@ -66,6 +66,7 @@ class CombinationStrategy(CombinationCreator):
         new, self.new_conditions               = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("new"))
         taking, self.taking_conditions         = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("taking"))
         stop_loss, self.stop_loss_conditions   = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("stop_loss"))
+        closing, self.closing_conditions       = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("closing"))
         x2, self.x2_conditions                 = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("x2"))
         x4, self.x4_conditions                 = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("x4"))
 
@@ -75,7 +76,7 @@ class CombinationStrategy(CombinationCreator):
             "new":new, "taking": taking, "stop_loss": stop_loss, "x2": x2, "x4": x4
         }
 
-    def closing_conditions(self, d):
+    def break_precondition(self, d):
         conditions = [
             d.data.daily["high_update"][-2:].max() == 0 and (d.position.gain(self.price(d)) <= 0 or sum(d.stats.gain()) <= 0) and d.position.get_num() >= 0,
             d.data.daily["high_update"][-10:].sum() <= 5
@@ -98,13 +99,14 @@ class CombinationStrategy(CombinationCreator):
         ]
 
         default.closing = [
-            lambda d: self.closing_conditions(d),
+            lambda d: self.break_precondition(d),
         ]
 
         for i in range(1, len(setting[1:])):
             default.new         = default.new           + [lambda d: self.apply(utils.combination(setting[i].new, self.new_conditions))]
             default.taking      = default.taking        + [lambda d: self.apply(utils.combination(setting[i].taking, self.taking_conditions))]
             default.stop_loss   = default.stop_loss     + [lambda d: self.apply(utils.combination(setting[i].stop_loss, self.stop_loss_conditions))]
+            default.closing   = default.closing     + [lambda d: self.apply(utils.combination(setting[i].closing, self.closing_conditions))]
             default.x2          = default.x2            + [lambda d: self.apply(utils.combination(setting[i].x2, self.x2_conditions))]
             default.x4          = default.x4            + [lambda d: self.apply(utils.combination(setting[i].x4, self.x4_conditions))]
             self.conditions_by_seed(self.setting.seed[i])
@@ -121,9 +123,7 @@ class CombinationStrategy(CombinationCreator):
         return self.stop_loss_conditions
 
     def closing(self):
-        return [
-            lambda d: False,
-        ]
+        return self.closing_conditions
 
     def x2(self):
         return self.x2_conditions

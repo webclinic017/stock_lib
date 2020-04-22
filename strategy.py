@@ -674,7 +674,7 @@ class Combination(StrategyCreator, StrategyUtil):
                 self.apply_common(data, self.common.closing),
                 self.apply(data, self.conditions.closing),
             ]
-        if any(conditions):
+        if all(conditions):
             order = data.position.get_num()
             return simulator.MarketOrder(order)
 
@@ -707,18 +707,20 @@ class CombinationChecker:
         return sources
 
     def get_strategy_sources(self, combination_strategy, setting):
-        new, taking, stop_loss = [], [], []
+        new, taking, stop_loss, closing = [], [], [], []
         for i, seed in enumerate(setting["seed"]):
             combination_strategy.conditions_by_seed(seed)
             s = setting["setting"][i]
             new         = new       + [utils.combination(s["new"], combination_strategy.new_conditions)]
             taking      = taking    + [utils.combination(s["taking"], combination_strategy.taking_conditions)]
             stop_loss   = stop_loss + [utils.combination(s["stop_loss"], combination_strategy.stop_loss_conditions)]
+            closing     = closing   + [utils.combination(s["closing"], combination_strategy.closing_conditions)]
 
         conditions = {
             "new": new,
             "taking": taking,
-            "stop_loss": stop_loss
+            "stop_loss": stop_loss,
+            "closing": closing
         }
 
         results = {}
