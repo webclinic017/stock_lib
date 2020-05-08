@@ -707,7 +707,7 @@ class CombinationChecker:
         return sources
 
     def get_strategy_sources(self, combination_strategy, setting):
-        new, taking, stop_loss, closing = [], [], [], []
+        new, taking, stop_loss, closing, x2, x4 = [], [], [], [], [], []
         for i, seed in enumerate(setting["seed"]):
             combination_strategy.conditions_by_seed(seed)
             s = setting["setting"][i]
@@ -715,12 +715,16 @@ class CombinationChecker:
             taking      = taking    + [utils.combination(s["taking"], combination_strategy.taking_conditions)]
             stop_loss   = stop_loss + [utils.combination(s["stop_loss"], combination_strategy.stop_loss_conditions)]
             closing     = closing   + [utils.combination(s["closing"], combination_strategy.closing_conditions)]
+            x2          = x2        + [utils.combination(s["x2"], combination_strategy.x2_conditions)]
+            x4          = x4        + [utils.combination(s["x4"], combination_strategy.x4_conditions)]
 
         conditions = {
             "new": new,
             "taking": taking,
             "stop_loss": stop_loss,
-            "closing": closing
+            "closing": closing,
+            "x2": x2,
+            "x4": x4
         }
 
         results = {}
