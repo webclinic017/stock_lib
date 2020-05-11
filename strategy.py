@@ -225,12 +225,14 @@ def create_simulator_setting_by_json(args):
 # ========================================================================
 
 class StrategyUtil:
-    def apply(self, data, conditions):
+    def apply(self, data, conditions, debug=False):
         if len(conditions) == 0:
             return False
         a = list(map(lambda x: x(data), conditions[0]))
         b = list(map(lambda x: x(data), conditions[1]))
-        print(a, b)
+        checker = CombinationChecker()
+        if debug:
+            print(checker.get_source(conditions[0]), checker.get_source(conditions[1]))
         return all(a) and any(b)
 
     def apply_common(self, data, conditions):
@@ -602,7 +604,6 @@ class Combination(StrategyCreator, StrategyUtil):
         max_position = self.max_position(data, max_risk, risk)
         max_position = max_position if max_position < self.setting.max_position_size else self.setting.max_position_size
 
-
         # 数量
         order = 1
         if self.setting.position_sizing:
@@ -622,7 +623,6 @@ class Combination(StrategyCreator, StrategyUtil):
         ]
 
         if not self.setting.simple:
-            print("[new]")
             conditions = conditions + [self.apply(data, self.conditions.new)]
 
         if all(conditions):
@@ -710,15 +710,13 @@ class CombinationChecker:
 
     def get_strategy_sources(self, combination_strategy, setting):
         new, taking, stop_loss, closing, x2, x4 = [], [], [], [], [], []
-        for i, seed in enumerate(setting["seed"]):
-            combination_strategy.conditions_by_seed(seed)
-            s = setting["setting"][i]
-            new         = new       + [utils.combination(s["new"], combination_strategy.new_conditions)]
-            taking      = taking    + [utils.combination(s["taking"], combination_strategy.taking_conditions)]
-            stop_loss   = stop_loss + [utils.combination(s["stop_loss"], combination_strategy.stop_loss_conditions)]
-            closing     = closing   + [utils.combination(s["closing"], combination_strategy.closing_conditions)]
-            x2          = x2        + [utils.combination(s["x2"], combination_strategy.x2_conditions)]
-            x4          = x4        + [utils.combination(s["x4"], combination_strategy.x4_conditions)]
+        s = setting["setting"][0]
+        new         = new       + [utils.combination(s["new"], combination_strategy.new_conditions)]
+        taking      = taking    + [utils.combination(s["taking"], combination_strategy.taking_conditions)]
+        stop_loss   = stop_loss + [utils.combination(s["stop_loss"], combination_strategy.stop_loss_conditions)]
+        closing     = closing   + [utils.combination(s["closing"], combination_strategy.closing_conditions)]
+        x2          = x2        + [utils.combination(s["x2"], combination_strategy.x2_conditions)]
+        x4          = x4        + [utils.combination(s["x4"], combination_strategy.x4_conditions)]
 
         conditions = {
             "new": new,
