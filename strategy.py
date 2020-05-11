@@ -230,6 +230,7 @@ class StrategyUtil:
             return False
         a = list(map(lambda x: x(data), conditions[0]))
         b = list(map(lambda x: x(data), conditions[1]))
+        print(a, b)
         return all(a) and any(b)
 
     def apply_common(self, data, conditions):
@@ -621,6 +622,7 @@ class Combination(StrategyCreator, StrategyUtil):
         ]
 
         if not self.setting.simple:
+            print("[new]")
             conditions = conditions + [self.apply(data, self.conditions.new)]
 
         if all(conditions):
