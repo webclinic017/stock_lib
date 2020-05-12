@@ -228,11 +228,12 @@ class StrategyUtil:
     def apply(self, data, conditions, debug=False):
         if len(conditions) == 0:
             return False
+        if debug:
+            checker = CombinationChecker()
+            print(checker.get_source(conditions[0]))
+            print(checker.get_source(conditions[1]))
         a = list(map(lambda x: x(data), conditions[0]))
         b = list(map(lambda x: x(data), conditions[1]))
-        checker = CombinationChecker()
-        if debug:
-            print(checker.get_source(conditions[0]), checker.get_source(conditions[1]))
         return all(a) and any(b)
 
     def apply_common(self, data, conditions):
@@ -623,7 +624,7 @@ class Combination(StrategyCreator, StrategyUtil):
         ]
 
         if not self.setting.simple:
-            conditions = conditions + [self.apply(data, self.conditions.new)]
+            conditions = conditions + [self.apply(data, self.conditions.new, True)]
 
         if all(conditions):
             if self.setting.use_limit:
