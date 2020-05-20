@@ -624,7 +624,7 @@ class Combination(StrategyCreator, StrategyUtil):
         ]
 
         if not self.setting.simple:
-            conditions = conditions + [self.apply(data, self.conditions.new, True)]
+            conditions = conditions + [self.apply(data, self.conditions.new)]
 
         if all(conditions):
             if self.setting.use_limit:
