@@ -317,28 +317,6 @@ class Loader:
         if data is None:
             raise Exception("%s: %s - %s not found" % (code, start_date, end_date))
 
-        d = data[data["date"] == end_date]
-
-        # 当日分の日足があったらすぐ返す
-        if len(d) > 0:
-            return data
-
-        realtime = Loader.load_realtime(code, end_date)
-        if realtime is not None:
-            data = data[data["date"] < end_date]
-            open_date = "%s 09:00:00" % end_date
-            realtime = realtime[realtime["date"] >= open_date]
-            d = {
-                "date": pandas.to_datetime([end_date], format='%Y-%m-%d'),
-                "open": [realtime["price"].iloc[0]],
-                "high": [realtime["price"].max()],
-                "low": [realtime["price"].min()],
-                "close": [realtime["price"].iloc[-1]],
-                "volume": [realtime["volume"].iloc[-1]]
-            }
-            d = pandas.DataFrame(d)
-            data = pandas.concat([data, d])
-
         return data
 
     @staticmethod
