@@ -379,6 +379,7 @@ class StrategySetting():
         self.closing = 0
         self.x2 = None
         self.x4 = None
+        self.x8 = None
 
     # spaceからの読込用
     def by_array(self, params):
@@ -388,6 +389,7 @@ class StrategySetting():
         self.closing = int(params[3])
         self.x2 = int(params[4]) if len(params) > 4 and params[4] is not None else None
         self.x4 = int(params[5]) if len(params) > 5 and params[5] is not None else None
+        self.x8 = int(params[6]) if len(params) > 6 and params[6] is not None else None
         return self
 
     # 設定からの読込用
@@ -398,6 +400,7 @@ class StrategySetting():
         self.closing = int(params["closing"])
         self.x2 = int(params["x2"]) if "x2" in params.keys() and params["x2"] is not None else None
         self.x4 = int(params["x4"]) if "x4" in params.keys() and params["x4"] is not None else None
+        self.x8 = int(params["x8"]) if "x8" in params.keys() and params["x8"] is not None else None
         return self
 
     # 設定への書き込み用
@@ -408,7 +411,8 @@ class StrategySetting():
             "stop_loss": self.stop_loss,
             "closing": self.closing,
             "x2": self.x2,
-            "x4": self.x4
+            "x4": self.x4,
+            "x8": self.x8
         }
 
 class StrategyConditions():
@@ -419,6 +423,7 @@ class StrategyConditions():
         self.closing = []
         self.x2 = []
         self.x4 = []
+        self.x8 = []
 
     def by_array(self, params):
         self.new = params[0]
@@ -427,6 +432,7 @@ class StrategyConditions():
         self.closing = params[3]
         self.x2 = params[4] if len(params) > 4 else []
         self.x4 = params[5] if len(params) > 5 else []
+        self.x8 = params[6] if len(params) > 6 else []
         return self
 
 # ========================================================================
@@ -472,6 +478,7 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
             list(range(utils.combinations_size(self.closing()))),
             list(range(utils.combinations_size(self.x2()))),
             list(range(utils.combinations_size(self.x4()))),
+            list(range(utils.combinations_size(self.x8()))),
         ]
 
     def create(self, settings):
@@ -489,6 +496,7 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
             utils.combination(setting.closing, self.closing()),
             [] if setting.x2 is None else utils.combination(setting.x2, self.x2()),
             [] if setting.x4 is None else utils.combination(setting.x4, self.x4()),
+            [] if setting.x8 is None else utils.combination(setting.x8, self.x8()),
         ]
 
     def conditions_by_index(self, conditions, index):
@@ -542,6 +550,11 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
         ]
 
     def x4(self):
+        return [
+            lambda d: False
+        ]
+
+    def x8(self):
         return [
             lambda d: False
         ]
@@ -611,6 +624,7 @@ class Combination(StrategyCreator, StrategyUtil):
             # レバレッジ
             order = 2 if self.apply(data, self.conditions.x2) else order
             order = 4 if self.apply(data, self.conditions.x4) else order
+            order = 8 if self.apply(data, self.conditions.x8) else order
 
             # 最大を超える場合は調整
             if order + data.position.get_num() > max_position:
@@ -710,7 +724,7 @@ class CombinationChecker:
         return sources
 
     def get_strategy_sources(self, combination_strategy, setting):
-        new, taking, stop_loss, closing, x2, x4 = [], [], [], [], [], []
+        new, taking, stop_loss, closing, x2, x4, x8 = [], [], [], [], [], [], []
         s = setting["setting"][0]
         new         = new       + [utils.combination(s["new"], combination_strategy.new_conditions)]
         taking      = taking    + [utils.combination(s["taking"], combination_strategy.taking_conditions)]
@@ -718,6 +732,7 @@ class CombinationChecker:
         closing     = closing   + [utils.combination(s["closing"], combination_strategy.closing_conditions)]
         x2          = x2        + [utils.combination(s["x2"], combination_strategy.x2_conditions)]
         x4          = x4        + [utils.combination(s["x4"], combination_strategy.x4_conditions)]
+        x8          = x8        + [utils.combination(s["x8"], combination_strategy.x8_conditions)]
 
         conditions = {
             "new": new,
@@ -725,7 +740,8 @@ class CombinationChecker:
             "stop_loss": stop_loss,
             "closing": closing,
             "x2": x2,
-            "x4": x4
+            "x4": x4,
+            "x8": x8
         }
 
         results = {}

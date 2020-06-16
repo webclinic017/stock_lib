@@ -70,7 +70,6 @@ def stop_high(data):
     current = data["close"].iloc[-1]
     limit = utils.price_limit(before)
     gradient = current - before
-    print(before, current, limit, gradient)
     return limit == gradient
 
 # ストップ安

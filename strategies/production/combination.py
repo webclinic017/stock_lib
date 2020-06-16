@@ -17,9 +17,6 @@ class CombinationStrategy(CombinationCreator):
         self.weights = setting.weights
         self.conditions_by_seed(setting.seed[0])
 
-#    def subject(self, date):
-#        return ["nikkei"]
-
     def conditions_index(self):
         return self.selected_condition_index
 
@@ -69,11 +66,11 @@ class CombinationStrategy(CombinationCreator):
         closing, self.closing_conditions       = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("closing"))
         x2, self.x2_conditions                 = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("x2"))
         x4, self.x4_conditions                 = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("x4"))
+        x8, self.x8_conditions                 = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("x8"))
 
         # 選択された条件のインデックスを覚えておく
-#        self.selected_condition_index = list(sum([new, taking, stop_loss, x2, x4], ()))
         self.selected_condition_index = {
-            "new":new, "taking": taking, "stop_loss": stop_loss, "x2": x2, "x4": x4
+            "new":new, "taking": taking, "stop_loss": stop_loss, "x2": x2, "x4": x4, "x8": x8
         }
 
     def break_precondition(self, d):
@@ -87,7 +84,8 @@ class CombinationStrategy(CombinationCreator):
     def common(self, setting):
         default = self.default_common()
         default.new = [
-            lambda d: d.index["new_score"]["score"].iloc[-1] > -400
+            lambda d: d.index["new_score"]["score"].iloc[-1] > -400,
+            lambda d: d.data.daily["stop_low"].iloc[-1] == 0
         ]
 
         default.taking = [
@@ -106,9 +104,10 @@ class CombinationStrategy(CombinationCreator):
             default.new         = default.new           + [lambda d: self.apply(utils.combination(setting[i].new, self.new_conditions))]
             default.taking      = default.taking        + [lambda d: self.apply(utils.combination(setting[i].taking, self.taking_conditions))]
             default.stop_loss   = default.stop_loss     + [lambda d: self.apply(utils.combination(setting[i].stop_loss, self.stop_loss_conditions))]
-            default.closing   = default.closing     + [lambda d: self.apply(utils.combination(setting[i].closing, self.closing_conditions))]
+            default.closing     = default.closing       + [lambda d: self.apply(utils.combination(setting[i].closing, self.closing_conditions))]
             default.x2          = default.x2            + [lambda d: self.apply(utils.combination(setting[i].x2, self.x2_conditions))]
             default.x4          = default.x4            + [lambda d: self.apply(utils.combination(setting[i].x4, self.x4_conditions))]
+            default.x8          = default.x8            + [lambda d: self.apply(utils.combination(setting[i].x8, self.x8_conditions))]
             self.conditions_by_seed(self.setting.seed[i])
 
         return default
@@ -130,3 +129,6 @@ class CombinationStrategy(CombinationCreator):
 
     def x4(self):
         return self.x4_conditions
+
+    def x8(self):
+        return self.x8_conditions

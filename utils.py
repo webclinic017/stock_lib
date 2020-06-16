@@ -127,6 +127,20 @@ def add_manda_stats(data):
 
     return data
 
+def stop_high(data):
+    before = data[-2]
+    current = data[-1]
+    limit = price_limit(before)
+    gradient = current - before
+    return limit == gradient
+
+def stop_low(data):
+    before = data[-2]
+    current = data[-1]
+    limit = price_limit(before)
+    gradient = current - before
+    return -limit == gradient
+
 def add_stats(data, default=0, names=[]):
     is_t = lambda name : len(names) == 0 or name in names
 
@@ -220,6 +234,10 @@ def add_cs_stats(data):
     # 三兵
     data["yang_sanpei"] = ((data["yang"].rolling(3).min() == 1) & (data["low_roundup"].rolling(2).min() == 1) & (data["long_upper_shadow"] == 1)) * 1
     data["yin_sanpei"]  = ((data["yin"].rolling(3).min() == 1) & (data["high_rounddown"].rolling(2).min() == 1) & (data["long_lower_shadow"] == 1)) * 1
+
+    # ストップ
+    data["stop_high"] = (data["close"].rolling(2).apply(stop_high)) * 1
+    data["stop_low"] = (data["close"].rolling(2).apply(stop_low)) * 1
 
     # スコア
     data["score"] = each(lambda i, x: score(x), data)
