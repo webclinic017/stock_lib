@@ -24,7 +24,9 @@ class CombinationStrategy(CombinationCreator):
         d = utils.to_format(datetime(date.year, date.month, 1))
         try:
             data = pandas.read_csv("portfolio/new_high/%s.csv" % d, header=None)
-            data.columns = ["code"]
+            data.columns = ["code", "price"]
+            data = data[data["price"] <= (self.setting.assets / 500)]
+            data = data.iloc[:self.setting.max_position_size]
         except:
             data = None
         return data

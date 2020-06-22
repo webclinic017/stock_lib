@@ -26,6 +26,7 @@ def add_options(parser):
     parser.add_argument("--stop_loss_rate", action="store", default=None, dest="stop_loss_rate", help="損切レート")
     parser.add_argument("--taking_rate", action="store", default=None, dest="taking_rate", help="利食いレート")
     parser.add_argument("--min_unit", action="store", default=None, dest="min_unit", help="最低単元")
+    parser.add_argument("--assets", type=int, action="store", default=None, dest="assets", help="assets")
 
     # strategy
     parser.add_argument("--ensemble_dir", action="store", default=None, dest="ensemble_dir", help="アンサンブルディレクトリ")
@@ -180,7 +181,7 @@ def ensemble_files(directory):
 
 # args > json > default の優先度
 def create_combination_setting(args, use_json=True):
-    combination_setting = create_combination_setting_by_json(args) if use_json else CombinationSetting()
+    combination_setting = create_combination_setting_by_json(args) if use_json else apply_assets(args, CombinationSetting())
     combination_setting.use_limit = args.use_limit if args.use_limit else combination_setting.use_limit
     combination_setting.position_sizing = args.position_sizing if args.position_sizing else combination_setting.position_sizing
     combination_setting.max_position_size = combination_setting.max_position_size if args.max_position_size is None else int(args.max_position_size)
@@ -189,9 +190,9 @@ def create_combination_setting(args, use_json=True):
 
 def create_combination_setting_by_json(args):
     setting_dict, _ = load_strategy_setting(args)
-    return create_combination_setting_by_dict(setting_dict)
+    return create_combination_setting_by_dict(args, setting_dict)
 
-def create_combination_setting_by_dict(setting_dict):
+def create_combination_setting_by_dict(args, setting_dict):
     combination_setting = CombinationSetting()
     if setting_dict is None:
         return combination_setting
@@ -201,6 +202,7 @@ def create_combination_setting_by_dict(setting_dict):
     combination_setting.seed = setting_dict["seed"] if "seed" in setting_dict.keys() else combination_setting.seed
     combination_setting.ensemble = ensemble_files(setting_dict["ensemble"]) if "ensemble" in setting_dict.keys() else combination_setting.ensemble
     combination_setting.weights = setting_dict["weights"] if "weights" in setting_dict.keys() else combination_setting.weights
+    combination_setting = apply_assets(args, combination_setting)
     return combination_setting
 
 def create_simulator_setting(args, use_json=True):
@@ -209,6 +211,7 @@ def create_simulator_setting(args, use_json=True):
     simulator_setting.taking_rate = simulator_setting.taking_rate if args.taking_rate is None else float(args.taking_rate)
     simulator_setting.min_unit = simulator_setting.min_unit if args.min_unit is None else int(args.min_unit)
     simulator_setting.short_trade = args.short
+    simulator_setting = apply_assets(args, simulator_setting)
     return simulator_setting
 
 def create_simulator_setting_by_json(args):
@@ -220,7 +223,13 @@ def create_simulator_setting_by_json(args):
     simulator_setting.taking_rate = setting_dict["taking_rate"] if "taking_rate" in setting_dict.keys() else simulator_setting.taking_rate
     simulator_setting.min_unit = setting_dict["min_unit"] if "min_unit" in setting_dict.keys() else simulator_setting.min_unit
     simulator_setting.short_trade = args.short
+    simulator_setting = apply_assets(args, simulator_setting)
     return simulator_setting
+
+def apply_assets(args, setting):
+    assets = Loader.assets()
+    setting.assets = assets["assets"] if args.assets is None else args.assets
+    return setting
 
 # ========================================================================
 
@@ -578,10 +587,11 @@ class StrategyCreateSetting:
 ## 指定可能な戦略====================================================================================================================
 
 class CombinationSetting:
+    assets = 0
     simple = False
     use_limit = False
     position_sizing = False
-    max_position_size = 5
+    max_position_size = 10
     condition_size = 5
     seed = [int(t.time())]
     ensemble = []
