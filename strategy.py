@@ -304,7 +304,7 @@ class StrategyUtil:
         if risk < 0:
             return 0
 
-        risk = risk * (order + 1)
+        risk = risk * (order + 1) * data.setting.min_unit
         return risk
 
     # 上限
@@ -343,7 +343,7 @@ class StrategyUtil:
     def max_position(self, data, max_risk, risk):
         if risk == 0:
             return 0
-        max_position = int((max_risk / risk) / data.setting.min_unit)
+        max_position = int((max_risk / risk))
         return max_position
 
 

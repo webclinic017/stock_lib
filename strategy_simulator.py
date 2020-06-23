@@ -98,6 +98,7 @@ class StrategySimulator:
         # 日付ごとにシミュレーション
         dates = sorted(dates, key=lambda x: utils.to_datetime_by_term(x))
         self.log("targets: %s" % simulators.keys())
+        capacity = None
 
         for date in dates:
             # 休日はスキップ
@@ -111,7 +112,9 @@ class StrategySimulator:
                 # 対象日までのデータの整形
                 if date in dates_dict[code]:
                     self.log("[%s]" % code)
+                    simulators[code].capacity = simulators[code].capacity if capacity is None else capacity
                     simulators[code].simulate_by_date(date, stocks[code], index)
+                    capacity = simulators[code].capacity
                 else:
                     self.log("[%s] is less data: %s" % (code, date))
 

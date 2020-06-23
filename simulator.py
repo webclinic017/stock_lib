@@ -423,6 +423,7 @@ class Simulator:
         self.setting = setting
         self.position = position if position is not None else Position(system=system, method=method, min_unit=self.setting.min_unit)
         self.assets = setting.assets
+        self.capacity = setting.assets + setting.assets * 3.33
         self.stats = SimulatorStats()
         self.logs = []
         self.new_orders = []
@@ -455,7 +456,7 @@ class Simulator:
     # 新規
     def new(self, value, num):
         value = value * (1 + random.uniform(0.0, self.setting.error_rate))
-        if (self.assets - self.position.eval(value, num)) <= 0:
+        if (self.capacity - self.position.eval(value, num)) <= 0:
             # 資産が足りなければスルー
             self.log(" - assets_not_enough: num %s, value %s" % (num, value))
             return False
@@ -464,6 +465,7 @@ class Simulator:
 
         cost = self.position.new(num, value)
         self.assets += cost
+        self.capacity += cost
         self.commission()
 
         self.log(" new: %s yen x %s, total %s, ave %s, assets %s, cost %s" % (value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost))
@@ -480,6 +482,7 @@ class Simulator:
         gain = self.position.gain(value)
         cost = self.position.repay(num, value)
         self.assets += cost
+        self.capacity += cost
         self.commission()
 
         self.log(" repay: %s yen x %s, total %s, ave %s, assets %s, cost %s : gain %s" % (value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost, gain))
@@ -884,7 +887,7 @@ class Simulator:
         # 注文を出す
         if step == 0:
             term_data = data.index(0, -1) if self.setting.use_before_stick else data
-            self.log("[order stick] %s:%s" % (term_data.daily["date"].iloc[-1], term_data.daily["open"].iloc[-1]))
+#            self.log("[order stick] %s:%s" % (term_data.daily["date"].iloc[-1], term_data.daily["open"].iloc[-1]))
             trade_data = self.signals(strategy, term_data, index, trade_data)
 
         # トレード履歴にシグナルを反映
