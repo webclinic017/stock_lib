@@ -591,7 +591,7 @@ class CombinationSetting:
     simple = False
     use_limit = False
     position_sizing = False
-    max_position_size = 10
+    max_position_size = 5
     condition_size = 5
     seed = [int(t.time())]
     ensemble = []
