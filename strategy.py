@@ -736,13 +736,13 @@ class CombinationChecker:
     def get_strategy_sources(self, combination_strategy, setting):
         new, taking, stop_loss, closing, x2, x4, x8 = [], [], [], [], [], [], []
         s = setting["setting"][0]
-        new         = new       + [utils.combination(s["new"], combination_strategy.new_conditions)]
-        taking      = taking    + [utils.combination(s["taking"], combination_strategy.taking_conditions)]
-        stop_loss   = stop_loss + [utils.combination(s["stop_loss"], combination_strategy.stop_loss_conditions)]
-        closing     = closing   + [utils.combination(s["closing"], combination_strategy.closing_conditions)]
-        x2          = x2        + [utils.combination(s["x2"], combination_strategy.x2_conditions)]
-        x4          = x4        + [utils.combination(s["x4"], combination_strategy.x4_conditions)]
-        x8          = x8        + [utils.combination(s["x8"], combination_strategy.x8_conditions)]
+        new         = new       + [utils.combination(s["new"], combination_strategy.new_conditions)] if "new" in s.keys() else []
+        taking      = taking    + [utils.combination(s["taking"], combination_strategy.taking_conditions)] if "taking" in s.keys() else []
+        stop_loss   = stop_loss + [utils.combination(s["stop_loss"], combination_strategy.stop_loss_conditions)] if "stop_loss" in s.keys() else []
+        closing     = closing   + [utils.combination(s["closing"], combination_strategy.closing_conditions)] if "closing" in s.keys() else []
+        x2          = x2        + [utils.combination(s["x2"], combination_strategy.x2_conditions)] if "x2" in s.keys() else []
+        x4          = x4        + [utils.combination(s["x4"], combination_strategy.x4_conditions)] if "x4" in s.keys() else []
+        x8          = x8        + [utils.combination(s["x8"], combination_strategy.x8_conditions)] if "x8" in s.keys() else []
 
         conditions = {
             "new": new,
@@ -757,7 +757,7 @@ class CombinationChecker:
         results = {}
 
         for name, condition in conditions.items():
-            sources = {"all": [], "any": []}
+            sources = {"all": {"source":"", "condition":""}, "any": {"source":"", "condition":""}}
             for a, b in condition:
                 sources["all"] = {"source": self.get_source(a), "condition": a}
                 sources["any"] = {"source": self.get_source(b), "condition": b}
