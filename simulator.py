@@ -118,7 +118,7 @@ class Position:
 
 # 注文
 class Order:
-    def __init__(self, num, conditions, is_short=False, is_reverse_limit=False, is_limit=False, price=None):
+    def __init__(self, num, conditions, is_short=False, is_reverse_limit=False, is_limit=False, on_close=False, price=None):
         self.num = int(num)
         self.term = 0
         self.price = price
@@ -126,6 +126,7 @@ class Order:
         self.is_short = is_short
         self.is_reverse_limit = is_reverse_limit
         self.is_limit = is_limit
+        self.on_close = on_close
 
         assert not is_limit or (is_limit and price is not None), "require 'price'"
         assert not is_reverse_limit or (is_reverse_limit and price is not None), "require 'price'"
@@ -147,9 +148,9 @@ class Order:
         return all(list(map(lambda x:x(data), self.conditions)))
 
 class MarketOrder(Order):
-    def __init__(self, num, is_short=False):
+    def __init__(self, num, is_short=False, on_close=False):
         conditions = [lambda x: True]
-        super().__init__(num, conditions)
+        super().__init__(num, conditions, is_short=is_short, on_close=on_close)
 
 class LimitOrder(Order):
     def __init__(self, num, price, is_short=False, is_repay=False):
@@ -544,12 +545,10 @@ class Simulator:
 
         return hit_orders, remain
 
-
-    # TODO _order系に出来があったかどうかのチェックを入れる
     # 出来がなければhit_ordersをまたキューに入れなおす
     # 出来高が注文数より少ない場合はhit_ordersのordersを現在の出来高にし、残りをキューに入れ直す
-    def new_order(self, price):
-        execution = lambda x: x.signal(price, self.position) and x.is_market()
+    def new_order(self, price, on_close=False):
+        execution = lambda x: x.signal(price, self.position) and x.is_market() and x.on_close == on_close
         hit_orders, self.new_orders = self.exec_order(execution, self.new_orders, price)
         return hit_orders
 
@@ -563,8 +562,8 @@ class Simulator:
         hit_orders, self.new_orders = self.exec_order(execution, self.new_orders, volume=volume)
         return hit_orders
 
-    def repay_order(self, price):
-        execution = lambda x: x.signal(price, self.position) and x.is_market()
+    def repay_order(self, price, on_close=False):
+        execution = lambda x: x.signal(price, self.position) and x.is_market() and x.on_close == on_close
         hit_orders, self.repay_orders = self.exec_order(execution, self.repay_orders, price)
         return hit_orders
 
@@ -776,7 +775,8 @@ class Simulator:
 
         self.trade(self.setting.strategy, price, volume, term_data, term_index)
 
-    def open_trade(self, price, volume, data, trade_data):
+    def open_trade(self, volume, data, trade_data):
+        price = data.daily["open"].iloc[-1].item()
         # 仮想トレードなら注文をキューから取得
 
         new_orders = []
@@ -789,7 +789,21 @@ class Simulator:
 
         return self.virtual_trade(data, new_orders, repay_orders, trade_data)
 
-    def intraday_trade(self, price, volume, data, trade_data):
+    def close_trade(self, volume, data, trade_data):
+        price = data.daily["close"].iloc[-1].item()
+        # 仮想トレードなら注文をキューから取得
+
+        new_orders = []
+        new_orders += self.new_order(price, on_close=True)
+
+        repay_orders = []
+        if self.position.get_num() > 0:
+            repay_orders += self.repay_order(price, on_close=True)
+
+        return self.virtual_trade(data, new_orders, repay_orders, trade_data)
+
+    def intraday_trade(self, volume, data, trade_data):
+        price = data.daily["open"].iloc[-1].item()
         # 仮想トレードなら注文をキューから取得
         limit = self.limit()
         reverse_limit = self.reverse_limit()
@@ -869,8 +883,9 @@ class Simulator:
 
         # 寄り付き====================================================================
         if self.setting.virtual_trade: # 注文の約定チェック
-            trade_data = self.open_trade(price, volume, data, trade_data)
-            trade_data = self.intraday_trade(price, volume, data, trade_data)
+            trade_data = self.open_trade(volume, data, trade_data)
+            trade_data = self.intraday_trade(volume, data, trade_data)
+            trade_data = self.close_trade(volume, data, trade_data)
 
         # トレード履歴に追加
         trade_data["size"] = self.position.get_num()
