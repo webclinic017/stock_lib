@@ -755,7 +755,7 @@ class Loader:
     def load_industry_index(code):
         try:
             data = pandas.read_csv("%s/index/industry/%s.csv" % (Loader.base_dir, code), header=None)
-            data.columns = ["date", "value", "volume"]
+            data.columns = ["date", "price", "volume"]
             data['date'] = pandas.to_datetime(data['date'], format='%Y-%m-%d')
             return data.sort_values(by=["date"])
         except:
