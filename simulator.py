@@ -172,6 +172,13 @@ class AppliableData:
         self.setting = setting # 設定
         self.stats = stats # 統計データ
 
+    def dates(self, start_date, end_date):
+        dates = list(set(self.data.dates(start_date, end_date)) & set(self.index.dates(start_date, end_date)))
+        return sorted(dates, key=lambda x: utils.to_datetime_by_term(x))
+
+    def at(self, date):
+        return AppliableData(self.data.at(date), self.index.at(date), self.position, self.assets, self.setting, self.stats)
+
 class SimulatorData:
     def __init__(self, code, daily, rule):
         self.code = code
@@ -190,6 +197,10 @@ class SimulatorData:
         d = self.daily[self.daily["date"] <= end_date]
         return SimulatorData(self.code, d, self.rule)
 
+    def split_until(self, end_date):
+        d = self.daily[self.daily["date"] < end_date]
+        return SimulatorData(self.code, d, self.rule)
+
     def dates(self, start_date, end_date):
         d = self.daily[self.daily["date"] >= start_date]
         d = d[d["date"] <= end_date]
@@ -197,11 +208,53 @@ class SimulatorData:
         return dates
 
     def at(self, date):
-        return self.daily[self.daily["date"] == date]
+        return SimulatorData(self.code, self.daily[self.daily["date"] == date], self.rule)
 
     def index(self, begin, end):
         d = self.daily.iloc[begin:end]
         return SimulatorData(self.code, d, self.rule)
+
+    def create_empty(self, date):
+        data = pandas.DataFrame([[0] * len(self.daily.columns)], columns=self.daily.columns)
+        data["date"].iloc[0] = date
+        data['date'] = pandas.to_datetime(data['date'], format='%Y-%m-%d')
+        return SimulatorData(self.code, pandas.DataFrame([[0] * len(self.daily.columns)], columns=self.daily.columns), self.rule)
+
+class SimulatorIndexData:
+    def __init__(self, data):
+        self.data = data
+
+    def complement(self, data, date):
+        return data if len(data.daily) > 0 else data.create_empty(date)
+
+    def dates(self, start_date, end_date):
+        dates = []
+        for k, v in self.data.items():
+            dates = list(set(dates + v.dates(start_date, end_date)))
+        dates = sorted(dates, key=lambda x: utils.to_datetime_by_term(x))
+        return dates
+
+    def split_from(self, date):
+        term_index = {}
+        for k, v in self.data.items():
+            term_index[k] = v.split_from(date)
+        return SimulatorIndexData(term_index)
+
+    def split_to(self, date):
+        term_index = {}
+        for k, v in self.data.items():
+            if k in ["dow", "nasdaq"]:
+                d = v.split_until(date)
+            else:
+                d = v.split_to(date)
+            term_index[k] = self.complement(d, date)
+        return SimulatorIndexData(term_index)
+
+    def split(self, start_date, end_date):
+        return self.split_from(start_date).split_to(end_date)
+
+    def at(self, date):
+        return self.split_from(date).split_to(date)
 
 # シミュレーター設定
 class SimulatorSetting:
@@ -757,13 +810,7 @@ class Simulator:
     def simulate_by_date(self, date, data, index={}):
         term_data = data.split_to(date)
 
-        term_index = {}
-        for k, v in index.items():
-            if k in ["dow", "nasdaq"]:
-                d = v[v["date"] < date]
-            else:
-                d = v[v["date"] <= date]
-            term_index[k] = d if len(d) > 0 else pandas.DataFrame([[0] * len(d.columns)], columns=d.columns)
+        term_index = index.split_to(date)
 
         today = term_data.daily.iloc[-1]
 
@@ -885,7 +932,6 @@ class Simulator:
         if self.setting.virtual_trade: # 注文の約定チェック
             trade_data = self.open_trade(volume, data, trade_data)
             trade_data = self.intraday_trade(volume, data, trade_data)
-            trade_data = self.close_trade(volume, data, trade_data)
 
         # トレード履歴に追加
         trade_data["size"] = self.position.get_num()
@@ -905,6 +951,10 @@ class Simulator:
 #            self.log("[order stick] %s:%s" % (term_data.daily["date"].iloc[-1], term_data.daily["open"].iloc[-1]))
             trade_data = self.signals(strategy, term_data, index, trade_data)
 
+        if self.setting.virtual_trade:
+            trade_data = self.close_trade(volume, data, trade_data)
+
         # トレード履歴にシグナルを反映
         trade_data["signal"] = "new" if len(self.new_orders) > 0 else "repay" if len(self.repay_orders) > 0 else None
         self.stats.apply(trade_data)
+

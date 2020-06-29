@@ -13,6 +13,7 @@ from loader import Loader
 from loader import Bitcoin
 from collections import namedtuple
 from simulator import SimulatorData
+from simulator import SimulatorIndexData
 from simulator import SimulatorSetting
 from argparse import ArgumentParser
 
@@ -31,6 +32,7 @@ def add_options(parser):
     # strategy
     parser.add_argument("--ensemble_dir", action="store", default=None, dest="ensemble_dir", help="アンサンブルディレクトリ")
     parser.add_argument("--ensemble", action="store_true", default=False, dest="ensemble", help="アンサンブル")
+    parser.add_argument("--open_close", action="store_true", default=False, dest="open_close", help="寄せ引け")
     return parser
 
 def create_parser():
@@ -57,17 +59,21 @@ def get_filename(args, ignore_code=False):
 class StrategyType:
     ENSEMBLE="ensemble"
     COMBINATION="combination"
+    OPEN_CLOSE="open_close"
 
     def list(self):
         return [
             self.ENSEMBLE,
-            self.COMBINATION
+            self.COMBINATION,
+            self.OPEN_CLOSE
         ]
 
 def get_strategy_name(args):
     strategy_types = StrategyType()
     if args.ensemble:
         return strategy_types.ENSEMBLE
+    elif args.open_close:
+        return strategy_types.OPEN_CLOSE
     else:
         return strategy_types.COMBINATION
 
@@ -79,12 +85,18 @@ def load_strategy_creator_by_type(strategy_type, is_production, combination_sett
         if strategy_types.ENSEMBLE == strategy_type and not ignore_ensemble:
             from strategies.production.ensemble import CombinationStrategy
             return CombinationStrategy(combination_setting)
+        elif strategy_types.OPEN_CLOSE == strategy_type:
+            from strategies.production.open_close import CombinationStrategy
+            return CombinationStrategy(combination_setting)
         else:
             from strategies.production.combination import CombinationStrategy
             return CombinationStrategy(combination_setting)
     else:
         if strategy_types.ENSEMBLE == strategy_type and not ignore_ensemble:
             from strategies.ensemble import CombinationStrategy
+            return CombinationStrategy(combination_setting)
+        elif strategy_types.OPEN_CLOSE == strategy_type:
+            from strategies.open_close import CombinationStrategy
             return CombinationStrategy(combination_setting)
         else:
             from strategies.combination import CombinationStrategy
@@ -144,13 +156,14 @@ def load_index(args, start_date, end_date):
 
     for k in ["nikkei", "dow"]:
         d = Loader.load_index(k, start, end_date, with_filter=True, strict=False)
-        d = utils.add_stats(d)
-        d = utils.add_cs_stats(d)
+        d = add_stats(k, d, "D")
+#        d = utils.add_stats(d)
+#        d = utils.add_cs_stats(d)
         index[k] = d
 
-    index["new_score"] = Loader.new_score()
+    index["new_score"] = SimulatorData("new_score", Loader.new_score(), "D")
 
-    return index
+    return SimulatorIndexData(index)
 
 def add_stats(code, data, rule):
     try:
@@ -493,12 +506,11 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
     def create(self, settings):
         strategy_setting = StrategySetting() if len(settings) == 0 else settings[0]
         condition = self.conditions(strategy_setting)
-        c = StrategyConditions().by_array(condition)
-        return Combination(c, self.common(settings), self.setting).create()
+        return Combination(condition, self.common(settings), self.setting).create()
 
     # インデックスから直接条件を生成
     def conditions(self, setting):
-        return [
+        return StrategyConditions().by_array([
             utils.combination(setting.new, self.new()),
             utils.combination(setting.taking, self.taking()),
             utils.combination(setting.stop_loss, self.stop_loss()),
@@ -506,7 +518,7 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
             [] if setting.x2 is None else utils.combination(setting.x2, self.x2()),
             [] if setting.x4 is None else utils.combination(setting.x4, self.x4()),
             [] if setting.x8 is None else utils.combination(setting.x8, self.x8()),
-        ]
+        ])
 
     def conditions_by_index(self, conditions, index):
         a = [conditions[i] for i in index[0]]
@@ -588,7 +600,12 @@ class StrategyCreateSetting:
 
 class CombinationSetting:
     assets = 0
-    simple = False
+    simple = {
+        "new": False,
+        "taking": False,
+        "stop_loss": False,
+        "closing": False,
+    }
     use_limit = False
     position_sizing = False
     max_position_size = 5
@@ -596,6 +613,10 @@ class CombinationSetting:
     seed = [int(t.time())]
     ensemble = []
     weights = {}
+    on_close = {
+        "new": False,
+        "repay": False
+    }
 
 class Combination(StrategyCreator, StrategyUtil):
     def __init__(self, conditions, common, setting=None):
@@ -647,20 +668,20 @@ class Combination(StrategyCreator, StrategyUtil):
             self.apply_common(data, self.common.new)
         ]
 
-        if not self.setting.simple:
+        if not self.setting.simple["new"]:
             conditions = conditions + [self.apply(data, self.conditions.new)]
 
         if all(conditions):
             if self.setting.use_limit:
                 return simulator.LimitOrder(order, self.price(data))
             else:
-                return simulator.MarketOrder(order)
+                return simulator.MarketOrder(order, on_close=self.setting.on_close["new"])
 
         return None
 
     # 利食い
     def create_taking_rules(self, data):
-        if self.setting.simple:
+        if self.setting.simple["taking"]:
             conditions = [self.apply_common(data, self.common.taking)]
         else:
             conditions = [
@@ -672,12 +693,12 @@ class Combination(StrategyCreator, StrategyUtil):
             if self.setting.use_limit:
                 return simulator.LimitOrder(order, self.price(data), is_repay=True)
             else:
-                return simulator.MarketOrder(order)
+                return simulator.MarketOrder(order, on_close=self.setting.on_close["repay"])
         return None
 
     # 損切
     def create_stop_loss_rules(self, data):
-        if self.setting.simple:
+        if self.setting.simple["stop_loss"]:
             conditions = [self.apply_common(data, self.common.stop_loss)]
         else:
             conditions = [
@@ -689,12 +710,12 @@ class Combination(StrategyCreator, StrategyUtil):
             if self.setting.use_limit:
                 return simulator.ReverseLimitOrder(order, self.price(data), is_repay=True)
             else:
-                return simulator.MarketOrder(order)
+                return simulator.MarketOrder(order, on_close=self.setting.on_close["repay"])
         return None
 
     # 手仕舞い
     def create_closing_rules(self, data):
-        if self.setting.simple:
+        if self.setting.simple["closing"]:
             conditions = [self.apply_common(data, self.common.closing)]
         else:
             conditions = [
@@ -703,7 +724,7 @@ class Combination(StrategyCreator, StrategyUtil):
             ]
         if all(conditions):
             order = data.position.get_num()
-            return simulator.MarketOrder(order)
+            return simulator.MarketOrder(order, on_close=self.setting.on_close["repay"])
 
         return None
 

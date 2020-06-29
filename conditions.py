@@ -3,10 +3,11 @@
 def select(data, target="daily"):
     data = {
         "daily": data.data.daily,
-        "nikkei": data.index["nikkei"],
-        "dow": data.index["dow"],
-#        "usdjpy": data.index["usdjpy"],
-#        "xbtusd": data.index["xbtusd"]
+        "nikkei": data.index.data["nikkei"].daily,
+        "dow": data.index.data["dow"].daily,
+        "new_score": data.index.data["new_score"].daily
+#        "usdjpy": data.index.data["usdjpy"].daily,
+#        "xbtusd": data.index.data["xbtusd"].daily
     }
 
     if target in data.keys():
@@ -156,32 +157,32 @@ def cs_conditions(legs=["daily"]):
 
 def index_conditions():
     conditions = [
-        lambda d: d.index["new_score"]["score"].iloc[-1] < d.index["new_score"]["score"].iloc[-2],
-        lambda d: d.index["new_score"]["score"].iloc[-1] > d.index["new_score"]["score"].iloc[-2],
-        lambda d: d.index["new_score"]["score"].iloc[-1] < -500,
-        lambda d: d.index["new_score"]["score"].iloc[-1] < -1000,
-        lambda d: d.index["new_score"]["score"].iloc[-1] < -2000,
-        lambda d: d.index["new_score"]["score"].iloc[-5:].min() < -500,
-        lambda d: d.index["new_score"]["score"].iloc[-10:].min() < -500,
-        lambda d: d.index["new_score"]["score"].iloc[-20:].min() < -500,
-        lambda d: d.index["new_score"]["score"].iloc[-5:].min() < -1000,
-        lambda d: d.index["new_score"]["score"].iloc[-10:].min() < -1000,
-        lambda d: d.index["new_score"]["score"].iloc[-20:].min() < -1000,
-        lambda d: d.index["new_score"]["score"].iloc[-5:].min() < -2000,
-        lambda d: d.index["new_score"]["score"].iloc[-10:].min() < -2000,
-        lambda d: d.index["new_score"]["score"].iloc[-20:].min() < -2000,
-        lambda d: d.index["new_score"]["score"].iloc[-1] > 50,
-        lambda d: d.index["new_score"]["score"].iloc[-1] > 100,
-        lambda d: d.index["new_score"]["score"].iloc[-1] > 200,
-        lambda d: d.index["new_score"]["score"].iloc[-5:].min() > 50,
-        lambda d: d.index["new_score"]["score"].iloc[-10:].min() > 50,
-        lambda d: d.index["new_score"]["score"].iloc[-20:].min() > 50,
-        lambda d: d.index["new_score"]["score"].iloc[-5:].min() > 100,
-        lambda d: d.index["new_score"]["score"].iloc[-10:].min() > 100,
-        lambda d: d.index["new_score"]["score"].iloc[-20:].min() > 100,
-        lambda d: d.index["new_score"]["score"].iloc[-5:].min() > 200,
-        lambda d: d.index["new_score"]["score"].iloc[-10:].min() > 200,
-        lambda d: d.index["new_score"]["score"].iloc[-20:].min() > 200,
+        lambda d: select(d, "new_score")["score"].iloc[-1] < select(d, "new_score")["score"].iloc[-2],
+        lambda d: select(d, "new_score")["score"].iloc[-1] > select(d, "new_score")["score"].iloc[-2],
+        lambda d: select(d, "new_score")["score"].iloc[-1] < -500,
+        lambda d: select(d, "new_score")["score"].iloc[-1] < -1000,
+        lambda d: select(d, "new_score")["score"].iloc[-1] < -2000,
+        lambda d: select(d, "new_score")["score"].iloc[-5:].min() < -500,
+        lambda d: select(d, "new_score")["score"].iloc[-10:].min() < -500,
+        lambda d: select(d, "new_score")["score"].iloc[-20:].min() < -500,
+        lambda d: select(d, "new_score")["score"].iloc[-5:].min() < -1000,
+        lambda d: select(d, "new_score")["score"].iloc[-10:].min() < -1000,
+        lambda d: select(d, "new_score")["score"].iloc[-20:].min() < -1000,
+        lambda d: select(d, "new_score")["score"].iloc[-5:].min() < -2000,
+        lambda d: select(d, "new_score")["score"].iloc[-10:].min() < -2000,
+        lambda d: select(d, "new_score")["score"].iloc[-20:].min() < -2000,
+        lambda d: select(d, "new_score")["score"].iloc[-1] > 50,
+        lambda d: select(d, "new_score")["score"].iloc[-1] > 100,
+        lambda d: select(d, "new_score")["score"].iloc[-1] > 200,
+        lambda d: select(d, "new_score")["score"].iloc[-5:].min() > 50,
+        lambda d: select(d, "new_score")["score"].iloc[-10:].min() > 50,
+        lambda d: select(d, "new_score")["score"].iloc[-20:].min() > 50,
+        lambda d: select(d, "new_score")["score"].iloc[-5:].min() > 100,
+        lambda d: select(d, "new_score")["score"].iloc[-10:].min() > 100,
+        lambda d: select(d, "new_score")["score"].iloc[-20:].min() > 100,
+        lambda d: select(d, "new_score")["score"].iloc[-5:].min() > 200,
+        lambda d: select(d, "new_score")["score"].iloc[-10:].min() > 200,
+        lambda d: select(d, "new_score")["score"].iloc[-20:].min() > 200,
 
     ]
     return conditions

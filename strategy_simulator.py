@@ -112,9 +112,9 @@ class StrategySimulator:
                 # 対象日までのデータの整形
                 if date in dates_dict[code]:
                     self.log("[%s]" % code)
-                    simulators[code].capacity = simulators[code].capacity if capacity is None else capacity
+#                    simulators[code].capacity = simulators[code].capacity if capacity is None else capacity
                     simulators[code].simulate_by_date(date, stocks[code], index)
-                    capacity = simulators[code].capacity
+#                    capacity = simulators[code].capacity
                 else:
                     self.log("[%s] is less data: %s" % (code, date))
 

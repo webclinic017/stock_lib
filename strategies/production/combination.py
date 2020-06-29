@@ -86,7 +86,7 @@ class CombinationStrategy(CombinationCreator):
     def common(self, setting):
         default = self.default_common()
         default.new = [
-            lambda d: d.index["new_score"]["score"].iloc[-1] > -400,
+            lambda d: d.index.data["new_score"].daily["score"].iloc[-1] > -400,
             lambda d: d.data.daily["stop_low"].iloc[-1] == 0
         ]
 
