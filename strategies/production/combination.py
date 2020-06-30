@@ -25,7 +25,8 @@ class CombinationStrategy(CombinationCreator):
         try:
             data = pandas.read_csv("portfolio/new_high/%s.csv" % d, header=None)
             data.columns = ["code", "price"]
-            data = data[data["price"] <= (self.setting.assets / 500)]
+#            data = data[data["price"] <= (self.setting.assets / 500)]
+            data = data[data["price"] <= 5000]
             data = data.iloc[:10]
         except:
             data = None
