@@ -52,6 +52,7 @@ class Loader:
     settings_dir = "%s/settings" % base_dir
     realtime_dir = "%s/realtime" % base_dir
     realtime_minutes_dir = "%s/realtime/minutes" % base_dir
+    futures_dir = "%s/futures" % base_dir
 
     foreign_dir = "%s/foreign_stocks" % workspace_dir
 
