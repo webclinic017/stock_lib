@@ -40,6 +40,9 @@ class Index:
 class Bitcoin:
     exchanges = ["bitmex"]
 
+class Futures:
+    codes = ["nikkei225mini"]
+
 class Loader:
     workspace_dir = os.path.expanduser("~/workspace")
 
@@ -312,12 +315,33 @@ class Loader:
     def load_with_realtime(code, start_date, end_date):
         if str(code).isdigit():
             data = Loader.load(code, start_date, end_date)
+        elif "_" in str(code):
+            data = Loader.load_futures(code, start_date, end_date)
         else:
             data = Loader.load_index(code, start_date, end_date)
 
         if data is None:
             raise Exception("%s: %s - %s not found" % (code, start_date, end_date))
 
+        return data
+
+    @staticmethod
+    def load_futures(name, start_date, end_date, with_filter=True):
+        try:
+            code, month, session = name.split("_")
+            data = pandas.read_csv("%s/%s/%s_%s.csv" % (Loader.futures_dir, code, month, session), header=None)
+        except:
+            data = None
+
+        if data is None:
+          return None
+
+        data = Loader.format(data, int, date_format="%Y-%m-%d")
+        if with_filter:
+            filtered = Loader.filter(data, start_date, end_date)
+            if len(filtered) == 0:
+              return None
+            return filtered
         return data
 
     @staticmethod
