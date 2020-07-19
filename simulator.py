@@ -832,7 +832,6 @@ class Simulator:
         repay_orders = []
         if self.position.get_num() > 0:
             repay_orders += self.repay_order(price)
-            repay_orders += self.closing_order(price)
 
         return self.virtual_trade(data, new_orders, repay_orders, trade_data)
 
@@ -846,6 +845,7 @@ class Simulator:
         repay_orders = []
         if self.position.get_num() > 0:
             repay_orders += self.repay_order(price, on_close=True)
+            repay_orders += self.closing_order(price)
 
         return self.virtual_trade(data, new_orders, repay_orders, trade_data)
 

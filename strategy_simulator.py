@@ -43,6 +43,7 @@ class StrategySimulator:
             validate_codes = self.get_targets(args, codes, utils.to_format(e))
             daterange = self.append_daterange(codes, s, daterange)
             daterange = self.append_daterange(validate_codes, e, daterange)
+
         return codes, validate_codes, daterange
 
     def get_targets(self, args, targets, date):

@@ -33,6 +33,7 @@ def add_options(parser):
     parser.add_argument("--ensemble_dir", action="store", default=None, dest="ensemble_dir", help="アンサンブルディレクトリ")
     parser.add_argument("--ensemble", action="store_true", default=False, dest="ensemble", help="アンサンブル")
     parser.add_argument("--open_close", action="store_true", default=False, dest="open_close", help="寄せ引け")
+    parser.add_argument("--futures", action="store_true", default=False, dest="futures", help="先物")
     return parser
 
 def create_parser():
@@ -60,12 +61,14 @@ class StrategyType:
     ENSEMBLE="ensemble"
     COMBINATION="combination"
     OPEN_CLOSE="open_close"
+    FUTURES="futures"
 
     def list(self):
         return [
             self.ENSEMBLE,
             self.COMBINATION,
-            self.OPEN_CLOSE
+            self.OPEN_CLOSE,
+            self.FUTURES
         ]
 
 def get_strategy_name(args):
@@ -74,6 +77,8 @@ def get_strategy_name(args):
         return strategy_types.ENSEMBLE
     elif args.open_close:
         return strategy_types.OPEN_CLOSE
+    elif args.futures:
+        return strategy_types.FUTURES
     else:
         return strategy_types.COMBINATION
 
@@ -85,9 +90,6 @@ def load_strategy_creator_by_type(strategy_type, is_production, combination_sett
         if strategy_types.ENSEMBLE == strategy_type and not ignore_ensemble:
             from strategies.production.ensemble import CombinationStrategy
             return CombinationStrategy(combination_setting)
-        elif strategy_types.OPEN_CLOSE == strategy_type:
-            from strategies.production.open_close import CombinationStrategy
-            return CombinationStrategy(combination_setting)
         else:
             from strategies.production.combination import CombinationStrategy
             return CombinationStrategy(combination_setting)
@@ -97,6 +99,9 @@ def load_strategy_creator_by_type(strategy_type, is_production, combination_sett
             return CombinationStrategy(combination_setting)
         elif strategy_types.OPEN_CLOSE == strategy_type:
             from strategies.open_close import CombinationStrategy
+            return CombinationStrategy(combination_setting)
+        elif strategy_types.FUTURES == strategy_type:
+            from strategies.futures import CombinationStrategy
             return CombinationStrategy(combination_setting)
         else:
             from strategies.combination import CombinationStrategy
@@ -724,7 +729,7 @@ class Combination(StrategyCreator, StrategyUtil):
             ]
         if all(conditions):
             order = data.position.get_num()
-            return simulator.MarketOrder(order, on_close=self.setting.on_close["repay"])
+            return simulator.MarketOrder(order, on_close=True)
 
         return None
 
