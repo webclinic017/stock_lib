@@ -26,6 +26,7 @@ class StrategySimulator:
             if not code in daterange.keys():
                 daterange[code] = []
             daterange[code].append(date)
+            daterange[code] = list(set(daterange[code]))
             daterange[code].sort()
         return daterange
 
@@ -33,23 +34,24 @@ class StrategySimulator:
         codes = []
         validate_codes = []
         daterange = {}
-        start = utils.to_datetime_by_term(start_date)
-        end = utils.to_datetime_by_term(end_date)
 
-        dates = list(utils.daterange_by_month(start, end))
-        ends = list(dates)[1:] + [end]
-        for s, e in zip(dates, dates[1:] + [end]):
-            codes = self.get_targets(args, codes, utils.to_format(s))
-            validate_codes = self.get_targets(args, codes, utils.to_format(e))
-            daterange = self.append_daterange(codes, s, daterange)
-            daterange = self.append_daterange(validate_codes, e, daterange)
+        dates = list(utils.daterange(utils.to_datetime(start_date), utils.to_datetime(end_date)))
+        ends = list(dates)[1:] + [utils.to_datetime(end_date)]
+        for s, e in zip(dates, dates[1:] + [utils.to_datetime(end_date)]):
+            start, end = utils.to_format(s), utils.to_format(e)
+            targets = self.get_targets(args, codes, start)
+            validate_targets = self.get_targets(args, codes, end)
+            codes = list(set(codes + targets))
+            validate_codes = list(set(validate_codes + validate_targets))
+            daterange = self.append_daterange(targets, s, daterange)
+            daterange = self.append_daterange(validate_targets, e, daterange)
 
         return codes, validate_codes, daterange
 
     def get_targets(self, args, targets, date):
         if args.code is None:
-            date = utils.to_format(utils.to_datetime_by_term(date))
-            targets = list(set(targets + self.strategy_creator(args).subject(date)))
+            date = utils.to_format(utils.to_datetime(date))
+            targets = list(self.strategy_creator(args).subject(date))
         else:
             targets = [args.code]
         return targets
@@ -69,7 +71,7 @@ class StrategySimulator:
         d = strategy.add_stats(data.code, d, data.rule)
         return d
 
-    def simulates(self, strategy_setting, data, start_date, end_date):
+    def simulates(self, strategy_setting, data, start_date, end_date, daterange):
         self.log("simulating %s %s" % (start_date, end_date))
 
         args = data["args"]
@@ -97,19 +99,22 @@ class StrategySimulator:
             dates = list(set(dates + dates_dict[code]))
 
         # 日付ごとにシミュレーション
-        dates = sorted(dates, key=lambda x: utils.to_datetime_by_term(x))
+        dates = sorted(dates, key=lambda x: utils.to_datetime(x))
         self.log("targets: %s" % simulators.keys())
         capacity = None
 
         for date in dates:
             # 休日はスキップ
-            if not utils.is_weekday(utils.to_datetime_by_term(date)):
+            if not utils.is_weekday(utils.to_datetime(date)):
                 self.log("%s is not weekday" % date)
                 continue
 
             self.log("=== [%s] ===" % date)
 
             for code in simulators.keys():
+                is_target = daterange[code][0] <= utils.to_datetime(date) and utils.to_datetime(date) <= daterange[code][-1]
+                if not is_target:
+                    continue
                 # 対象日までのデータの整形
                 if date in dates_dict[code]:
                     self.log("[%s]" % code)
@@ -126,6 +131,7 @@ class StrategySimulator:
                 if len(split_data.daily) == 0:
                     continue
                 simulators[code].closing(dates[-1], split_data.daily["close"].iloc[-1])
+                self.log("[%s] closing: %s" % (code, split_data.daily["date"].iloc[-1]))
 
         # 統計 ====================================
         stats = {}
