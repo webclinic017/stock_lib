@@ -340,6 +340,7 @@ class Loader:
           return None
 
         data = Loader.format(data, int, date_format="%Y-%m-%d")
+        data["volume"] = 0
         if with_filter:
             filtered = Loader.filter(data, start_date, end_date)
             if len(filtered) == 0:
