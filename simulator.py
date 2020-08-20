@@ -368,6 +368,7 @@ class SimulatorStats:
         max_assets = numpy.maximum.accumulate(assets)
         drawdown = max_assets - assets
         drawdown = drawdown / max_assets
+
         return drawdown.tolist()
 
     # 最大ドローダウン
