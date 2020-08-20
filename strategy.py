@@ -604,7 +604,10 @@ class StrategyCreateSetting:
 ## 指定可能な戦略====================================================================================================================
 
 class CombinationSetting:
-    assets = 0
+    on_close = {
+        "new": False,
+        "repay": False
+    }
     simple = {
         "new": False,
         "taking": False,
@@ -613,15 +616,14 @@ class CombinationSetting:
     }
     use_limit = False
     position_sizing = False
+    position_adjust = True
+    strict=True
+    assets = 0
     max_position_size = 5
     condition_size = 5
     seed = [int(t.time())]
     ensemble = []
     weights = {}
-    on_close = {
-        "new": False,
-        "repay": False
-    }
 
 class Combination(StrategyCreator, StrategyUtil):
     def __init__(self, conditions, common, setting=None):
@@ -654,6 +656,8 @@ class Combination(StrategyCreator, StrategyUtil):
         max_position = self.max_position(data, max_risk, risk)
         max_position = max_position if max_position < self.setting.max_position_size else self.setting.max_position_size
 
+        additional = [self.apply(data, self.conditions.new)]
+
         # 数量
         order = 1
         if self.setting.position_sizing:
@@ -663,8 +667,18 @@ class Combination(StrategyCreator, StrategyUtil):
             order = 8 if self.apply(data, self.conditions.x8) else order
 
             # 最大を超える場合は調整
-            if order + data.position.get_num() > max_position:
+            if self.setting.position_adjust and order + data.position.get_num() > max_position:
+                if data.setting.debug:
+                    print("order(+position) > max_position: ", order, data.position.get_num(), max_position)
                 order = max_position - data.position.get_num()
+
+            # レバレッジシグナルも買いシグナルとする
+            if not self.setting.strict:
+                additional = additional + [
+                    self.apply(data, self.conditions.x2),
+                    self.apply(data, self.conditions.x4),
+                    self.apply(data, self.conditions.x8)
+                ]
 
         conditions = [
             self.drawdown_allowable(data), # ドローダウンが問題ない状態
@@ -674,7 +688,7 @@ class Combination(StrategyCreator, StrategyUtil):
         ]
 
         if not self.setting.simple["new"]:
-            conditions = conditions + [self.apply(data, self.conditions.new)]
+            conditions = conditions + [any(additional)]
 
         if all(conditions):
             if self.setting.use_limit:

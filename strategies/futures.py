@@ -13,6 +13,8 @@ from loader import Loader
 
 class CombinationStrategy(CombinationCreator):
     def __init__(self, setting):
+        setting.position_adjust = False
+        setting.strict = False
         super().__init__(setting)
         self.weights = setting.weights
         self.conditions_by_seed(setting.seed[0])
