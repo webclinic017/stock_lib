@@ -13,7 +13,7 @@ def target(data):
     if manda(data) or data["close"].iloc[-1] < 300:
         return False
 
-    volume = numpy.average(data["volume"].as_matrix().tolist())
+    volume = numpy.average(data["volume"].values.tolist())
     if volume <= 500.0: # 平均出来高が10万以上
         return False
 
@@ -87,7 +87,7 @@ def price_stop(data):
 
 def template(data, output=False):
 
-    close = numpy.array(data["close"].as_matrix(), dtype="f8")
+    close = numpy.array(data["close"].values, dtype="f8")
 
     if len(close) == 0:
         return False

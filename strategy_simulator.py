@@ -65,7 +65,7 @@ class StrategySimulator:
         d = data.daily
         d = d[d["date"] <= date].iloc[-300:].copy()
         for column in ["high", "low", "close"]:
-            tmp = d[column].as_matrix().tolist()
+            tmp = d[column].values.tolist()
             tmp[-1] = d["open"].iloc[-1]
             d[column] = tmp
         d = strategy.add_stats(data.code, d, data.rule)

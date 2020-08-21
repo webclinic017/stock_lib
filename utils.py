@@ -18,10 +18,10 @@ def nan_to_num(data, default=0):
     return data if default is None else numpy.nan_to_num(data)
 
 def add_average_stats(data):
-    close = numpy.array(data["close"].as_matrix(), dtype="f8")
+    close = numpy.array(data["close"].values, dtype="f8")
     data["daily_average"]     = ta.SMA(close, timeperiod=5)
     data["weekly_average"]    = ta.SMA(close, timeperiod=25)
-    data["volume_average"]    = ta.SMA(data["volume"].astype(float).as_matrix(), timeperiod=5)
+    data["volume_average"]    = ta.SMA(data["volume"].astype(float).values, timeperiod=5)
     data["ma_divergence"]     = (data["close"] - data["weekly_average"]) / data["weekly_average"]
     return data
 
@@ -29,7 +29,7 @@ def add_tec_stats(data):
     data["rci"]                 = data["close"].rolling(9).apply(rci)
     data["rci_long"]            = data["close"].rolling(27).apply(rci)
 
-    close = numpy.array(data["close"].as_matrix(), dtype="f8")
+    close = numpy.array(data["close"].values, dtype="f8")
     macd, macdsignal, macdhist = ta.MACD(close, fastperiod=12, slowperiod=26, signalperiod=9)
     data["macd"]           = macd
     data["macdsignal"]     = macdsignal
@@ -37,11 +37,11 @@ def add_tec_stats(data):
     data["macdhist_convert"] = data["macdhist"].rolling(100).apply(trend_convert)
 
     # average true range
-    data["atr"] = ta.ATR(data["high"].astype(float).as_matrix(), data["low"].astype(float).as_matrix(), data["close"].astype(float).as_matrix(), timeperiod=14)
+    data["atr"] = ta.ATR(data["high"].astype(float).values, data["low"].astype(float).values, data["close"].astype(float).values, timeperiod=14)
     return data
 
 def add_band_stats(data):
-    close = numpy.array(data["close"].as_matrix(), dtype="f8")
+    close = numpy.array(data["close"].values, dtype="f8")
     upper, _, lower = ta.BBANDS(close, timeperiod=25, nbdevup=1, nbdevdn=1, matype=0)
     upper2, _, lower2 = ta.BBANDS(close, timeperiod=25, matype=0)
 
@@ -51,7 +51,7 @@ def add_band_stats(data):
     data["env08"]          = nan_to_num(lower2)
 
     data["env_entity"]     =  each(lambda i, x: x["env12"] - x["env08"], data)
-    data["env_entity_average"] = ta.SMA(numpy.array(data["env_entity"].as_matrix(), dtype="f8"), timeperiod=5)
+    data["env_entity_average"] = ta.SMA(numpy.array(data["env_entity"].values, dtype="f8"), timeperiod=5)
     return data
 
 def add_safety_stats(data):
@@ -72,7 +72,7 @@ def add_stages_stats(data):
     data["support"] = data["low"].rolling(15).min()
 
     data["stages"]                      = stages(data)
-    stages_average                      = ta.SMA(data["stages"].astype(float).as_matrix(), timeperiod=10)
+    stages_average                      = ta.SMA(data["stages"].astype(float).values, timeperiod=10)
     data["stages_average"]              = stages_average
     data["macd_stages"]                 = (data["macd"] > 0) * 1
     data["macdhist_stages"]             = (data["macdhist"] > 0) * 1
@@ -181,7 +181,7 @@ def add_cs_stats(data):
 
     # 実体
     data["entity"] = (data["open"] - data["close"]).abs()
-    entity = numpy.array(data["entity"].as_matrix(), dtype="f8")
+    entity = numpy.array(data["entity"].values, dtype="f8")
     entity_average = ta.SMA(entity, timeperiod=5)
     data["entity_average"] = entity_average
     # 上ヒゲ・下ヒゲ
@@ -273,7 +273,7 @@ def to_features(data):
     for i, d in data.iterrows():
         index, _ = price_limit_with_index(d["close"])
         numerical_feature = "{0:x}".format(index if index < 16 else 15)
-        categorical = list(map(lambda x: str(x), d[columns].as_matrix().tolist()))
+        categorical = list(map(lambda x: str(x), d[columns].values.tolist()))
         categorical_feature = "{0:x}".format(int("".join(categorical), 2), "x")
         features = features + [numerical_feature+categorical_feature]
     return features
@@ -343,7 +343,7 @@ def count(data, callback):
     return len(list(filter(callback, data.iterrows())))
 
 def exists(data, callback):
-    d = data.as_matrix()
+    d = data.values
     length = len(list(filter(lambda x:callback(x), d)))
     return length > 0
 
@@ -449,8 +449,8 @@ def trend(data):
 
 def strict_trend(data, term):
     d = data.iloc[-term:]
-    high_noize = list(filter(lambda x: x > 0, d.as_matrix()))
-    low_noize = list(filter(lambda x: x < 0, d.as_matrix()))
+    high_noize = list(filter(lambda x: x > 0, d.values))
+    low_noize = list(filter(lambda x: x < 0, d.values))
 
     high_average = abs(numpy.average(high_noize)) if len(high_noize) > 0 else 0
     low_average = abs(numpy.average(low_noize)) if len(low_noize) > 0 else 0
@@ -478,7 +478,7 @@ def rate(base, data):
     return (data - base) / float(base)
 
 def get(data, index=-1):
-    return data.as_matrix()[index]
+    return data.values[index]
 
 # NaN inf -inf を置換
 def replace_invalid(data, source=0.0):
@@ -506,7 +506,7 @@ def gradient_rate(data):
 
 # 単純移動平均線
 def average(data, term):
-    term_data = data.as_matrix()[-term:]
+    term_data = data.values[-term:]
     return numpy.convolve(term_data, numpy.ones(term)/float(term), 'valid')[0]
 
 # RCI
@@ -522,12 +522,12 @@ def rci(data):
 
 # 標準偏差
 def sigma(data, term):
-    term_data = data.as_matrix()[-term:]
+    term_data = data.values[-term:]
     return math.sqrt((term * sum(term_data ** 2) - sum(term_data ** 2)) / (term * (term - 1)))
 
 # ストキャスティクス
 def stochastics(data, term):
-    term_data = data.as_matrix()[-term:]
+    term_data = data.values[-term:]
     min_data = min(term_data)
     max_data = max(term_data)
     A = term_data[-1] - min_data
@@ -552,9 +552,9 @@ def golden_cross(d1, d2):
     if not (len(d1) == len(d2)):
         return False
     if not isinstance(d1, list):
-        d1 = d1.as_matrix()
+        d1 = d1.values
     if not isinstance(d2, list):
-        d2 = d2.as_matrix()
+        d2 = d2.values
     for i in range(len(d1)-1):
         if d1[i] < d2[i] and d1[i+1] > d2[i+1]:
             return True
@@ -567,9 +567,9 @@ def dead_cross(d1, d2):
     if not (len(d1) == len(d2)):
         return False
     if not isinstance(d1, list):
-        d1 = d1.as_matrix()
+        d1 = d1.values
     if not isinstance(d2, list):
-        d2 = d2.as_matrix()
+        d2 = d2.values
 
     for i in range(len(d1)-1):
         if d1[i] > d2[i] and d1[i+1] < d2[i+1]:

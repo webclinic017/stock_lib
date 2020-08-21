@@ -37,7 +37,7 @@ class CombinationStrategy(CombinationCreator):
         if data is None:
             codes = []
         else:
-            codes = data["code"].as_matrix().tolist()
+            codes = data["code"].values.tolist()
         return codes
 
     def choice(self, conditions, size, weights):

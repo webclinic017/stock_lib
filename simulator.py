@@ -204,7 +204,7 @@ class SimulatorData:
     def dates(self, start_date, end_date):
         d = self.daily[self.daily["date"] >= start_date]
         d = d[d["date"] <= end_date]
-        dates = d["date"].copy().astype(str).as_matrix().tolist()
+        dates = d["date"].copy().astype(str).values.tolist()
         return dates
 
     def at(self, date):

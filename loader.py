@@ -368,8 +368,8 @@ class Loader:
             path = '%s/%s/%s.csv' % (Loader.realtime_dir, date, code)
             data = pandas.read_csv(path, header=None)
             data = Loader.format(data, "float", replace=" ", how=how, columns=['date', 'high', 'low', 'price', 'volume', 'update_time'], date_format="%Y-%m-%d %H:%M:%S")
-            data["volume"] = utils.diff(data["volume"].as_matrix() / 1000)
-            data["volume"] = list(map(lambda x: 0 if x < 0 else x, data["volume"].as_matrix().tolist()))
+            data["volume"] = utils.diff(data["volume"].values / 1000)
+            data["volume"] = list(map(lambda x: 0 if x < 0 else x, data["volume"].values.tolist()))
         except:
 #            import traceback
 #            traceback.print_exc()
@@ -393,7 +393,7 @@ class Loader:
             data = data[data['date'] >= "%s 00:00:00" % date]
             data = data[data['date'] <= "%s 23:59:59" % date]
             data = data.drop("other", axis=1)
-            data["volume"] = data["volume"].as_matrix() / 1000
+            data["volume"] = data["volume"].values / 1000
             data = data.dropna()
             data = data.reset_index()
         except:
@@ -520,7 +520,7 @@ class Loader:
                 months = utils.format(current, output_format=output_format)
                 d = pandas.read_csv("%s/steady_trend_stocks/%s/%s" % (Loader.settings_dir, months, filename), header=None)
                 d.columns = ['code']
-                data[months] = d["code"].as_matrix().tolist()
+                data[months] = d["code"].values.tolist()
                 data["all"] = list(set(data["all"] + data[months]))
             except:
                 continue
@@ -713,7 +713,7 @@ class Loader:
         ]
         for stock in stocks:
             if stock is not None:
-                codes.extend(stock["code"].as_matrix().tolist())
+                codes.extend(stock["code"].values.tolist())
 
         print(codes)
         return list(set(codes))
@@ -732,7 +732,7 @@ class Loader:
         stocks = Loader.before_ranking(date, ranking_type, before=before)
         if stocks is None:
             return []
-        codes = stocks["code"].iloc[:monitor_size].as_matrix().tolist()
+        codes = stocks["code"].iloc[:monitor_size].values.tolist()
         return codes
 
     @staticmethod
