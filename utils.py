@@ -26,15 +26,15 @@ def add_average_stats(data):
     return data
 
 def add_tec_stats(data):
-    data["rci"]                 = data["close"].rolling(9).apply(rci)
-    data["rci_long"]            = data["close"].rolling(27).apply(rci)
+    data["rci"]                 = data["close"].rolling(9).apply(rci, raw=True)
+    data["rci_long"]            = data["close"].rolling(27).apply(rci, raw=True)
 
     close = numpy.array(data["close"].values, dtype="f8")
     macd, macdsignal, macdhist = ta.MACD(close, fastperiod=12, slowperiod=26, signalperiod=9)
     data["macd"]           = macd
     data["macdsignal"]     = macdsignal
     data["macdhist"]       = macdhist
-    data["macdhist_convert"] = data["macdhist"].rolling(100).apply(trend_convert)
+    data["macdhist_convert"] = data["macdhist"].rolling(100).apply(trend_convert, raw=True)
 
     # average true range
     data["atr"] = ta.ATR(data["high"].astype(float).values, data["low"].astype(float).values, data["close"].astype(float).values, timeperiod=14)
@@ -55,13 +55,13 @@ def add_band_stats(data):
     return data
 
 def add_safety_stats(data):
-    data["low_noize"]         = data["low"].rolling(2).apply(lambda x: x[-2] - x[-1] if x[-2] - x[-1] < 0 else 0)
-    data["rising_safety"]     = data["low_noize"].rolling(10).apply(rising_safety)
+    data["low_noize"]         = data["low"].rolling(2).apply(lambda x: x[-2] - x[-1] if x[-2] - x[-1] < 0 else 0, raw=True)
+    data["rising_safety"]     = data["low_noize"].rolling(10).apply(rising_safety, raw=True)
     data["rising_safety"]     = data["low"] + data["rising_safety"]
     data["rising_safety"]     = data["rising_safety"].rolling(3).max() # 過去のsafetyより低い場合は高い方に合わせる
 
-    data["high_noize"]        = data["high"].rolling(2).apply(lambda x: x[-2] - x[-1] if x[-2] - x[-1] > 0 else 0)
-    data["fall_safety"]       = data["high_noize"].rolling(10).apply(fall_safety)
+    data["high_noize"]        = data["high"].rolling(2).apply(lambda x: x[-2] - x[-1] if x[-2] - x[-1] > 0 else 0, raw=True)
+    data["fall_safety"]       = data["high_noize"].rolling(10).apply(fall_safety, raw=True)
     data["fall_safety"]       = data["high"] + data["fall_safety"]
     data["fall_safety"]       = data["fall_safety"].rolling(3).min() # 過去のsafetyより高い場合は低い方に合わせる
 
@@ -105,17 +105,17 @@ def add_trend_stats(data):
     data["macd_gradient"]               = diff(data["macd"])
     data["macdhist_gradient"]           = diff(data["macdhist"])
 
-    data["daily_average_trend"] = data["daily_gradient"].rolling(5).apply(trend)
-    data["weekly_average_trend"] = data["weekly_gradient"].rolling(5).apply(trend)
-    data["volume_average_trend"] = data["volume_gradient"].rolling(5).apply(trend)
-    data["macd_trend"] = data["macd_gradient"].rolling(5).apply(trend)
-    data["macdhist_trend"] = data["macdhist_gradient"].rolling(1).apply(trend)
-    data["rci_trend"]       = data["rci_gradient"].rolling(5).apply(trend)
-    data["rci_long_trend"]  = data["rci_long_gradient"].rolling(5).apply(trend)
-    data["stages_trend"] = data["stages_gradient"].rolling(5).apply(trend)
-    data["stages_average_trend"] = data["stages_average_gradient"].rolling(5).apply(trend)
-    data["rising_safety_trend"] = data["rising_safety_gradient"].rolling(5).apply(trend)
-    data["fall_safety_trend"] = data["fall_safety_gradient"].rolling(5).apply(trend)
+    data["daily_average_trend"] = data["daily_gradient"].rolling(5).apply(trend, raw=True)
+    data["weekly_average_trend"] = data["weekly_gradient"].rolling(5).apply(trend, raw=True)
+    data["volume_average_trend"] = data["volume_gradient"].rolling(5).apply(trend, raw=True)
+    data["macd_trend"] = data["macd_gradient"].rolling(5).apply(trend, raw=True)
+    data["macdhist_trend"] = data["macdhist_gradient"].rolling(1).apply(trend, raw=True)
+    data["rci_trend"]       = data["rci_gradient"].rolling(5).apply(trend, raw=True)
+    data["rci_long_trend"]  = data["rci_long_gradient"].rolling(5).apply(trend, raw=True)
+    data["stages_trend"] = data["stages_gradient"].rolling(5).apply(trend, raw=True)
+    data["stages_average_trend"] = data["stages_average_gradient"].rolling(5).apply(trend, raw=True)
+    data["rising_safety_trend"] = data["rising_safety_gradient"].rolling(5).apply(trend, raw=True)
+    data["fall_safety_trend"] = data["fall_safety_gradient"].rolling(5).apply(trend, raw=True)
 
     return data
 
@@ -236,8 +236,8 @@ def add_cs_stats(data):
     data["yin_sanpei"]  = ((data["yin"].rolling(3).min() == 1) & (data["high_rounddown"].rolling(2).min() == 1) & (data["long_lower_shadow"] == 1)) * 1
 
     # ストップ
-    data["stop_high"] = (data["close"].rolling(2).apply(stop_high)) * 1
-    data["stop_low"] = (data["close"].rolling(2).apply(stop_low)) * 1
+    data["stop_high"] = (data["close"].rolling(2).apply(stop_high, raw=True)) * 1
+    data["stop_low"] = (data["close"].rolling(2).apply(stop_low, raw=True)) * 1
 
     # スコア
     data["score"] = each(lambda i, x: score(x), data)
