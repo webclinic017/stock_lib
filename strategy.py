@@ -257,10 +257,14 @@ class StrategyUtil:
             return False
         if debug:
             checker = CombinationChecker()
-            print(checker.get_source(conditions[0]))
-            print(checker.get_source(conditions[1]))
+            print(checker.get_source(conditions[0]), checker.get_source(conditions[1]))
+
         a = list(map(lambda x: x(data), conditions[0]))
         b = list(map(lambda x: x(data), conditions[1]))
+
+        if debug:
+            print(a, b)
+
         return all(a) and (any(b) or len(b) == 0)
 
     def apply_common(self, data, conditions):

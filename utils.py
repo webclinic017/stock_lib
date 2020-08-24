@@ -216,7 +216,7 @@ def add_cs_stats(data):
     # つつみ線
     data["tsutsumi"]      = (data["entity"].shift(1) < data["entity"]) * 1
     data["yang_tsutsumi"] = ((data["tsutsumi"] == 1) & (data["yin"].shift(1) == 1) & (data["yang"] == 1)) * 1
-    data["yin_tsutsumi"]  = ((data["tsutsumi"] == 1) & (data["yang"].iloc[-2] == 1) & (data["yin"].iloc[-1] == 1)) * 1
+    data["yin_tsutsumi"]  = ((data["tsutsumi"] == 1) & (data["yang"].shift(1) == 1) & (data["yin"] == 1)) * 1
     # はらみ線
     data["harami"]      = (data["entity"].shift(1) > data["entity"]) * 1
     data["yang_harami"] = ((data["harami"] == 1) & (data["yin"].shift(1) == 1) & (data["yang"] == 1)) * 1
@@ -227,7 +227,7 @@ def add_cs_stats(data):
     # 宵の明星
     data["yoi_mojo"] = ((data["yang_gap"].shift(1) == 1) & (data["yin_gap"] == 1)) * 1
     # 明けの明星
-    data["ake_mojo"] = ((data["yin_gap"].iloc[-2] == 1) & (data["yang_gap"].iloc[-1] == 1)) * 1
+    data["ake_mojo"] = ((data["yin_gap"].shift(1) == 1) & (data["yang_gap"] == 1)) * 1
     # 三空
     data["yang_sanku"] = ((data["yang_gap"].rolling(2).min() == 1) & (data["yang"].rolling(3).min() == 1)) * 1
     data["yin_sanku"]  = ((data["yin_gap"].rolling(2).min() == 1) & (data["yin"].rolling(3).min() == 1)) * 1
