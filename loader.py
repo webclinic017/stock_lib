@@ -598,7 +598,7 @@ class Loader:
     def hold_stocks():
         try:
             data = pandas.read_csv('settings/hold_stocks.csv', header=None)
-            data.columns = ['code', 'order', 'price', 'term', 'initial', 'strategy', 'system', 'method']
+            data.columns = ['code', 'order', 'price', 'term', 'system', 'method']
         except:
             data = None
         return data
