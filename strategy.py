@@ -230,7 +230,7 @@ def create_simulator_setting(args, use_json=True):
     simulator_setting.taking_rate = simulator_setting.taking_rate if args.taking_rate is None else float(args.taking_rate)
     simulator_setting.min_unit = simulator_setting.min_unit if args.min_unit is None else int(args.min_unit)
     simulator_setting.short_trade = args.short
-    simulator_setting.auto_stop_loss = args.auto_stop_loss
+    simulator_setting.auto_stop_loss = simulator_setting.auto_stop_loss if args.auto_stop_loss is None else args.auto_stop_loss
     simulator_setting.ignore_volume = args.futures
     simulator_setting = apply_assets(args, simulator_setting)
     return simulator_setting
@@ -244,7 +244,7 @@ def create_simulator_setting_by_json(args):
     simulator_setting.taking_rate = setting_dict["taking_rate"] if "taking_rate" in setting_dict.keys() else simulator_setting.taking_rate
     simulator_setting.min_unit = setting_dict["min_unit"] if "min_unit" in setting_dict.keys() else simulator_setting.min_unit
     simulator_setting.short_trade = args.short
-    simulator_setting.auto_stop_loss = args.auto_stop_loss
+    simulator_setting.auto_stop_loss = setting_dict["auto_stop_loss"] if "auto_stop_loss" in setting_dict.keys() else simulator_setting.auto_stop_loss
     simulator_setting.ignore_volume = args.futures
     simulator_setting = apply_assets(args, simulator_setting)
     return simulator_setting

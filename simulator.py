@@ -797,27 +797,27 @@ class Simulator:
 
         return trade_data
 
-    def auto_stop_loss(self, price):
+    def auto_stop_loss(self, price, position):
         if self.setting.auto_stop_loss is None:
             return
 
-        if self.position.get_num() > 0:
+        if position.get_num() > 0:
             protect_gain = self.setting.assets * (self.setting.auto_stop_loss * 2)
             allowable_loss = self.setting.assets * self.setting.auto_stop_loss
 
-            if protect_gain <= self.position.gain(price):
-                step = int(self.position.gain(price) / protect_gain)
-                price_range = - (protect_gain * step) / self.position.min_unit / self.position.get_num()
+            if protect_gain <= position.gain(price):
+                step = int(position.gain(price) / protect_gain)
+                price_range = - (protect_gain * step) / position.min_unit / position.get_num()
             else:
-                price_range = allowable_loss / self.position.min_unit / self.position.get_num()
+                price_range = allowable_loss / position.min_unit / position.get_num()
 
             if self.setting.short_trade:
-                price = self.position.get_value() + price_range
+                price = position.get_value() + price_range
             else:
-                price = self.position.get_value() - price_range
+                price = position.get_value() - price_range
 
-            self.log("[auto_stop_loss] price: %s, stop: %s" % (self.position.get_value(), price))
-            self.repay_orders = self.repay_orders + [ReverseLimitOrder(self.position.get_num(), price, is_repay=True, is_short=self.setting.short_trade, valid_term=1)]
+            self.log("[auto_stop_loss] price: %s, stop: %s" % (position.get_value(), price))
+            self.repay_orders = self.repay_orders + [ReverseLimitOrder(position.get_num(), price, is_repay=True, is_short=self.setting.short_trade, valid_term=1)]
         return
 
     def order_adjust(self, trade_data):
@@ -990,7 +990,7 @@ class Simulator:
             trade_data = self.open_trade(volume, data, trade_data)
 
         # 損切の逆指値
-        self.auto_stop_loss(data.daily["close"].iloc[-2])
+        self.auto_stop_loss(data.daily["close"].iloc[-2], self.position)
 
         # ザラバ
         if self.setting.virtual_trade:
