@@ -118,18 +118,18 @@ class Position:
 
 # 注文
 class Order:
-    def __init__(self, num, conditions, is_short=False, is_reverse_limit=False, is_limit=False, on_close=False, price=None):
+    def __init__(self, num, conditions):
         self.num = int(num)
         self.term = 0
-        self.price = price
+        self.price = None
         self.conditions = conditions
-        self.is_short = is_short
-        self.is_reverse_limit = is_reverse_limit
-        self.is_limit = is_limit
-        self.on_close = on_close
+        self.is_short = False
+        self.is_reverse_limit = False
+        self.is_limit = False
+        self.on_close = False
+        self.valid_term = None
+        self.order_type = None
 
-        assert not is_limit or (is_limit and price is not None), "require 'price'"
-        assert not is_reverse_limit or (is_reverse_limit and price is not None), "require 'price'"
 
     def is_market(self):
         return all([
@@ -139,6 +139,9 @@ class Order:
 
     def increment_term(self):
         self.term += 1
+
+    def is_valid(self):
+        return True if self.valid_term is None else self.term <= self.valid_term
 
     def signal(self, price, position):
         data = {
@@ -150,17 +153,31 @@ class Order:
 class MarketOrder(Order):
     def __init__(self, num, is_short=False, on_close=False):
         conditions = [lambda x: True]
-        super().__init__(num, conditions, is_short=is_short, on_close=on_close)
+        super().__init__(num, conditions)
+        self.is_short = is_short
+        self.on_close = on_close
+        self.order_type = "market"
 
 class LimitOrder(Order):
     def __init__(self, num, price, is_short=False, is_repay=False):
         conditions = [lambda x: x["price"] < price if is_short else x["price"] > price] if is_repay else [lambda x: x["price"] > price if is_short else x["price"] < price]
-        super().__init__(num, conditions, is_limit=True, price=price)
+        super().__init__(num, conditions)
+        self.price = price
+        self.is_short = is_short
+        self.is_limit = True
+        self.order_type = "limit"
+        assert price is not None, "require 'price'"
 
 class ReverseLimitOrder(Order):
-    def __init__(self, num, price, is_short=False, is_repay=False):
+    def __init__(self, num, price, is_short=False, is_repay=False, valid_term=None):
         conditions = [lambda x: x["price"] >= price if is_short else x["price"] <= price] if is_repay else [lambda x: x["price"] <= price if is_short else x["price"] >= price]
-        super().__init__(num, conditions, is_reverse_limit=True, price=price)
+        super().__init__(num, conditions)
+        self.price = price
+        self.is_short = is_short
+        self.is_reverse_limit = True
+        self.valid_term = valid_term
+        self.order_type = "reverse_limit"
+        assert price is not None, "require 'price'"
 
 # ルール適用用データ
 class AppliableData:
@@ -272,6 +289,8 @@ class SimulatorSetting:
         self.min_unit = 100
         self.trade_step = 1
         self.use_before_stick = False
+        self.auto_stop_loss = None
+        self.ignore_volume = False # 指値時の出来高チェックをスキップ
 
 # 統計
 class SimulatorStats:
@@ -294,7 +313,8 @@ class SimulatorStats:
             "term": 0,
             "size": 0,
             "canceled": None,
-            "contract_price": None
+            "contract_price": None,
+            "order_type": None
         }
         return trade_data
 
@@ -470,6 +490,9 @@ class SimulatorStats:
     def executed(self):
         return list(filter(lambda x: x["new"] is not None or x["repay"] is not None, self.trade_history))
 
+    def auto_stop_loss(self):
+        return list(filter(lambda x: x["repay"] is not None and x["order_type"] == "reverse_limit", self.trade_history))
+
 # シミュレーター
 class Simulator:
     def __init__(self, setting, position = None):
@@ -507,6 +530,31 @@ class Simulator:
     def total_assets(self, value):
         holdings = self.position.eval(value, self.position.get_num())
         return self.assets + holdings
+
+    def get_stats(self): 
+        stats = dict()
+        stats["assets"] = int(self.assets)
+        stats["gain"] = stats["assets"] - self.setting.assets
+        stats["return"] = float((stats["assets"] - self.setting.assets) / float(self.setting.assets))
+        stats["win_rate"] = float(self.stats.win_rate())
+        stats["drawdown"] = float(self.stats.max_drawdown())
+        stats["max_unavailable_assets"] = self.stats.max_unavailable_assets()
+        stats["trade"] = int(self.stats.trade_num())
+        stats["win_trade"] = int(self.stats.win_trade_num())
+        # 平均利益率
+        stats["average_profit_rate"] = self.stats.average_profit_rate()
+        # 平均損失率
+        stats["average_loss_rate"] = self.stats.average_loss_rate()
+        # リワードリスクレシオ
+        stats["rewordriskratio"] = self.stats.rewordriskratio()
+
+        # トレード履歴
+        stats["trade_history"] = self.stats.trade_history
+
+        if self.setting.debug:
+            stats["logs"] = self.logs
+
+        return stats
 
     # 新規
     def new(self, value, num):
@@ -565,6 +613,24 @@ class Simulator:
     def commission(self):
         self.assets -= self.setting.commission
 
+    def tick_price(self, price):
+        tick_prices = [
+            [3000, 1],
+            [5000, 5],
+            [30000, 10],
+            [50000, 50],
+        ]
+        tick_price = None
+        for t in tick_prices:
+            if price < t[0]:
+                tick_price = t[1]
+                break
+
+        if tick_price is None:
+            tick_price = 100
+
+        return tick_price
+
     # 注文を分割する
     def split_order(self, order, num):
         hit = copy.copy(order)
@@ -578,14 +644,14 @@ class Simulator:
         return [hit, remain]
 
     def exec_order(self, condition, orders, price=None, volume=None):
-        hit_orders = list(filter(lambda x: condition(x), orders)) # 条件を満たした注文
+        hit_orders = list(filter(lambda x: condition(x) and x.is_valid(), orders)) # 条件を満たした注文
 
         # 注文の価格を設定
         if price is not None:
             for i in range(len(hit_orders)):
                 hit_orders[i].price = price
 
-        remain = list(filter(lambda x: not condition(x), orders)) # 残っている注文
+        remain = list(filter(lambda x: not condition(x) and x.is_valid(), orders)) # 残っている注文
 
         # 出来の確認をする
         if volume is not None:
@@ -645,39 +711,33 @@ class Simulator:
 
     # 指値の約定価格
     def new_agreed_price(self, data, order):
+
+        slippage = self.tick_price(order.price) * 2
+        slippage = -slippage if self.setting.short_trade else slippage
+
         if order.is_market():
             return order.price
 
         if order.is_limit:
             worst_price = order.price
         else:
-            limit = self.reverse_limit()
-            worst_price = data.daily[limit].iloc[-1]
+            worst_price = order.price + slippage
         return worst_price
 
 
     def repay_agreed_price(self, data, order):
+
+        slippage = self.tick_price(order.price) * 2
+        slippage = slippage if self.setting.short_trade else -slippage
+
         if order.is_market():
             return order.price
 
         if order.is_limit:
             worst_price = order.price
         else:
-            limit = self.limit()
-            worst_price = data.daily[limit].iloc[-1]
+            worst_price = order.price + slippage
         return worst_price
-
-    # 損切りの逆指値価格
-    def reverse_limit_price(self, price, assets=None):
-        # 注文の価格を設定
-        total = self.total_assets(price) if assets is None else assets
-        price_range = (total * 0.02) / self.position.get_num()
-        print("reverse_limit_price:", total, self.position.get_num(), price_range)
-        if self.setting.short_trade:
-            value = self.position.get_value() + price_range
-        else:
-            value = self.position.get_value() - price_range
-        return value
 
     # 新規シグナル
     def new_signal(self, strategy, data, index):
@@ -737,6 +797,29 @@ class Simulator:
 
         return trade_data
 
+    def auto_stop_loss(self, price):
+        if self.setting.auto_stop_loss is None:
+            return
+
+        if self.position.get_num() > 0:
+            protect_gain = self.setting.assets * (self.setting.auto_stop_loss * 2)
+            allowable_loss = self.setting.assets * self.setting.auto_stop_loss
+
+            if protect_gain <= self.position.gain(price):
+                step = int(self.position.gain(price) / protect_gain)
+                price_range = - (protect_gain * step) / self.position.min_unit / self.position.get_num()
+            else:
+                price_range = allowable_loss / self.position.min_unit / self.position.get_num()
+
+            if self.setting.short_trade:
+                price = self.position.get_value() + price_range
+            else:
+                price = self.position.get_value() - price_range
+
+            self.log("[auto_stop_loss] price: %s, stop: %s" % (self.position.get_value(), price))
+            self.repay_orders = self.repay_orders + [ReverseLimitOrder(self.position.get_num(), price, is_repay=True, is_short=self.setting.short_trade, valid_term=1)]
+        return
+
     def order_adjust(self, trade_data):
         # 手仕舞いの場合全部キャンセル
         if self.position.get_num() > 0 and len(self.closing_orders) > 0:
@@ -766,31 +849,6 @@ class Simulator:
 
         return trade_data
 
-    def get_stats(self): 
-        stats = dict()
-        stats["assets"] = int(self.assets)
-        stats["gain"] = stats["assets"] - self.setting.assets
-        stats["return"] = float((stats["assets"] - self.setting.assets) / float(self.setting.assets))
-        stats["win_rate"] = float(self.stats.win_rate())
-        stats["drawdown"] = float(self.stats.max_drawdown())
-        stats["max_unavailable_assets"] = self.stats.max_unavailable_assets()
-        stats["trade"] = int(self.stats.trade_num())
-        stats["win_trade"] = int(self.stats.win_trade_num())
-        # 平均利益率
-        stats["average_profit_rate"] = self.stats.average_profit_rate()
-        # 平均損失率
-        stats["average_loss_rate"] = self.stats.average_loss_rate()
-        # リワードリスクレシオ
-        stats["rewordriskratio"] = self.stats.rewordriskratio()
-
-        # トレード履歴
-        stats["trade_history"] = self.stats.trade_history
-
-        if self.setting.debug:
-            stats["logs"] = self.logs
-
-        return stats
-
     def simulate(self, dates, data, index={}):
         assert type(data) is SimulatorData, "data is not SimulatorData."
 
@@ -818,7 +876,7 @@ class Simulator:
         assert len(today) > 0, "not found %s data" % date
 
         price = today["open"].item() # 約定価格
-        volume = math.ceil(today["volume"].item() * 10)
+        volume = None if self.setting.ignore_volume else math.ceil(today["volume"].item() * 10)
         self.log("date: %s, price: %s, volume: %s" % (date, price, volume))
 
         self.trade(self.setting.strategy, price, volume, term_data, term_index)
@@ -876,6 +934,7 @@ class Simulator:
             agreed_price = self.new_agreed_price(data, order)
             if self.new(agreed_price, order.num):
                 trade_data["new"] = agreed_price
+                trade_data["order_type"] = order.order_type
 
         # 返済注文実行
         for order in repay_orders:
@@ -889,6 +948,7 @@ class Simulator:
                 trade_data["repay"] = agreed_price
                 trade_data["gain"] = gain
                 trade_data["gain_rate"] = gain_rate
+                trade_data["order_type"] = order.order_type
 
         return trade_data
 
@@ -904,10 +964,6 @@ class Simulator:
         assert type(data) is SimulatorData, "data is not SimulatorData."
 
         date = data.daily["date"].iloc[-1]
-
-        # step == 0なら注文
-        time = int(date.minute)
-        step = time % self.setting.trade_step
 
         # stats
         trade_data = self.create_trade_data(date, price)
@@ -932,6 +988,12 @@ class Simulator:
         # 寄り付き====================================================================
         if self.setting.virtual_trade: # 注文の約定チェック
             trade_data = self.open_trade(volume, data, trade_data)
+
+        # 損切の逆指値
+        self.auto_stop_loss(data.daily["close"].iloc[-2])
+
+        # ザラバ
+        if self.setting.virtual_trade:
             trade_data = self.intraday_trade(volume, data, trade_data)
 
         # トレード履歴に追加
@@ -947,11 +1009,9 @@ class Simulator:
             return
 
         # 注文を出す
-        if step == 0:
-            term_data = data.index(0, -1) if self.setting.use_before_stick else data
-#            self.log("[order stick] %s:%s" % (term_data.daily["date"].iloc[-1], term_data.daily["open"].iloc[-1]))
-            trade_data = self.signals(strategy, term_data, index, trade_data)
+        trade_data = self.signals(strategy, data, index, trade_data)
 
+        # 引け
         if self.setting.virtual_trade:
             trade_data = self.close_trade(volume, data, trade_data)
 

@@ -24,6 +24,7 @@ def add_options(parser):
     parser.add_argument("--max_position_size", action="store", default=None, dest="max_position_size", help="最大ポジションサイズ")
     parser.add_argument("--production", action="store_true", default=False, dest="production", help="本番向け") # 実行環境の選択
     parser.add_argument("--short", action="store_true", default=False, dest="short", help="空売り戦略")
+    parser.add_argument("--auto_stop_loss", type=float, action="store", default=None, dest="auto_stop_loss", help="自動損切")
     parser.add_argument("--stop_loss_rate", action="store", default=None, dest="stop_loss_rate", help="損切レート")
     parser.add_argument("--taking_rate", action="store", default=None, dest="taking_rate", help="利食いレート")
     parser.add_argument("--min_unit", action="store", default=None, dest="min_unit", help="最低単元")
@@ -229,6 +230,8 @@ def create_simulator_setting(args, use_json=True):
     simulator_setting.taking_rate = simulator_setting.taking_rate if args.taking_rate is None else float(args.taking_rate)
     simulator_setting.min_unit = simulator_setting.min_unit if args.min_unit is None else int(args.min_unit)
     simulator_setting.short_trade = args.short
+    simulator_setting.auto_stop_loss = args.auto_stop_loss
+    simulator_setting.ignore_volume = args.futures
     simulator_setting = apply_assets(args, simulator_setting)
     return simulator_setting
 
@@ -241,6 +244,8 @@ def create_simulator_setting_by_json(args):
     simulator_setting.taking_rate = setting_dict["taking_rate"] if "taking_rate" in setting_dict.keys() else simulator_setting.taking_rate
     simulator_setting.min_unit = setting_dict["min_unit"] if "min_unit" in setting_dict.keys() else simulator_setting.min_unit
     simulator_setting.short_trade = args.short
+    simulator_setting.auto_stop_loss = args.auto_stop_loss
+    simulator_setting.ignore_volume = args.futures
     simulator_setting = apply_assets(args, simulator_setting)
     return simulator_setting
 

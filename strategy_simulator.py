@@ -168,6 +168,7 @@ class StrategySimulator:
         position_term = list(filter(lambda x: x != 0, sum(position_term, [])))
         max_unavailable_assets = self.agg(stats, "unavailable_assets").values()
         sum_contract_price = list(map(lambda x: x[1].sum_contract_price(), stats.items()))
+        auto_stop_loss = list(map(lambda x: len(x[1].auto_stop_loss()), stats.items()))
 
         if self.verbose:
             print(start_date, end_date, "assets:", self.simulator_setting.assets, "gain:", gain, sum(gain))
@@ -193,6 +194,7 @@ class StrategySimulator:
             "max_position_term": max(position_term) if len(position_term) > 0 else 0,
             "max_unavailable_assets": max(max_unavailable_assets) if len(s) > 0 and len(max_unavailable_assets) > 0 else 0,
             "sum_contract_price": sum(sum_contract_price) if len(s) > 0 else 0,
+            "auto_stop_loss": sum(auto_stop_loss) if len(s) > 0 else 0,
         }
 
         return results
