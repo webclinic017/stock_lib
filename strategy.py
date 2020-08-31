@@ -91,6 +91,9 @@ def load_strategy_creator_by_type(strategy_type, is_production, combination_sett
         if strategy_types.ENSEMBLE == strategy_type and not ignore_ensemble:
             from strategies.production.ensemble import CombinationStrategy
             return CombinationStrategy(combination_setting)
+        elif strategy_types.FUTURES == strategy_type:
+            from strategies.production.futures import CombinationStrategy
+            return CombinationStrategy(combination_setting)
         else:
             from strategies.production.combination import CombinationStrategy
             return CombinationStrategy(combination_setting)
