@@ -805,7 +805,7 @@ class Simulator:
             protect_gain = self.setting.assets * (self.setting.auto_stop_loss * 2)
             allowable_loss = self.setting.assets * self.setting.auto_stop_loss
 
-            if protect_gain <= position.gain(price):
+            if position.get_term() >= 1 and protect_gain <= position.gain(price):
                 step = int(position.gain(price) / protect_gain)
                 price_range = - (protect_gain * step) / position.min_unit / position.get_num()
             else:
@@ -822,7 +822,7 @@ class Simulator:
 
     def order_adjust(self, trade_data):
         # 手仕舞いの場合全部キャンセル
-        if self.position.get_num() > 0 and len(self.closing_orders) > 0:
+        if self.position.get_num() > 0 and len(self.closing_orders) > 0 or len(self.stats.auto_stop_loss()) > 2:
             self.log("[cancel] new/repay order. force closed")
             self.new_orders = []
             self.repay_orders = []
