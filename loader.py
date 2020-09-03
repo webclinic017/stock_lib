@@ -604,6 +604,15 @@ class Loader:
         return data
 
     @staticmethod
+    def hold_op():
+        try:
+            data = pandas.read_csv('settings/hold_op.csv', header=None)
+            data.columns = ['code', 'order', 'price', 'term', 'method']
+        except:
+            data = None
+        return data
+
+    @staticmethod
     def new_high_stocks():
         try:
             data = pandas.read_csv('settings/new_high.csv', header=None)
