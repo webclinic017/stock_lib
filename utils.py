@@ -89,6 +89,9 @@ def add_cross_stats(data):
     data["env09_cross"] = cross(data["low"], data["env09"])
     data["env08_cross"] = cross(data["low"], data["env08"])
 
+    data["rising_safety_cross"] = cross(data["low"], data["rising_safety"])
+    data["fall_safety_cross"] = cross(data["high"], data["fall_safety"])
+
     return data
 
 def add_trend_stats(data):

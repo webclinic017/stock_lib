@@ -2,7 +2,6 @@
 import numpy
 import utils
 import simulator
-import conditions
 import random
 import subprocess
 import pandas
@@ -10,6 +9,8 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from strategy import CombinationCreator
 from loader import Loader
+
+from strategies.production import conditions
 
 class CombinationStrategy(CombinationCreator):
     def __init__(self, setting):

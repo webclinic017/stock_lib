@@ -96,20 +96,12 @@ def stages_conditions(legs=["daily"]):
             lambda d, leg=leg: select(d, leg)["stages"].iloc[-1] < 0,
             lambda d, leg=leg: select(d, leg)["stages_average"].iloc[-1] > 0,
             lambda d, leg=leg: select(d, leg)["stages_average"].iloc[-1] < 0,
-            lambda d, leg=leg: select(d, leg)["stages"][-3:].min() > 0,
-            lambda d, leg=leg: select(d, leg)["stages"][-3:].min() < 0,
-            lambda d, leg=leg: select(d, leg)["stages"][-3:].max() > 0,
-            lambda d, leg=leg: select(d, leg)["stages"][-3:].max() < 0,
-            lambda d, leg=leg: select(d, leg)["stages_average"][-3:].min() > 0,
-            lambda d, leg=leg: select(d, leg)["stages_average"][-3:].min() < 0,
-            lambda d, leg=leg: select(d, leg)["stages_average"][-3:].max() > 0,
-            lambda d, leg=leg: select(d, leg)["stages_average"][-3:].max() < 0,
         ]
     return conditions
 
 def cross_conditions(legs=["daily"]):
     columns = [
-        "average_cross", "macd_cross", "rci_cross", "env12_cross", "env11_cross", "env09_cross", "env08_cross", "rising_safety_cross", "fall_safety_cross"
+        "average_cross", "macd_cross", "rci_cross", "env12_cross", "env11_cross", "env09_cross", "env08_cross"
     ]
 
     conditions = []
@@ -119,12 +111,6 @@ def cross_conditions(legs=["daily"]):
                 lambda d, leg=leg, column=column: select(d, leg)[column].iloc[-1] == 1,
                 lambda d, leg=leg, column=column: select(d, leg)[column].iloc[-1] == 0,
                 lambda d, leg=leg, column=column: select(d, leg)[column].iloc[-1] == -1,
-                lambda d, leg=leg, column=column: select(d, leg)[column][-3:].max() == 1,
-                lambda d, leg=leg, column=column: select(d, leg)[column][-3:].max() == 0,
-                lambda d, leg=leg, column=column: select(d, leg)[column][-3:].max() == -1,
-                lambda d, leg=leg, column=column: select(d, leg)[column][-3:].min() == 1,
-                lambda d, leg=leg, column=column: select(d, leg)[column][-3:].min() == 0,
-                lambda d, leg=leg, column=column: select(d, leg)[column][-3:].min() == -1,
             ]
 
     return conditions
@@ -142,12 +128,6 @@ def trend_conditions(legs=["daily"]):
                 lambda d, leg=leg, column=column: select(d, leg)[column].iloc[-1] == 1,
                 lambda d, leg=leg, column=column: select(d, leg)[column].iloc[-1] == 0,
                 lambda d, leg=leg, column=column: select(d, leg)[column].iloc[-1] == -1,
-                lambda d, leg=leg, column=column: select(d, leg)[column][-3:].max() == 1,
-                lambda d, leg=leg, column=column: select(d, leg)[column][-3:].max() == 0,
-                lambda d, leg=leg, column=column: select(d, leg)[column][-3:].max() == -1,
-                lambda d, leg=leg, column=column: select(d, leg)[column][-3:].min() == 1,
-                lambda d, leg=leg, column=column: select(d, leg)[column][-3:].min() == 0,
-                lambda d, leg=leg, column=column: select(d, leg)[column][-3:].min() == -1,
             ]
 
     return conditions
@@ -166,7 +146,6 @@ def cs_conditions(legs=["daily"]):
             conditions = conditions + [
                 lambda d, leg=leg, column=column: select(d, leg)[column].iloc[-1] == 1,
                 lambda d, leg=leg, column=column: select(d, leg)[column].iloc[-1] == 0,
-                lambda d, leg=leg, column=column: select(d, leg)[column][-3:].max() == 1,
             ]
 
         conditions = conditions + [

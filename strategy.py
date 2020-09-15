@@ -662,10 +662,11 @@ class Combination(StrategyCreator, StrategyUtil):
 
     # 買い
     def create_new_rules(self, data):
-        risk = self.risk(data)
-        max_risk = self.max_risk(data)
 
         if self.setting.position_adjust:
+            risk = self.risk(data)
+            max_risk = self.max_risk(data)
+
             max_position = self.max_position(data, max_risk, risk)
             max_position = max_position if max_position < self.setting.max_position_size else self.setting.max_position_size
         else:
@@ -732,11 +733,13 @@ class Combination(StrategyCreator, StrategyUtil):
 
     # 損切
     def create_stop_loss_rules(self, data):
+        conditions = [
+            data.position.gain_rate(data.data.daily["close"].iloc[-1]) < -self.stop_loss_rate(data, self.setting.max_position_size), # 保有数最大で最大の損切ラインを適用
+        ]
         if self.setting.simple["stop_loss"]:
-            conditions = [self.apply_common(data, self.common.stop_loss)]
+            conditions = conditions + [self.apply_common(data, self.common.stop_loss)]
         else:
-            conditions = [
-                data.position.gain_rate(data.data.daily["close"].iloc[-1]) < -self.stop_loss_rate(data, self.setting.max_position_size), # 保有数最大で最大の損切ラインを適用
+            conditions = conditions + [
                 self.apply_common(data, self.common.stop_loss) and self.apply(data, self.conditions.stop_loss),
             ]
         if any(conditions):

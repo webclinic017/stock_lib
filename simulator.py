@@ -501,7 +501,7 @@ class Simulator:
         self.setting = setting
         self.position = position if position is not None else Position(system=system, method=method, min_unit=self.setting.min_unit)
         self.assets = setting.assets
-        self.capacity = setting.assets + setting.assets * 3.33
+        self.capacity = setting.assets * 3.33
         self.stats = SimulatorStats()
         self.logs = []
         self.new_orders = []

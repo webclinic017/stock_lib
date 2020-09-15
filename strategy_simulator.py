@@ -103,6 +103,8 @@ class StrategySimulator:
         self.log("targets: %s" % simulators.keys())
         capacity = None
 
+        codes = self.get_targets(args, [], start_date)
+
         for date in dates:
             # 休日はスキップ
             if not utils.is_weekday(utils.to_datetime(date)):
@@ -111,7 +113,9 @@ class StrategySimulator:
 
             self.log("=== [%s] ===" % date)
 
-            for code in simulators.keys():
+            for code in codes:
+                if not code in simulators.keys():
+                    continue
                 is_target = daterange[code][0] <= utils.to_datetime(date) and utils.to_datetime(date) <= daterange[code][-1]
                 if not is_target:
                     continue
@@ -126,7 +130,10 @@ class StrategySimulator:
 
         # 手仕舞い
         if len(dates) > 0:
-            for code in simulators.keys():
+            self.log("=== [closing] ===")
+            for code in codes:
+                if not code in simulators.keys():
+                    continue
                 split_data = stocks[code].split(dates[0], dates[-1])
                 if len(split_data.daily) == 0:
                     continue
