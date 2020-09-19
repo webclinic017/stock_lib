@@ -569,7 +569,7 @@ class Simulator:
         cost = self.position.new(num, value)
         self.assets += cost
         self.capacity += cost
-        self.commission()
+        self.commission(cost)
 
         self.log(" new: %s yen x %s, total %s, ave %s, assets %s, cost %s" % (value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost))
 
@@ -586,7 +586,7 @@ class Simulator:
         cost = self.position.repay(num, value)
         self.assets += cost
         self.capacity += cost
-        self.commission()
+        self.commission(cost)
 
         self.log(" repay: %s yen x %s, total %s, ave %s, assets %s, cost %s : gain %s" % (value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost, gain))
         return True
@@ -610,8 +610,10 @@ class Simulator:
 
     # 取引手数料
     # TODO 実際のものに合わせる
-    def commission(self):
-        self.assets -= self.setting.commission
+    def commission(self, cost):
+        import rakuten
+        self.assets -= rakuten.default_comission(cost, is_credit=False)
+#        self.assets -= self.setting.commission
 
     def tick_price(self, price):
         tick_prices = [

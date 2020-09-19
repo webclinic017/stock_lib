@@ -2,6 +2,7 @@
 import numpy
 import utils
 import simulator
+import conditions
 import random
 import subprocess
 import pandas
@@ -10,10 +11,10 @@ from dateutil.relativedelta import relativedelta
 from strategy import CombinationCreator
 from loader import Loader
 
-from strategies.production import conditions
-
 class CombinationStrategy(CombinationCreator):
     def __init__(self, setting):
+        setting.position_adjust = False
+        setting.strict = True
         super().__init__(setting)
         self.weights = setting.weights
         self.conditions_by_seed(setting.seed[0])
@@ -24,10 +25,9 @@ class CombinationStrategy(CombinationCreator):
     def load_portfolio(self, date):
         d = utils.to_format(datetime(date.year, date.month, 1))
         try:
-            data = pandas.read_csv("portfolio/new_high/%s.csv" % d, header=None)
-            data.columns = ["code", "price"]
-#            data = data[data["price"] <= (self.setting.assets / 500)]
-            data = data[data["price"] <= 5000]
+            data = pandas.read_csv("portfolio/high_update/%s.csv" % d, header=None)
+            data.columns = ["code", "price", "count", "date"]
+            data = data[data["price"] <= (self.setting.assets / 250)]
             data = data.iloc[:10]
         except:
             data = None
@@ -48,11 +48,11 @@ class CombinationStrategy(CombinationCreator):
         return list(zip(*choiced))
 
     def apply_weights(self, method):
-        base = numpy.array([1] * len(self.conditions_all))
+        base = numpy.array([200] * len(self.conditions_all))
 
         if method in self.weights.keys():
             for index, weight in self.weights[method].items():
-                base[int(index)] = weight
+                base[int(index)] = base[int(index)] + weight
 
         weights = base / sum(base)
         return weights
@@ -89,7 +89,8 @@ class CombinationStrategy(CombinationCreator):
         default = self.default_common()
         default.new = [
             lambda d: d.index.data["new_score"].daily["score"].iloc[-1] > -400,
-            lambda d: d.data.daily["stop_low"].iloc[-1] == 0
+            lambda d: d.data.daily["stop_high"].iloc[-1] == 0 if d.setting.short_trade else d.data.daily["stop_low"].iloc[-1] == 0,
+            lambda d: self.break_precondition(d) if d.setting.short_trade else not self.break_precondition(d)
         ]
 
         default.taking = [
@@ -101,17 +102,14 @@ class CombinationStrategy(CombinationCreator):
         ]
 
         default.closing = [
-            lambda d: self.break_precondition(d),
+            lambda d: not self.break_precondition(d) if d.setting.short_trade else self.break_precondition(d)
         ]
 
         for i in range(1, len(setting[1:])):
-            default.new         = default.new           + [lambda d: self.apply(utils.combination(setting[i].new, self.new_conditions))]
-            default.taking      = default.taking        + [lambda d: self.apply(utils.combination(setting[i].taking, self.taking_conditions))]
-            default.stop_loss   = default.stop_loss     + [lambda d: self.apply(utils.combination(setting[i].stop_loss, self.stop_loss_conditions))]
-            default.closing     = default.closing       + [lambda d: self.apply(utils.combination(setting[i].closing, self.closing_conditions))]
-            default.x2          = default.x2            + [lambda d: self.apply(utils.combination(setting[i].x2, self.x2_conditions))]
-            default.x4          = default.x4            + [lambda d: self.apply(utils.combination(setting[i].x4, self.x4_conditions))]
-            default.x8          = default.x8            + [lambda d: self.apply(utils.combination(setting[i].x8, self.x8_conditions))]
+            default.new         = default.new           + [lambda d: self.apply(utils.combination(setting[i-1].new, self.new_conditions))]
+            default.taking      = default.taking        + [lambda d: self.apply(utils.combination(setting[i-1].taking, self.taking_conditions))]
+            default.stop_loss   = default.stop_loss     + [lambda d: self.apply(utils.combination(setting[i-1].stop_loss, self.stop_loss_conditions))]
+            default.closing     = default.closing       + [lambda d: self.apply(utils.combination(setting[i-1].closing, self.closing_conditions))]
             self.conditions_by_seed(self.setting.seed[i])
 
         return default

@@ -35,6 +35,7 @@ def add_options(parser):
     parser.add_argument("--ensemble", action="store_true", default=False, dest="ensemble", help="アンサンブル")
     parser.add_argument("--open_close", action="store_true", default=False, dest="open_close", help="寄せ引け")
     parser.add_argument("--futures", action="store_true", default=False, dest="futures", help="先物")
+    parser.add_argument("--new_high", action="store_true", default=False, dest="new_high", help="新高値")
     return parser
 
 def create_parser():
@@ -63,13 +64,15 @@ class StrategyType:
     COMBINATION="combination"
     OPEN_CLOSE="open_close"
     FUTURES="futures"
+    NEW_HIGH="new_high"
 
     def list(self):
         return [
             self.ENSEMBLE,
             self.COMBINATION,
             self.OPEN_CLOSE,
-            self.FUTURES
+            self.FUTURES,
+            self.NEW_HIGH
         ]
 
 def get_strategy_name(args):
@@ -80,6 +83,8 @@ def get_strategy_name(args):
         return strategy_types.OPEN_CLOSE
     elif args.futures:
         return strategy_types.FUTURES
+    elif args.new_high:
+        return strategy_types.NEW_HIGH
     else:
         return strategy_types.COMBINATION
 
@@ -90,6 +95,9 @@ def load_strategy_creator_by_type(strategy_type, is_production, combination_sett
     if is_production:
         if strategy_types.ENSEMBLE == strategy_type and not ignore_ensemble:
             from strategies.production.ensemble import CombinationStrategy
+            return CombinationStrategy(combination_setting)
+        elif strategy_types.NEW_HIGH == strategy_type:
+            from strategies.production.new_high import CombinationStrategy
             return CombinationStrategy(combination_setting)
         elif strategy_types.FUTURES == strategy_type:
             from strategies.production.futures import CombinationStrategy
@@ -106,6 +114,9 @@ def load_strategy_creator_by_type(strategy_type, is_production, combination_sett
             return CombinationStrategy(combination_setting)
         elif strategy_types.FUTURES == strategy_type:
             from strategies.futures import CombinationStrategy
+            return CombinationStrategy(combination_setting)
+        elif strategy_types.NEW_HIGH == strategy_type:
+            from strategies.new_high import CombinationStrategy
             return CombinationStrategy(combination_setting)
         else:
             from strategies.combination import CombinationStrategy

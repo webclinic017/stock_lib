@@ -25,8 +25,8 @@ class CombinationStrategy(CombinationCreator):
     def load_portfolio(self, date):
         d = utils.to_format(datetime(date.year, date.month, 1))
         try:
-            data = pandas.read_csv("portfolio/high_update/%s.csv" % d, header=None)
-            data.columns = ["code", "price", "count", "date"]
+            data = pandas.read_csv("portfolio/new_high/%s.csv" % d, header=None)
+            data.columns = ["code", "price"]
             data = data[data["price"] <= (self.setting.assets / 250)]
             data = data.iloc[:10]
         except:
@@ -89,8 +89,8 @@ class CombinationStrategy(CombinationCreator):
         default = self.default_common()
         default.new = [
             lambda d: d.index.data["new_score"].daily["score"].iloc[-1] > -400,
-            lambda d: d.data.daily["stop_high"].iloc[-1] == 0 if d.setting.short_trade else d.data.daily["stop_low"].iloc[-1] == 0,
-            lambda d: self.break_precondition(d) if d.setting.short_trade else not self.break_precondition(d)
+            lambda d: d.data.daily["stop_low"].iloc[-1] == 0,
+            lambda d: not self.break_precondition(d)
         ]
 
         default.taking = [
@@ -102,7 +102,7 @@ class CombinationStrategy(CombinationCreator):
         ]
 
         default.closing = [
-            lambda d: not self.break_precondition(d) if d.setting.short_trade else self.break_precondition(d)
+            lambda d: self.break_precondition(d),
         ]
 
         for i in range(1, len(setting[1:])):
