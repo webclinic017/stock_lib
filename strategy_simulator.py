@@ -180,7 +180,7 @@ class StrategySimulator:
         if self.verbose:
             print(start_date, end_date, "assets:", self.simulator_setting.assets, "gain:", gain, sum(gain))
             for code, s in sorted(stats.items(), key=lambda x: sum(x[1].gain())):
-                print("[%s] return: %s, drawdown: %s, trade: %s, win: %s" % (code, sum(s.gain()), s.max_drawdown(), s.trade_num(), s.win_trade_num()))
+                print("[%s] return: %s, drawdown: %s, trade: %s, win: %s, term: %s" % (code, sum(s.gain()), s.max_drawdown(), s.trade_num(), s.win_trade_num(), s.max_term()))
 
         s = stats.values()
         results = {
