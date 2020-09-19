@@ -157,7 +157,7 @@ def load_strategy(args, combination_setting=None):
     _, settings = load_strategy_setting(args)
     return load_strategy_creator(args, combination_setting).create(settings)
 
-def load_simulator_data(code, start_date, end_date, args, time=None):
+def load_simulator_data(code, start_date, end_date, args):
     rule = "D"
     start = utils.to_format(utils.to_datetime(start_date) - utils.relativeterm(6))
     data = Loader.load_with_realtime(code, start, end_date)
