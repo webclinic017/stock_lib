@@ -846,14 +846,14 @@ class Simulator:
             else:
                 price_range = allowable_loss / position.min_unit / position.get_num()
 
-            if self.setting.short_trade:
+            if position.is_short():
                 price = position.get_value() + price_range
             else:
                 price = position.get_value() - price_range
 
             if price > 0:
-                self.log("[auto_stop_loss] price: %s, stop: %s, %s - %s" % (position.get_value(), price, position.get_value(), price_range))
-                self.repay_orders = self.repay_orders + [ReverseLimitOrder(position.get_num(), price, is_repay=True, is_short=self.setting.short_trade, valid_term=1)]
+                self.log("[auto_stop_loss][%s] price: %s, stop: %s, %s - %s" % (position.method, position.get_value(), price, position.get_value(), price_range))
+                self.repay_orders = self.repay_orders + [ReverseLimitOrder(position.get_num(), price, is_repay=True, is_short=position.is_short(), valid_term=1)]
         return
 
     def order_adjust(self, trade_data):
