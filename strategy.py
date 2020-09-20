@@ -24,6 +24,7 @@ def add_options(parser):
     parser.add_argument("--max_position_size", action="store", default=None, dest="max_position_size", help="最大ポジションサイズ")
     parser.add_argument("--production", action="store_true", default=False, dest="production", help="本番向け") # 実行環境の選択
     parser.add_argument("--short", action="store_true", default=False, dest="short", help="空売り戦略")
+    parser.add_argument("--long_short", action="store_true", default=False, dest="long_short", help="ロングショート戦略")
     parser.add_argument("--auto_stop_loss", type=float, action="store", default=None, dest="auto_stop_loss", help="自動損切")
     parser.add_argument("--stop_loss_rate", action="store", default=None, dest="stop_loss_rate", help="損切レート")
     parser.add_argument("--taking_rate", action="store", default=None, dest="taking_rate", help="利食いレート")
@@ -43,11 +44,14 @@ def create_parser():
     return add_options(parser)
 
 def get_prefix(args, ignore_code=False):
+    return create_prefix(args, args.production, args.short, ignore_code)
+
+def create_prefix(args, is_production, is_short, ignore_code=False):
     code = "" if args.code is None or ignore_code else "%s_" % args.code
 
-    prefix = "production_" if args.production else ""
+    prefix = "production_" if is_production else ""
 
-    method = "short_" if args.short else ""
+    method = "short_" if is_short else ""
 
     target = get_strategy_name(args)
     target = "" if target == "combination" else "%s_" % target
@@ -56,8 +60,11 @@ def get_prefix(args, ignore_code=False):
 
 def get_filename(args, ignore_code=False):
     prefix = get_prefix(args, ignore_code=ignore_code)
-    filename = "%ssimulate_setting.json" % prefix
+    filename = create_filename(prefix)
     return filename
+
+def create_filename(prefix):
+    return "%ssimulate_setting.json" % prefix
 
 class StrategyType:
     ENSEMBLE="ensemble"
@@ -155,6 +162,12 @@ def load_strategy_setting_by_filename(filename):
 
 def load_strategy(args, combination_setting=None):
     _, settings = load_strategy_setting(args)
+    return load_strategy_creator(args, combination_setting).create(settings)
+
+def load_strategy_by_option(args, is_short):
+    filename = create_filename(create_prefix(args, is_production=args.production, is_short=is_short))
+    setting_dict, settings = load_strategy_setting_by_filename(filename)
+    combination_setting = create_combination_setting_by_dict(args, setting_dict)
     return load_strategy_creator(args, combination_setting).create(settings)
 
 def load_simulator_data(code, start_date, end_date, args):
@@ -266,6 +279,10 @@ def create_simulator_setting_by_json(args):
 def apply_assets(args, setting):
     assets = Loader.assets()
     setting.assets = assets["assets"] if args.assets is None else args.assets
+    return setting
+
+def apply_long_short(args, setting):
+    setting.long_short_trade = {"long": load_strategy_by_option(args, is_short=False), "short": load_strategy_by_option(args, is_short=True)} if args.long_short else setting.long_short_trade
     return setting
 
 # ========================================================================
@@ -695,8 +712,8 @@ class Combination(StrategyCreator, StrategyUtil):
 
             # 最大を超える場合は調整
             if order + data.position.get_num() > max_position:
-                if data.setting.debug:
-                    print("order(+position) > max_position: ", order, data.position.get_num(), max_position)
+#                if data.setting.debug:
+#                    print("order(+position) > max_position: ", order, data.position.get_num(), max_position)
                 order = max_position - data.position.get_num()
 
             # レバレッジシグナルも買いシグナルとする
@@ -719,9 +736,9 @@ class Combination(StrategyCreator, StrategyUtil):
 
         if all(conditions):
             if self.setting.use_limit:
-                return simulator.LimitOrder(order, self.price(data))
+                return simulator.LimitOrder(order, self.price(data), is_short=data.setting.short_trade)
             else:
-                return simulator.MarketOrder(order, on_close=self.setting.on_close["new"])
+                return simulator.MarketOrder(order, on_close=self.setting.on_close["new"], is_short=data.setting.short_trade)
 
         return None
 
@@ -737,9 +754,9 @@ class Combination(StrategyCreator, StrategyUtil):
         if all(conditions):
             order = data.position.get_num()
             if self.setting.use_limit:
-                return simulator.LimitOrder(order, self.price(data), is_repay=True)
+                return simulator.LimitOrder(order, self.price(data), is_repay=True, is_short=data.setting.short_trade)
             else:
-                return simulator.MarketOrder(order, on_close=self.setting.on_close["repay"])
+                return simulator.MarketOrder(order, on_close=self.setting.on_close["repay"], is_short=data.setting.short_trade)
         return None
 
     # 損切
@@ -756,9 +773,9 @@ class Combination(StrategyCreator, StrategyUtil):
         if any(conditions):
             order = data.position.get_num()
             if self.setting.use_limit:
-                return simulator.ReverseLimitOrder(order, self.price(data), is_repay=True)
+                return simulator.ReverseLimitOrder(order, self.price(data), is_repay=True, is_short=data.setting.short_trade)
             else:
-                return simulator.MarketOrder(order, on_close=self.setting.on_close["repay"])
+                return simulator.MarketOrder(order, on_close=self.setting.on_close["repay"], is_short=data.setting.short_trade)
         return None
 
     # 手仕舞い
@@ -772,7 +789,7 @@ class Combination(StrategyCreator, StrategyUtil):
             ]
         if all(conditions):
             order = data.position.get_num()
-            return simulator.MarketOrder(order, on_close=True)
+            return simulator.MarketOrder(order, on_close=True, is_short=data.setting.short_trade)
 
         return None
 

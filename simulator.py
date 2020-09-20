@@ -284,6 +284,7 @@ class SimulatorSetting:
         self.error_rate = 0.00
         self.virtual_trade = True # 仮想取引 Falseにすると注文を処理しない
         self.short_trade = False
+        self.long_short_trade = {"long": None, "short": None}
         self.stop_loss_rate = 0.02
         self.taking_rate = 0.005
         self.min_unit = 100
@@ -571,7 +572,7 @@ class Simulator:
         self.capacity += cost
         self.commission(cost)
 
-        self.log(" new: %s yen x %s, total %s, ave %s, assets %s, cost %s" % (value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost))
+        self.log("[%s] new: %s yen x %s, total %s, ave %s, assets %s, cost %s" % (self.position.method, value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost))
 
         return True
 
@@ -588,7 +589,7 @@ class Simulator:
         self.capacity += cost
         self.commission(cost)
 
-        self.log(" repay: %s yen x %s, total %s, ave %s, assets %s, cost %s : gain %s" % (value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost, gain))
+        self.log("[%s] repay: %s yen x %s, total %s, ave %s, assets %s, cost %s : gain %s" % (self.position.method, value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost, gain))
         return True
 
     # 全部売る
@@ -715,7 +716,7 @@ class Simulator:
     def new_agreed_price(self, data, order):
 
         slippage = self.tick_price(order.price) * 2
-        slippage = -slippage if self.setting.short_trade else slippage
+        slippage = -slippage if order.is_short else slippage
 
         if order.is_market():
             return order.price
@@ -730,7 +731,7 @@ class Simulator:
     def repay_agreed_price(self, data, order):
 
         slippage = self.tick_price(order.price) * 2
-        slippage = slippage if self.setting.short_trade else -slippage
+        slippage = slippage if order.is_short else -slippage
 
         if order.is_market():
             return order.price
@@ -788,12 +789,44 @@ class Simulator:
         return None
 
     def signals(self, strategy, data, index, trade_data):
-        # 新規ルールに当てはまる場合買う
-        trade_data["new_order"] = self.new_signals(strategy, data, index)
-        # 返済注文
-        trade_data["repay_order"] = self.repay_signals(strategy, data, index)
-        # 手仕舞い注文
-        trade_data["closing_order"] = self.closing_signals(strategy, data, index)
+        strategies = self.setting.long_short_trade
+        if None in strategies.values():
+            # 新規ルールに当てはまる場合買う
+            trade_data["new_order"] = self.new_signals(strategy, data, index)
+            # 返済注文
+            trade_data["repay_order"] = self.repay_signals(strategy, data, index)
+            # 手仕舞い注文
+            trade_data["closing_order"] = self.closing_signals(strategy, data, index)
+        else:
+            self.setting.short_trade = False
+            long_new = self.new_signals(strategies["long"], data, index)
+            self.setting.short_trade = True
+            short_new = self.new_signals(strategies["short"], data, index)
+
+            trade_data["new_order"] = short_new if long_new is None else long_new
+
+            if self.position.get_num() > 0:
+                self.setting.short_trade = self.position.is_short()
+                # short中のlongシグナルで手仕舞いする
+                if self.position.is_short() and long_new is not None:
+                    self.log(" - long active.")
+                    trade_data["new_order"] = None
+                    trade_data["repay_order"] = MarketOrder(self.position.get_num(), is_short=self.position.is_short())
+                    trade_data["closing_order"] = None
+                else:
+                    trade_data["new_order"] = short_new if self.setting.short_trade else long_new
+                    trade_data["repay_order"] = self.repay_signals(strategies["short"], data, index) if self.setting.short_trade else self.repay_signals(strategies["long"], data, index)
+                    trade_data["closing_order"] = self.closing_signals(strategies["short"], data, index) if self.setting.short_trade else self.closing_signals(strategies["long"], data, index)
+            else:
+                self.setting.short_trade = long_new is None
+                trade_data["repay_order"] = self.repay_signals(strategies["short"], data, index) if self.setting.short_trade else self.repay_signals(strategies["long"], data, index)
+                trade_data["closing_order"] = self.closing_signals(strategies["short"], data, index) if self.setting.short_trade else self.closing_signals(strategies["long"], data, index)
+
+
+            self.new_orders = [] if trade_data["new_order"] is None else [trade_data["new_order"]]
+            self.repay_orders = [] if trade_data["repay_order"] is None else [trade_data["repay_order"]]
+            self.closing_orders = [] if trade_data["closing_order"] is None else [trade_data["closing_order"]]
+
         # 注文の整理
         trade_data = self.order_adjust(trade_data)
 
@@ -935,9 +968,13 @@ class Simulator:
         # 新規注文実行
         for order in new_orders:
             agreed_price = self.new_agreed_price(data, order)
+            self.position.system = "credit" if order.is_short else "actual"
+            self.position.method = "short" if order.is_short else "long"
             if self.new(agreed_price, order.num):
                 trade_data["new"] = agreed_price
                 trade_data["order_type"] = order.order_type
+                trade_data["assets"]              = self.total_assets(agreed_price)
+                trade_data["unavailable_assets"]  = trade_data["assets"] - self.assets
 
         # 返済注文実行
         for order in repay_orders:
@@ -952,6 +989,8 @@ class Simulator:
                 trade_data["gain"] = gain
                 trade_data["gain_rate"] = gain_rate
                 trade_data["order_type"] = order.order_type
+                trade_data["assets"]              = self.total_assets(agreed_price)
+                trade_data["unavailable_assets"]  = trade_data["assets"] - self.assets
 
         return trade_data
 
