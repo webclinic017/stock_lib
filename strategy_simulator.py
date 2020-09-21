@@ -138,7 +138,7 @@ class StrategySimulator:
                 split_data = stocks[code].split(dates[0], dates[-1])
                 if len(split_data.daily) == 0:
                     continue
-                simulators[code].closing(dates[-1], split_data.daily["close"].iloc[-1])
+                simulators[code].closing(dates[-1], split_data.daily["low"].iloc[-1], split_data.daily["high"].iloc[-1], split_data.daily["close"].iloc[-1])
                 self.log("[%s] closing: %s" % (code, split_data.daily["date"].iloc[-1]))
 
         # 統計 ====================================
@@ -149,17 +149,18 @@ class StrategySimulator:
         return self.get_results(stats, start_date, end_date)
 
 
-    def agg(self, stats, target):
+    def agg(self, stats, target, proc=None):
         results = {}
         for s in stats.values():
             for history in s.trade_history:
                 date = history["date"]
                 if date is None:
                     continue
+                d = history[target] if proc is None else proc(history[target])
                 if date in results.keys():
-                    results[date] += history[target]
+                    results[date] += d
                 else:
-                    results[date] = history[target]
+                    results[date] = d
         return results
 
     def get_results(self, stats, start_date, end_date):
@@ -175,6 +176,8 @@ class StrategySimulator:
         position_term = list(map(lambda x: x[1].term(), stats.items()))
         position_term = list(filter(lambda x: x != 0, sum(position_term, [])))
         max_unavailable_assets = self.agg(stats, "unavailable_assets").values()
+        min_assets = self.agg(stats, "min_assets", proc=lambda x: x - self.simulator_setting.assets).values()
+        min_assets = list(map(lambda x: self.simulator_setting.assets + x, min_assets))
         sum_contract_price = list(map(lambda x: x[1].sum_contract_price(), stats.items()))
         auto_stop_loss = list(map(lambda x: len(x[1].auto_stop_loss()), stats.items()))
 
@@ -192,6 +195,7 @@ class StrategySimulator:
             "lose": lose_codes,
             "gain": sum(gain),
             "return": round(sum(gain) / self.simulator_setting.assets, 2),
+            "min_assets": min(min_assets) if len(min_assets) > 0 else 0,
             "drawdown": round(numpy.average(list(map(lambda x: x.max_drawdown(), s))).item() if len(s) > 0 else 0, 2),
             "max_drawdown": round(max(list(map(lambda x: x.max_drawdown(), s))) if len(s) > 0 else 0, 2),
             "win_trade": sum(list(map(lambda x: x.win_trade_num(), s))) if len(s) > 0 else 0,

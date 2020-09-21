@@ -33,6 +33,11 @@ class Position:
     def eval(self, value, num):
         return value * num * self.min_unit
 
+    def cost(self, value, num):
+        price = self.eval(self.get_value(), num)
+        price = price + self.gain(value)
+        return price
+
     # 新規
     def new(self, num, value):
         self.add_history(num, value)
@@ -42,8 +47,7 @@ class Position:
     # 返済
     def repay(self, num, value):
         assert len(self.value) > 0, "do not repay. not hold."
-        price = self.eval(self.get_value(), num)
-        price = price + self.gain(value)
+        price = self.cost(value, num)
         self.add_history(-num, value)
         return price
 
@@ -310,6 +314,7 @@ class SimulatorStats:
             "gain": None,
             "gain_rate": None,
             "assets": None,
+            "min_assets": None,
             "unavailable_assets": None,
             "term": 0,
             "size": 0,
@@ -364,6 +369,9 @@ class SimulatorStats:
 
     def assets(self):
         return list(map(lambda x: x["assets"], self.trade_history))
+
+    def min_assets(self):
+        return list(map(lambda x: x["min_assets"], self.trade_history))
 
     def max_assets(self):
         if len(self.assets()) == 0:
@@ -529,7 +537,7 @@ class Simulator:
 
     # 総資産
     def total_assets(self, value):
-        holdings = self.position.eval(value, self.position.get_num())
+        holdings = self.position.cost(value, self.position.get_num())
         return self.assets + holdings
 
     def get_stats(self): 
@@ -593,8 +601,8 @@ class Simulator:
         return True
 
     # 全部売る
-    def closing(self, date, value, data=None):
-        trade_data = self.create_trade_data(date, value)
+    def closing(self, date, low, high, value, data=None):
+        trade_data = self.create_trade_data(date, low, high, value)
         num = self.position.get_num()
         gain = self.position.gain(value)
         gain_rate = self.position.gain_rate(value)
@@ -675,13 +683,13 @@ class Simulator:
         hit_orders, self.new_orders = self.exec_order(execution, self.new_orders, price)
         return hit_orders
 
-    def limit_new_order(self, price, volume):
-        execution = lambda x: x.signal(price, self.position) and x.is_limit
+    def limit_new_order(self, low, high, volume):
+        execution = lambda x: x.signal(self.limit(low, high, x), self.position) and x.is_limit
         hit_orders, self.new_orders = self.exec_order(execution, self.new_orders, volume=volume)
         return hit_orders
 
-    def reverse_limit_new_order(self, price, volume):
-        execution = lambda x: x.signal(price, self.position) and x.is_reverse_limit
+    def reverse_limit_new_order(self, low, high, volume):
+        execution = lambda x: x.signal(self.reverse_limit(low, high, x), self.position) and x.is_reverse_limit
         hit_orders, self.new_orders = self.exec_order(execution, self.new_orders, volume=volume)
         return hit_orders
 
@@ -690,13 +698,13 @@ class Simulator:
         hit_orders, self.repay_orders = self.exec_order(execution, self.repay_orders, price)
         return hit_orders
 
-    def limit_repay_order(self, price, volume):
-        execution = lambda x: x.signal(price, self.position) and x.is_limit
+    def limit_repay_order(self, low, high, volume):
+        execution = lambda x: x.signal(self.reverse_limit(low, high, x), self.position) and x.is_limit
         hit_orders, self.repay_orders = self.exec_order(execution, self.repay_orders, volume=volume)
         return hit_orders
 
-    def reverse_limit_repay_order(self, price, volume):
-        execution = lambda x: x.signal(price, self.position) and x.is_reverse_limit
+    def reverse_limit_repay_order(self, low, high, volume):
+        execution = lambda x: x.signal(self.limit(low, high, x), self.position) and x.is_reverse_limit
         hit_orders, self.repay_orders = self.exec_order(execution, self.repay_orders, volume=volume)
         return hit_orders
 
@@ -706,11 +714,11 @@ class Simulator:
         return hit_orders
 
     # 指値の条件に使うデータ
-    def limit(self):
-        return "high" if self.setting.short_trade else "low"
+    def limit(self, low, high, order):
+        return high if order.is_short else low
 
-    def reverse_limit(self):
-        return "low" if self.setting.short_trade else "high"
+    def reverse_limit(self, low, high, order):
+        return low if order.is_short else high
 
     # 指値の約定価格
     def new_agreed_price(self, data, order):
@@ -813,6 +821,11 @@ class Simulator:
                     trade_data["new_order"] = None
                     trade_data["repay_order"] = MarketOrder(self.position.get_num(), is_short=self.position.is_short())
                     trade_data["closing_order"] = None
+                elif not self.position.is_short() and short_new is not None:
+                    self.log(" - short active.")
+                    trade_data["new_order"] = None
+                    trade_data["repay_order"] = MarketOrder(self.position.get_num(), is_short=self.position.is_short())
+                    trade_data["closing_order"] = None
                 else:
                     trade_data["new_order"] = short_new if self.setting.short_trade else long_new
                     trade_data["repay_order"] = self.repay_signals(strategies["short"], data, index) if self.setting.short_trade else self.repay_signals(strategies["long"], data, index)
@@ -893,7 +906,7 @@ class Simulator:
             self.simulate_by_date(date, data, index)
 
         # 統計取得のために全部手仕舞う
-        self.closing(dates[-1], data.daily["close"].iloc[-1])
+        self.closing(dates[-1], data.daily["low"].iloc[-1], data.daily["high"].iloc[-1], data.daily["close"].iloc[-1])
 
         stats = self.get_stats()
 
@@ -947,20 +960,17 @@ class Simulator:
     def intraday_trade(self, volume, data, trade_data):
         price = data.daily["open"].iloc[-1].item()
         # 仮想トレードなら注文をキューから取得
-        limit = self.limit()
-        reverse_limit = self.reverse_limit()
-
-        limit_price = data.daily[limit].iloc[-1]
-        reverse_limit_price = data.daily[reverse_limit].iloc[-1]
+        low = data.daily["low"].iloc[-1]
+        high = data.daily["high"].iloc[-1]
 
         new_orders = []
-        new_orders += self.limit_new_order(limit_price, volume)
-        new_orders += self.reverse_limit_new_order(reverse_limit_price, volume)
+        new_orders += self.limit_new_order(low, high, volume)
+        new_orders += self.reverse_limit_new_order(low, high, volume)
 
         repay_orders = []
         if self.position.get_num() > 0:
-            repay_orders += self.limit_repay_order(reverse_limit_price, volume)
-            repay_orders += self.reverse_limit_repay_order(limit_price, volume)
+            repay_orders += self.limit_repay_order(low, high, volume)
+            repay_orders += self.reverse_limit_repay_order(low, high, volume)
 
         return self.virtual_trade(data, new_orders, repay_orders, trade_data)
 
@@ -994,10 +1004,11 @@ class Simulator:
 
         return trade_data
 
-    def create_trade_data(self, date, price):
+    def create_trade_data(self, date, low, high, price):
         trade_data = self.stats.create_trade_data()
         trade_data["date"]                = date
         trade_data["assets"]              = self.total_assets(price)
+        trade_data["min_assets"]          = self.total_assets(high if self.position.is_short() else low)
         trade_data["unavailable_assets"]  = trade_data["assets"] - self.assets
         return trade_data
 
@@ -1008,7 +1019,7 @@ class Simulator:
         date = data.daily["date"].iloc[-1]
 
         # stats
-        trade_data = self.create_trade_data(date, price)
+        trade_data = self.create_trade_data(date, data.daily["low"].iloc[-1], data.daily["high"].iloc[-1], price)
 
         # 判断に必要なデータ数がない
         if price == 0 or len(data.daily) < self.setting.min_data_length:
