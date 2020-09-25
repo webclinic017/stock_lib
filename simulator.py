@@ -984,6 +984,7 @@ class Simulator:
                 trade_data["new"] = agreed_price
                 trade_data["order_type"] = order.order_type
                 trade_data["assets"]              = self.total_assets(agreed_price)
+                trade_data["min_assets"]          = self.total_assets(data.daily["high"].iloc[-1] if self.position.is_short() else data.daily["low"].iloc[-1])
                 trade_data["unavailable_assets"]  = trade_data["assets"] - self.assets
 
         # 返済注文実行
