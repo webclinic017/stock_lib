@@ -815,7 +815,6 @@ class Simulator:
 
             if self.position.get_num() > 0:
                 self.setting.short_trade = self.position.is_short()
-                # short中のlongシグナルで手仕舞いする
                 if self.position.is_short() and long_new is not None:
                     self.log(" - long active.")
                     trade_data["new_order"] = None
@@ -850,14 +849,10 @@ class Simulator:
             return
 
         if position.get_num() > 0:
-            protect_gain = self.setting.assets * (self.setting.auto_stop_loss * 2)
-            allowable_loss = self.setting.assets * self.setting.auto_stop_loss
+            allowable_loss = position.get_value() * self.setting.auto_stop_loss
 
-            if position.get_term() >= 1 and protect_gain <= position.gain(price):
-                step = int(position.gain(price) / protect_gain)
-                price_range = - (protect_gain * step) / position.min_unit / position.get_num()
-            else:
-                price_range = allowable_loss / position.min_unit / position.get_num()
+            #price_range = allowable_loss / position.min_unit / position.get_num()
+            price_range = allowable_loss
 
             if position.is_short():
                 price = position.get_value() + price_range
