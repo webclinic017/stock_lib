@@ -419,6 +419,11 @@ class StrategyUtil:
         position_rate = data.position.get_num() / max_position_size
         return data.setting.stop_loss_rate * position_rate
 
+    # 保有数最大で最大の利食ラインを適用
+    def taking_rate(self, data, max_position_size):
+        position_rate = data.position.get_num() / max_position_size
+        return data.setting.taking_rate * position_rate
+
 # ========================================================================
 
 # 売買ルール
@@ -744,6 +749,9 @@ class Combination(StrategyCreator, StrategyUtil):
 
     # 利食い
     def create_taking_rules(self, data):
+        taking = [
+            data.position.gain_rate(data.data.daily["close"].iloc[-1]) > self.taking_rate(data, self.setting.max_position_size),
+        ]
         if self.setting.simple["taking"]:
             conditions = [self.apply_common(data, self.common.taking)]
         else:
