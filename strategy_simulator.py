@@ -98,10 +98,11 @@ class StrategySimulator:
         for code in stocks.keys():
             dates_dict[code] = stocks[code].dates(start_date, end_date)
             dates = list(set(dates + dates_dict[code]))
+        self.log("dates: %s" % dates)
 
         # 日付ごとにシミュレーション
         dates = sorted(dates, key=lambda x: utils.to_datetime(x))
-        self.log("targets: %s" % simulators.keys())
+        self.log("targets: %s" % list(simulators.keys()))
         capacity = None
 
         codes = self.get_targets(args, [], start_date)
@@ -119,6 +120,7 @@ class StrategySimulator:
                     continue
                 is_target = daterange[code][0] <= utils.to_datetime(date) and utils.to_datetime(date) <= daterange[code][-1]
                 if not is_target:
+                    self.log("[%s] is not target: %s" % (code, date))
                     continue
                 # 対象日までのデータの整形
                 if date in dates_dict[code]:

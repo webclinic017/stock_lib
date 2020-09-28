@@ -337,10 +337,10 @@ class SimulatorStats:
         return list(map(lambda x: x["term"], self.trade_history))
 
     def max_size(self):
-        return max(self.size())
+        return max(self.size()) if len(self.size()) > 0 else 0
 
     def max_term(self):
-        return max(self.term())
+        return max(self.term()) if len(self.term()) > 0 else 0
 
     def trade(self):
         return list(filter(lambda x: x["gain"] is not None, self.trade_history))
