@@ -25,8 +25,8 @@ class CombinationStrategy(CombinationCreator):
     def load_portfolio(self, date):
         d = utils.to_format(date)
         try:
-            data = pandas.read_csv("portfolio/new_high/%s.csv" % d, header=None)
-            data.columns = ["code", "price"]
+            data = pandas.read_csv("portfolio/high_update/%s.csv" % d, header=None)
+            data.columns = ["code", "price", "count", "date"]
             data = data[data["price"] <= (self.setting.assets / 250)]
             data = data.iloc[:10]
         except:
