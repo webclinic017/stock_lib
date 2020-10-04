@@ -630,7 +630,7 @@ def proc_call(params, retry=3):
             return
 
 def timestamp():
-    return datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 def to_datetime(date, input_format="%Y-%m-%d"):
     return datetime.strptime(date, input_format)

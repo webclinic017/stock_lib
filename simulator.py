@@ -290,7 +290,7 @@ class SimulatorSetting:
         self.short_trade = False
         self.long_short_trade = {"long": None, "short": None}
         self.stop_loss_rate = 0.02
-        self.taking_rate = 0.005
+        self.taking_rate = 0.04
         self.min_unit = 100
         self.trade_step = 1
         self.use_before_stick = False
@@ -850,8 +850,6 @@ class Simulator:
 
         if position.get_num() > 0:
             allowable_loss = position.get_value() * self.setting.auto_stop_loss
-
-            #price_range = allowable_loss / position.min_unit / position.get_num()
             price_range = allowable_loss
 
             if position.is_short():
@@ -862,7 +860,6 @@ class Simulator:
             if price > 0:
                 self.log("[auto_stop_loss][%s] price: %s, stop: %s, %s - %s" % (position.method, position.get_value(), price, position.get_value(), price_range))
                 self.repay_orders = self.repay_orders + [ReverseLimitOrder(position.get_num(), price, is_repay=True, is_short=position.is_short(), valid_term=1)]
-        return
 
     def order_adjust(self, trade_data):
         # 手仕舞いの場合全部キャンセル

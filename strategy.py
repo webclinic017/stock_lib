@@ -30,6 +30,7 @@ def add_options(parser):
     parser.add_argument("--taking_rate", action="store", default=None, dest="taking_rate", help="利食いレート")
     parser.add_argument("--min_unit", action="store", default=None, dest="min_unit", help="最低単元")
     parser.add_argument("--assets", type=int, action="store", default=None, dest="assets", help="assets")
+    parser.add_argument("--instant", action="store_true", default=False, dest="instant", help="日次トレード")
 
     # strategy
     parser.add_argument("--ensemble_dir", action="store", default=None, dest="ensemble_dir", help="アンサンブルディレクトリ")
@@ -53,10 +54,12 @@ def create_prefix(args, is_production, is_short, ignore_code=False):
 
     method = "short_" if is_short else ""
 
+    instant = "instant_" if args.instant else ""
+
     target = get_strategy_name(args)
     target = "" if target == "combination" else "%s_" % target
 
-    return "%s%s%s%s" % (prefix, code, target, method)
+    return "%s%s%s%s%s" % (prefix, code, target, method, instant)
 
 def get_filename(args, ignore_code=False):
     prefix = get_prefix(args, ignore_code=ignore_code)
@@ -541,6 +544,13 @@ class StrategyCreator:
 class CombinationCreator(StrategyCreator, StrategyUtil):
     def __init__(self, setting=None):
         self.setting = CombinationSetting() if setting is None else setting
+        self.new_conditions = []
+        self.taking_conditions = []
+        self.stop_loss_conditions = []
+        self.closing_conditions = []
+        self.x2_conditions = []
+        self.x4_conditions = []
+        self.x8_conditions = []
 
     def ranges(self):
         return [

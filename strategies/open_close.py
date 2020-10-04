@@ -28,7 +28,7 @@ class CombinationStrategy(CombinationCreator):
             data = pandas.read_csv("portfolio/high_update/%s.csv" % d, header=None)
             data.columns = ["code", "price", "count", "date"]
             data = data[data["price"] <= (self.setting.assets / 250)]
-            data = data.iloc[:10]
+            data = data.iloc[:5]
         except:
             data = None
         return data
@@ -61,7 +61,7 @@ class CombinationStrategy(CombinationCreator):
         random.seed(seed)
         numpy.random.seed(seed)
 
-        targets = ["daily", "nikkei", "dow"]
+        targets = ["daily"]
         self.conditions_all         = conditions.all_with_index(targets)
 
         new, self.new_conditions               = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("new"))
