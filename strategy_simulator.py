@@ -140,8 +140,8 @@ class StrategySimulator:
                 split_data = stocks[code].split(dates[0], dates[-1])
                 if len(split_data.daily) == 0:
                     continue
-                simulators[code].closing(dates[-1], split_data.daily["low"].iloc[-1], split_data.daily["high"].iloc[-1], split_data.daily["close"].iloc[-1])
                 self.log("[%s] closing: %s" % (code, split_data.daily["date"].iloc[-1]))
+                simulators[code].closing(dates[-1], split_data.daily["low"].iloc[-1], split_data.daily["high"].iloc[-1], split_data.daily["close"].iloc[-1])
 
         # 統計 ====================================
         stats = {}
@@ -172,21 +172,26 @@ class StrategySimulator:
         win_codes = list(map(lambda x: x[0], wins))
         lose_codes = list(map(lambda x: x[0], lose))
         codes = win_codes + lose_codes
+        commission = list(map(lambda x: sum(x[1].commission()), stats.items()))
         gain = list(map(lambda x: sum(x[1].gain()), stats.items()))
         position_size = self.agg(stats, "size").values()
         position_size = list(filter(lambda x: x != 0, position_size,))
         position_term = list(map(lambda x: x[1].term(), stats.items()))
         position_term = list(filter(lambda x: x != 0, sum(position_term, [])))
-        max_unavailable_assets = self.agg(stats, "unavailable_assets").values()
+        unavailable_assets = self.agg(stats, "unavailable_assets").values()
         min_assets = self.agg(stats, "min_assets", proc=lambda x: x - self.simulator_setting.assets).values()
         min_assets = list(map(lambda x: self.simulator_setting.assets + x, min_assets))
         sum_contract_price = list(map(lambda x: x[1].sum_contract_price(), stats.items()))
+        agg_contract_price = self.agg(stats, "contract_price", proc=lambda x: 0 if x is None else x).values()
+        import rakuten
+        oneday_commission = list(map(lambda x: rakuten.oneday_commission(x), agg_contract_price))
+        interest = list(map(lambda x: int(x * 0.028 / 365), unavailable_assets))
         auto_stop_loss = list(map(lambda x: len(x[1].auto_stop_loss()), stats.items()))
 
         if self.verbose:
             print(start_date, end_date, "assets:", self.simulator_setting.assets, "gain:", gain, sum(gain))
             for code, s in sorted(stats.items(), key=lambda x: sum(x[1].gain())):
-                print("[%s] return: %s, drawdown: %s, trade: %s, win: %s, term: %s" % (code, sum(s.gain()), s.max_drawdown(), s.trade_num(), s.win_trade_num(), s.max_term()))
+                print("[%s] return: %s, commission: %s, drawdown: %s, trade: %s, win: %s, term: %s" % (code, sum(s.gain()), sum(s.commission()), s.max_drawdown(), s.trade_num(), s.win_trade_num(), s.max_term()))
 
         s = stats.values()
         results = {
@@ -196,6 +201,9 @@ class StrategySimulator:
             "win": win_codes,
             "lose": lose_codes,
             "gain": sum(gain),
+            "commission": sum(commission),
+            "oneday_commission": sum(oneday_commission),
+            "interest": sum(interest),
             "return": round(sum(gain) / self.simulator_setting.assets, 2),
             "min_assets": min(min_assets) if len(min_assets) > 0 else 0,
             "drawdown": round(numpy.average(list(map(lambda x: x.max_drawdown(), s))).item() if len(s) > 0 else 0, 2),
@@ -206,7 +214,7 @@ class StrategySimulator:
             "max_position_size": max(position_size) if len(position_size) > 0 else 0,
             "position_term": round(numpy.average(position_term).item()) if len(position_term) > 0 else 0,
             "max_position_term": max(position_term) if len(position_term) > 0 else 0,
-            "max_unavailable_assets": max(max_unavailable_assets) if len(s) > 0 and len(max_unavailable_assets) > 0 else 0,
+            "max_unavailable_assets": max(unavailable_assets) if len(s) > 0 and len(unavailable_assets) > 0 else 0,
             "sum_contract_price": sum(sum_contract_price) if len(s) > 0 else 0,
             "auto_stop_loss": sum(auto_stop_loss) if len(s) > 0 else 0,
         }

@@ -1,32 +1,28 @@
 
 # price: 一日の約定金額合計
-def oneday_comission(price):
-    comissions = [
-        [100000, 0],
-        [200000, 206],
-        [300000, 308],
-        [500000, 463],
-        [1000000, 926],
-        [2000000, 2160],
-        [3000000, 3240],
+def oneday_commission(price):
+    commissions = [
+        [500000, 0],
+        [1000000, 943],
+        [2000000, 2200],
+        [3000000, 3300],
     ]
 
-    comission = None
-    for c in comissions:
-        # 厳密ではないが片道無料なので半分に
-        if price / 2 < c[0]:
-            comission = c[1]
+    commission = None
+    for c in commissions:
+        if price < c[0]:
+            commission = c[1]
             break
 
     # 300万以上の場合
-    if comission is None:
-        comission = 3240 + (int((price / 2) / 1000000) - 3) * 1080
+    if commission is None:
+        commission = 3300 + (int(price / 1000000) - 2) * 1100
 
-    return comission
+    return commission
 
 # price: 取引一回の約定代金
-def default_comission(price, is_credit):
-    actual_comissions = [
+def default_commission(price, is_credit):
+    actual_commissions = [
         [50000, 50],
         [100000, 90],
         [200000, 105],
@@ -36,7 +32,7 @@ def default_comission(price, is_credit):
         [30000000, 921],
     ]
 
-    credit_comissions = [
+    credit_commissions = [
         [100000, 90],
         [200000, 135],
         [500000, 180],
@@ -45,16 +41,16 @@ def default_comission(price, is_credit):
     # 最大超え
     over = 350 if is_credit else 973
 
-    comissions = credit_comissions if is_credit else actual_comissions
+    commissions = credit_commissions if is_credit else actual_commissions
 
-    comission = None
-    for c in comissions:
+    commission = None
+    for c in commissions:
         if price < c[0]:
-            comission = c[1]
+            commission = c[1]
             break
 
-    if comission is None:
-        comission = over
+    if commission is None:
+        commission = over
 
-    return comission
+    return int(commission * 1.1)
 

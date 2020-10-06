@@ -38,6 +38,10 @@ class Position:
         price = price + self.gain(value)
         return price
 
+    def commission(self, value, num):
+        import rakuten
+        return rakuten.default_commission(self.cost(value, num), is_credit=False)
+
     # 新規
     def new(self, num, value):
         self.add_history(num, value)
@@ -320,7 +324,8 @@ class SimulatorStats:
             "size": 0,
             "canceled": None,
             "contract_price": None,
-            "order_type": None
+            "order_type": None,
+            "commission": None
         }
         return trade_data
 
@@ -412,6 +417,9 @@ class SimulatorStats:
 
     def gain_rate(self):
         return list(filter(lambda x: x is not None, map(lambda x: x["gain_rate"], self.trade_history)))
+
+    def commission(self):
+        return list(filter(lambda x: x is not None, map(lambda x: x["commission"], self.trade_history)))
 
     def profits(self):
         return list(filter(lambda x: x > 0, self.gain()))
@@ -576,11 +584,11 @@ class Simulator:
             return False
 
         cost = self.position.new(num, value)
+        commission = self.position.commission(value, num)
         self.assets += cost
         self.capacity += cost
-        self.commission(cost)
 
-        self.log("[%s] new: %s yen x %s, total %s, ave %s, assets %s, cost %s" % (self.position.method, value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost))
+        self.log("[%s] new: %s yen x %s, total %s, ave %s, assets %s, cost %s, commission %s" % (self.position.method, value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost, commission))
 
         return True
 
@@ -592,12 +600,12 @@ class Simulator:
 
         gain_rate = self.position.gain_rate(value)
         gain = self.position.gain(value)
+        commission = self.position.commission(value, num)
         cost = self.position.repay(num, value)
         self.assets += cost
         self.capacity += cost
-        self.commission(cost)
 
-        self.log("[%s] repay: %s yen x %s, total %s, ave %s, assets %s, cost %s : gain %s" % (self.position.method, value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost, gain))
+        self.log("[%s] repay: %s yen x %s, total %s, ave %s, assets %s, cost %s, commission %s : gain %s" % (self.position.method, value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost, commission, gain))
         return True
 
     # 全部売る
@@ -606,6 +614,7 @@ class Simulator:
         num = self.position.get_num()
         gain = self.position.gain(value)
         gain_rate = self.position.gain_rate(value)
+        cost = self.position.cost(num, value)
         if self.repay(value, num):
             self.log(" - closing: price %s x %s" % (value, num))
             trade_data["repay"] = value
@@ -616,13 +625,6 @@ class Simulator:
         self.repay_orders = []
         self.stats.append(trade_data)
         self.force_stop = True
-
-    # 取引手数料
-    # TODO 実際のものに合わせる
-    def commission(self, cost):
-        import rakuten
-        self.assets -= rakuten.default_comission(cost, is_credit=False)
-#        self.assets -= self.setting.commission
 
     def tick_price(self, price):
         tick_prices = [
@@ -978,6 +980,7 @@ class Simulator:
                 trade_data["assets"]              = self.total_assets(agreed_price)
                 trade_data["min_assets"]          = self.total_assets(data.daily["high"].iloc[-1] if self.position.is_short() else data.daily["low"].iloc[-1])
                 trade_data["unavailable_assets"]  = trade_data["assets"] - self.assets
+                trade_data["commission"]          = self.position.commission(agreed_price, order.num)
 
         # 返済注文実行
         for order in repay_orders:
@@ -987,6 +990,7 @@ class Simulator:
             agreed_price = self.repay_agreed_price(data, order)
             gain        = self.position.gain(agreed_price)
             gain_rate   = self.position.gain_rate(agreed_price)
+            commission  = self.position.commission(agreed_price, order.num)
             if self.repay(agreed_price, order.num):
                 trade_data["repay"] = agreed_price
                 trade_data["gain"] = gain
@@ -994,6 +998,7 @@ class Simulator:
                 trade_data["order_type"] = order.order_type
                 trade_data["assets"]              = self.total_assets(agreed_price)
                 trade_data["unavailable_assets"]  = trade_data["assets"] - self.assets
+                trade_data["commission"]          = commission
 
         return trade_data
 
