@@ -89,7 +89,6 @@ class StrategySimulator:
         for code in stocks.keys():
             if stocks[code].split(start_date, end_date).daily["manda"].isin([1]).any(): # M&Aがあった銘柄はスキップ
                 self.log("skip. M&A. %s" % code)
-                print("skip. M&A. %s" % code)
                 continue
             simulators[code] = Simulator(simulator_setting)
 
