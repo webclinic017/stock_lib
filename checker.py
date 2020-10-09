@@ -233,14 +233,14 @@ def drift(data, regs, output=False):
     if "c" in regs:
         result["c"] = {"reg":results.params[1], "aic":results.aic, "bic":results.bic}
     if output:
-        print("with drift ", results.params[0], results.params[1]) # [1]:回帰係数
+        print("with drift ", results.params) # [1]:回帰係数
     x["t"] = range(len(y))
     model = sm.OLS(y, x)
     results = model.fit()
     if "ct" in regs:
         result["ct"] = {"reg":results.params[1], "aic":results.aic, "bic":results.bic}
     if output:
-        print("with drift + time trend ", results.params[0], results.params[1], results.params[2]) # [1]:回帰係数
+        print("with drift + time trend ", results.params) # [1]:回帰係数
     return result
 
 #########################################

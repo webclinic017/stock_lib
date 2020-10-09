@@ -193,8 +193,6 @@ def load_index(args, start_date, end_date):
     for k in ["nikkei", "dow"]:
         d = Loader.load_index(k, start, end_date, with_filter=True, strict=False)
         d = add_stats(k, d, "D")
-#        d = utils.add_stats(d)
-#        d = utils.add_cs_stats(d)
         index[k] = d
 
     index["new_score"] = SimulatorData("new_score", Loader.new_score(), "D")
