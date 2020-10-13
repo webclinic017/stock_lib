@@ -31,6 +31,7 @@ def add_options(parser):
     parser.add_argument("--min_unit", action="store", default=None, dest="min_unit", help="最低単元")
     parser.add_argument("--assets", type=int, action="store", default=None, dest="assets", help="assets")
     parser.add_argument("--instant", action="store_true", default=False, dest="instant", help="日次トレード")
+    parser.add_argument("--max_leverage", type=int, action="store", default=None, dest="max_leverage", help="max_leverage")
 
     # strategy
     parser.add_argument("--ensemble_dir", action="store", default=None, dest="ensemble_dir", help="アンサンブルディレクトリ")
@@ -232,6 +233,7 @@ def create_combination_setting(args, use_json=True):
     combination_setting.use_limit = args.use_limit if args.use_limit else combination_setting.use_limit
     combination_setting.position_sizing = args.position_sizing if args.position_sizing else combination_setting.position_sizing
     combination_setting.max_position_size = combination_setting.max_position_size if args.max_position_size is None else int(args.max_position_size)
+    combination_setting.max_leverage = combination_setting.max_leverage if args.max_leverage is None else int(args.max_leverage)
     combination_setting.ensemble = [] if args.ensemble_dir is None else ensemble_files(args.ensemble_dir)
     return combination_setting
 
@@ -508,6 +510,23 @@ class StrategyConditions():
         self.x8 = params[6] if len(params) > 6 else []
         return self
 
+    def concat(self, left, right):
+        return [
+            list(left[0]) + list(right[0]), # and
+            list(left[1]) + list(right[1])  # or
+        ]
+
+    def __add__(self, right):
+        return StrategyConditions().by_array([
+            self.concat(self.new, right.new),
+            self.concat(self.taking, right.taking),
+            self.concat(self.stop_loss, right.stop_loss),
+            self.concat(self.closing, right.closing),
+            self.concat(self.x2, right.x2),
+            self.concat(self.x4, right.x4),
+            self.concat(self.x8, right.x8)
+        ])
+
 # ========================================================================
 
 class StrategyCreator:
@@ -562,12 +581,12 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
         ]
 
     def create(self, settings):
-        strategy_setting = StrategySetting() if len(settings) == 0 else settings[0]
-        condition = self.conditions(strategy_setting)
-        return Combination(condition, self.common(settings), self.setting).create()
+        strategy_settings = [StrategySetting()] if len(settings) == 0 else settings
+        conditions = self.conditions(strategy_settings)
+        return Combination(conditions, self.common(settings), self.setting).create()
 
     # インデックスから直接条件を生成
-    def conditions(self, setting):
+    def condition(self, setting):
         return StrategyConditions().by_array([
             utils.combination(setting.new, self.new()),
             utils.combination(setting.taking, self.taking()),
@@ -578,11 +597,19 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
             [] if setting.x8 is None else utils.combination(setting.x8, self.x8()),
         ])
 
-    def conditions_by_index(self, conditions, index):
-        a = [conditions[i] for i in index[0]]
-        b = [conditions[i] for i in index[1]]
-        return [a, b]
+    def conditions(self, settings):
+        condition = None
+        for i in range(len(settings)):
+            self.conditions_by_seed(self.setting.seed[i])
+            debug = True
+            if condition is None:
+                condition = self.condition(settings[i])
+            else:
+                condition = condition + self.condition(settings[i])
+        return condition
 
+    def conditions_by_seed(self, seed):
+        raise Exception("Need override conditions_by_seed.")
 
     def subject(self):
         raise Exception("Need override subject.")
@@ -599,7 +626,7 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
         return StrategyCreator(new=rules, taking=rules, stop_loss=rules, closing=[lambda d: False])
 
     # @return StrategyCreator
-    def common(self, setting):
+    def common(self, settings):
         return self.default_common()
 
     # 継承したクラスから条件のリストから組み合わせを生成する
@@ -670,9 +697,10 @@ class CombinationSetting:
     use_limit = False
     position_sizing = False
     position_adjust = True
-    strict=True
+    strict = True
     assets = 0
     max_position_size = 5
+    max_leverage = None
     condition_size = 5
     seed = [int(t.time())]
     ensemble = []
@@ -719,9 +747,10 @@ class Combination(StrategyCreator, StrategyUtil):
         order = 1
         if self.setting.position_sizing:
             # レバレッジ
-            order = 2 if self.apply(data, self.conditions.x2) else order
-            order = 4 if self.apply(data, self.conditions.x4) else order
-            order = 8 if self.apply(data, self.conditions.x8) else order
+            available_leverage = lambda x: self.setting.max_leverage is None or x <= self.setting.max_leverage
+            order = 2 if self.apply(data, self.conditions.x2) and available_leverage(2) else order
+            order = 4 if self.apply(data, self.conditions.x4) and available_leverage(4) else order
+            order = 8 if self.apply(data, self.conditions.x8) and available_leverage(8) else order
 
             # 最大を超える場合は調整
             if order + data.position.get_num() > max_position:

@@ -85,7 +85,7 @@ class CombinationStrategy(CombinationCreator):
 
         return any(conditions)
 
-    def common(self, setting):
+    def common(self, settings):
         default = self.default_common()
         default.new = [
             lambda d: d.index.data["new_score"].daily["score"].iloc[-1] > -400,
@@ -104,13 +104,6 @@ class CombinationStrategy(CombinationCreator):
         default.closing = [
             lambda d: self.break_precondition(d)
         ]
-
-        for i in range(1, len(setting[1:])):
-            default.new         = default.new           + [lambda d: self.apply(utils.combination(setting[i-1].new, self.new_conditions))]
-            default.taking      = default.taking        + [lambda d: self.apply(utils.combination(setting[i-1].taking, self.taking_conditions))]
-            default.stop_loss   = default.stop_loss     + [lambda d: self.apply(utils.combination(setting[i-1].stop_loss, self.stop_loss_conditions))]
-            default.closing     = default.closing       + [lambda d: self.apply(utils.combination(setting[i-1].closing, self.closing_conditions))]
-            self.conditions_by_seed(self.setting.seed[i])
 
         return default
 

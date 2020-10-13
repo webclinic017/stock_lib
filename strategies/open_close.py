@@ -61,7 +61,7 @@ class CombinationStrategy(CombinationCreator):
         random.seed(seed)
         numpy.random.seed(seed)
 
-        targets = ["daily"]
+        targets = ["daily", "nikkei", "dow"]
         self.conditions_all         = conditions.all_with_index(targets)
 
         new, self.new_conditions               = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("new"))

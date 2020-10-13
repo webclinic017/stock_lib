@@ -32,21 +32,16 @@ class StrategySimulator:
 
     def select_codes(self, args, start_date, end_date):
         codes = []
-        validate_codes = []
         daterange = {}
 
         dates = list(utils.daterange(utils.to_datetime(start_date), utils.to_datetime(end_date)))
-        ends = list(dates)[1:] + [utils.to_datetime(end_date)]
-        for s, e in zip(dates, dates[1:] + [utils.to_datetime(end_date)]):
-            start, end = utils.to_format(s), utils.to_format(e)
-            targets = self.get_targets(args, codes, start)
-            validate_targets = self.get_targets(args, codes, end)
+        for d in dates:
+            date = utils.to_format(d)
+            targets = self.get_targets(args, codes, date)
             codes = list(set(codes + targets))
-            validate_codes = list(set(validate_codes + validate_targets))
-            daterange = self.append_daterange(targets, s, daterange)
-            daterange = self.append_daterange(validate_targets, e, daterange)
+            daterange = self.append_daterange(targets, d, daterange)
 
-        return codes, validate_codes, daterange
+        return codes, daterange
 
     def get_targets(self, args, targets, date):
         if args.code is None:
@@ -78,6 +73,8 @@ class StrategySimulator:
         stocks = data["data"]
         index = data["index"]
 
+        codes = self.get_targets(args, [], start_date)
+
         # シミュレーター準備
         simulators = {}
         simulator_setting = self.simulator_setting
@@ -86,7 +83,7 @@ class StrategySimulator:
         strategy_creator = self.strategy_creator(args)
         simulator_setting = strategy.apply_long_short(args, simulator_setting)
         simulator_setting.strategy = strategy_creator.create(strategy_settings)
-        for code in stocks.keys():
+        for code in codes:
             if stocks[code].split(start_date, end_date).daily["manda"].isin([1]).any(): # M&Aがあった銘柄はスキップ
                 self.log("skip. M&A. %s" % code)
                 continue
@@ -95,7 +92,7 @@ class StrategySimulator:
         # 日付のリストを取得
         dates = []
         dates_dict = {}
-        for code in stocks.keys():
+        for code in codes:
             dates_dict[code] = stocks[code].dates(start_date, end_date)
             dates = list(set(dates + dates_dict[code]))
         self.log("dates: %s" % dates)
@@ -104,8 +101,6 @@ class StrategySimulator:
         dates = sorted(dates, key=lambda x: utils.to_datetime(x))
         self.log("targets: %s" % list(simulators.keys()))
         capacity = None
-
-        codes = self.get_targets(args, [], start_date)
 
         for date in dates:
             # 休日はスキップ
@@ -117,10 +112,6 @@ class StrategySimulator:
 
             for code in codes:
                 if not code in simulators.keys():
-                    continue
-                is_target = daterange[code][0] <= utils.to_datetime(date) and utils.to_datetime(date) <= daterange[code][-1]
-                if not is_target:
-                    self.log("[%s] is not target: %s" % (code, date))
                     continue
                 # 対象日までのデータの整形
                 if date in dates_dict[code]:
