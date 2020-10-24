@@ -41,22 +41,6 @@ class CombinationStrategy(CombinationCreator):
             codes = data["code"].values.tolist()
         return codes
 
-    def choice(self, conditions, size, weights):
-        conditions_with_index = list(map(lambda x: {"x": x}, list(enumerate(conditions))))
-        choiced = numpy.random.choice(conditions_with_index, size, p=weights, replace=False).tolist()
-        choiced = list(map(lambda x: x["x"], choiced))
-        return list(zip(*choiced))
-
-    def apply_weights(self, method):
-        base = numpy.array([200] * len(self.conditions_all))
-
-        if method in self.weights.keys():
-            for index, weight in self.weights[method].items():
-                base[int(index)] = base[int(index)] + weight
-
-        weights = base / sum(base)
-        return weights
-
     def conditions_by_seed(self, seed):
         random.seed(seed)
         numpy.random.seed(seed)

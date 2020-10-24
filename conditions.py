@@ -1,19 +1,6 @@
 # -*- coding: utf-8 -*-
 
-def select(data, target="daily"):
-    data = {
-        "daily": data.data.daily,
-        "nikkei": data.index.data["nikkei"].daily,
-        "dow": data.index.data["dow"].daily,
-        "new_score": data.index.data["new_score"].daily
-#        "usdjpy": data.index.data["usdjpy"].daily,
-#        "xbtusd": data.index.data["xbtusd"].daily
-    }
-
-    if target in data.keys():
-        return data[target]
-
-    raise Exception("unselectable: %s" % target)
+from strategy import select
 
 def average_conditions(legs=["daily"]):
     columns = ["daily_average", "weekly_average"]

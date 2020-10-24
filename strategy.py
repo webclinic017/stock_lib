@@ -561,6 +561,7 @@ class StrategyCreator:
 class CombinationCreator(StrategyCreator, StrategyUtil):
     def __init__(self, setting=None):
         self.setting = CombinationSetting() if setting is None else setting
+        self.default_weights = 200
         self.new_conditions = []
         self.taking_conditions = []
         self.stop_loss_conditions = []
@@ -607,6 +608,26 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
             else:
                 condition = condition + self.condition(settings[i])
         return condition
+
+    def select_dates(self, start_date, end_date, instant):
+        return list(utils.daterange(utils.to_datetime(start_date), utils.to_datetime(end_date)))
+
+    def choice(self, conditions, size, weights):
+        conditions_with_index = list(map(lambda x: {"x": x}, list(enumerate(conditions))))
+        choiced = numpy.random.choice(conditions_with_index, size, p=weights, replace=False).tolist()
+        choiced = list(map(lambda x: x["x"], choiced))
+        return list(zip(*choiced))
+
+    def apply_weights(self, method):
+        base = numpy.array([self.default_weights] * len(self.conditions_all))
+
+        if method in self.weights.keys():
+            for index, weight in self.weights[method].items():
+                base[int(index)] = base[int(index)] + weight
+
+        weights = base / sum(base)
+        return weights
+
 
     def conditions_by_seed(self, seed):
         raise Exception("Need override conditions_by_seed.")
@@ -682,6 +703,27 @@ class StrategyCreateSetting:
         return strategy_types.COMBINATION
 
 ## 指定可能な戦略====================================================================================================================
+
+def selectable_data():
+    data = {
+        "daily": lambda d: d.data.daily,
+        "nikkei": lambda d: d.index.data["nikkei"].daily,
+        "dow": lambda d: d.index.data["dow"].daily,
+        "new_score": lambda d: d.index.data["new_score"].daily
+#        "usdjpy": data.index.data["usdjpy"].daily,
+#        "xbtusd": data.index.data["xbtusd"].daily
+    }
+
+    return data
+
+def select(data, target="daily"):
+
+    d = selectable_data()
+
+    if target in d.keys():
+        return d[target](data)
+
+    raise Exception("unselectable: %s" % target)
 
 class CombinationSetting:
     on_close = {

@@ -21,27 +21,16 @@ class StrategySimulator:
     def strategy_creator(self, args):
         return strategy.load_strategy_creator(args, self.combination_setting)
 
-    def append_daterange(self, codes, date, daterange):
-        for code in codes:
-            if not code in daterange.keys():
-                daterange[code] = []
-            daterange[code].append(date)
-            daterange[code] = list(set(daterange[code]))
-            daterange[code].sort()
-        return daterange
-
     def select_codes(self, args, start_date, end_date):
         codes = []
-        daterange = {}
 
-        dates = list(utils.daterange(utils.to_datetime(start_date), utils.to_datetime(end_date)))
+        dates = self.strategy_creator(args).select_dates(start_date, end_date, instant=args.instant)
         for d in dates:
             date = utils.to_format(d)
             targets = self.get_targets(args, codes, date)
             codes = list(set(codes + targets))
-            daterange = self.append_daterange(targets, d, daterange)
 
-        return codes, daterange
+        return codes
 
     def get_targets(self, args, targets, date):
         if args.code is None:
@@ -66,7 +55,7 @@ class StrategySimulator:
         d = strategy.add_stats(data.code, d, data.rule)
         return d
 
-    def simulates(self, strategy_setting, data, start_date, end_date, daterange):
+    def simulates(self, strategy_setting, data, start_date, end_date):
         self.log("simulating %s %s" % (start_date, end_date))
 
         args = data["args"]

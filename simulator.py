@@ -1021,7 +1021,7 @@ class Simulator:
 
         # 判断に必要なデータ数がない
         if price == 0 or len(data.daily) < self.setting.min_data_length:
-            self.log("less data. skip trade. [%s - %s]" % (data.daily["date"].iloc[0], date))
+            self.log("less data. skip trade. [%s - %s]. price: %s == 0 or length: %s < %s" % (data.daily["date"].iloc[0], date, price, len(data.daily), self.setting.min_data_length))
             self.stats.append(trade_data)
             return
 

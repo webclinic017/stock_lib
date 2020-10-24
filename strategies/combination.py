@@ -23,7 +23,7 @@ class CombinationStrategy(CombinationCreator):
         return self.selected_condition_index
 
     def load_portfolio(self, date):
-        d = utils.to_format(datetime(date.year, date.month, 1))
+        d = utils.to_format(date)
         try:
             data = pandas.read_csv("portfolio/high_update/%s.csv" % d, header=None)
             data.columns = ["code", "price", "count", "date"]
@@ -33,6 +33,13 @@ class CombinationStrategy(CombinationCreator):
             data = None
         return data
 
+    def select_dates(self, start_date, end_date, instant):
+        dates = super().select_dates(start_date, end_date, instant)
+        if instant:
+            return [utils.to_datetime(start_date)]
+        else:
+            return list(set(map(lambda x: datetime(x.year, x.month, 1), dates)))
+
     def subject(self, date):
         data = self.load_portfolio(utils.to_datetime(date))
         if data is None:
@@ -40,22 +47,6 @@ class CombinationStrategy(CombinationCreator):
         else:
             codes = data["code"].values.tolist()
         return codes
-
-    def choice(self, conditions, size, weights):
-        conditions_with_index = list(map(lambda x: {"x": x}, list(enumerate(conditions))))
-        choiced = numpy.random.choice(conditions_with_index, size, p=weights, replace=False).tolist()
-        choiced = list(map(lambda x: x["x"], choiced))
-        return list(zip(*choiced))
-
-    def apply_weights(self, method):
-        base = numpy.array([200] * len(self.conditions_all))
-
-        if method in self.weights.keys():
-            for index, weight in self.weights[method].items():
-                base[int(index)] = base[int(index)] + weight
-
-        weights = base / sum(base)
-        return weights
 
     def conditions_by_seed(self, seed):
         random.seed(seed)
