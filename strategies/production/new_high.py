@@ -86,14 +86,6 @@ class CombinationStrategy(CombinationCreator):
             lambda d: d.data.daily["stop_low"].iloc[-1] == 0
         ]
 
-        default.taking = [
-            lambda d: d.position.gain(self.price(d)) > 0,
-        ]
-
-        default.stop_loss = [
-            lambda d: d.position.gain(self.price(d)) < 0,
-        ]
-
         default.closing = [
             lambda d: self.break_precondition(d),
         ]

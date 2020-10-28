@@ -77,14 +77,6 @@ class CombinationStrategy(CombinationCreator):
             lambda d: not self.break_precondition(d)
         ]
 
-        default.taking = [
-            lambda d: d.position.gain(self.price(d)) > 0,
-        ]
-
-        default.stop_loss = [
-            lambda d: d.position.gain(self.price(d)) < 0,
-        ]
-
         default.closing = [
             lambda d: self.break_precondition(d),
         ]

@@ -455,6 +455,13 @@ class StrategySetting():
         self.x2 = None
         self.x4 = None
         self.x8 = None
+        self.x0_5 = None
+
+    def get_optional(self, params, index):
+        if isinstance(params, dict):
+            return int(params[index]) if index in params.keys() and params[index] is not None else None
+        else:
+            return int(params[index]) if len(params) > index and params[index] is not None else None
 
     # spaceからの読込用
     def by_array(self, params):
@@ -462,9 +469,10 @@ class StrategySetting():
         self.taking = int(params[1])
         self.stop_loss = int(params[2])
         self.closing = int(params[3])
-        self.x2 = int(params[4]) if len(params) > 4 and params[4] is not None else None
-        self.x4 = int(params[5]) if len(params) > 5 and params[5] is not None else None
-        self.x8 = int(params[6]) if len(params) > 6 and params[6] is not None else None
+        self.x2 = self.get_optional(params, 4)
+        self.x4 = self.get_optional(params, 5)
+        self.x8 = self.get_optional(params, 6)
+        self.x0_5 = self.get_optional(params, 7)
         return self
 
     # 設定からの読込用
@@ -473,9 +481,10 @@ class StrategySetting():
         self.taking = int(params["taking"])
         self.stop_loss = int(params["stop_loss"])
         self.closing = int(params["closing"])
-        self.x2 = int(params["x2"]) if "x2" in params.keys() and params["x2"] is not None else None
-        self.x4 = int(params["x4"]) if "x4" in params.keys() and params["x4"] is not None else None
-        self.x8 = int(params["x8"]) if "x8" in params.keys() and params["x8"] is not None else None
+        self.x2 = self.get_optional(params, "x2")
+        self.x4 = self.get_optional(params, "x4")
+        self.x8 = self.get_optional(params, "x8")
+        self.x0_5 = self.get_optional(params, "x0_5")
         return self
 
     # 設定への書き込み用
@@ -487,7 +496,8 @@ class StrategySetting():
             "closing": self.closing,
             "x2": self.x2,
             "x4": self.x4,
-            "x8": self.x8
+            "x8": self.x8,
+            "x0_5": self.x0_5
         }
 
 class StrategyConditions():
@@ -499,6 +509,7 @@ class StrategyConditions():
         self.x2 = []
         self.x4 = []
         self.x8 = []
+        self.x0_5 = []
 
     def by_array(self, params):
         self.new = params[0]
@@ -508,6 +519,7 @@ class StrategyConditions():
         self.x2 = params[4] if len(params) > 4 else []
         self.x4 = params[5] if len(params) > 5 else []
         self.x8 = params[6] if len(params) > 6 else []
+        self.x0_5 = params[7] if len(params) > 7 else []
         return self
 
     def concat(self, left, right):
@@ -524,7 +536,8 @@ class StrategyConditions():
             self.concat(self.closing, right.closing),
             self.concat(self.x2, right.x2),
             self.concat(self.x4, right.x4),
-            self.concat(self.x8, right.x8)
+            self.concat(self.x8, right.x8),
+            self.concat(self.x0_5, right.x0_5)
         ])
 
 # ========================================================================
@@ -569,6 +582,7 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
         self.x2_conditions = []
         self.x4_conditions = []
         self.x8_conditions = []
+        self.x0_5_conditions = []
 
     def ranges(self):
         return [
@@ -579,6 +593,7 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
             list(range(utils.combinations_size(self.x2()))),
             list(range(utils.combinations_size(self.x4()))),
             list(range(utils.combinations_size(self.x8()))),
+            list(range(utils.combinations_size(self.x0_5()))),
         ]
 
     def create(self, settings):
@@ -596,6 +611,7 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
             [] if setting.x2 is None else utils.combination(setting.x2, self.x2()),
             [] if setting.x4 is None else utils.combination(setting.x4, self.x4()),
             [] if setting.x8 is None else utils.combination(setting.x8, self.x8()),
+            [] if setting.x0_5 is None else utils.combination(setting.x0_5, self.x0_5()),
         ])
 
     def conditions(self, settings):
@@ -682,6 +698,11 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
         ]
 
     def x8(self):
+        return [
+            lambda d: False
+        ]
+
+    def x0_5(self):
         return [
             lambda d: False
         ]
@@ -831,15 +852,22 @@ class Combination(StrategyCreator, StrategyUtil):
         taking = [
             data.position.gain_rate(data.data.daily["close"].iloc[-1]) > self.taking_rate(data, self.setting.max_position_size),
         ]
+
+        conditions = [
+            data.position.gain(self.price(data)) > 0
+        ]
+
         if self.setting.simple["taking"]:
-            conditions = [self.apply_common(data, self.common.taking)]
+            conditions = conditions + [self.apply_common(data, self.common.taking)]
         else:
-            conditions = [
+            conditions = conditions + [
                 self.apply_common(data, self.common.taking),
                 self.apply(data, self.conditions.taking)
             ]
+
+        order = data.position.get_num()
+
         if all(conditions):
-            order = data.position.get_num()
             if self.setting.use_limit:
                 return simulator.LimitOrder(order, self.price(data), is_repay=True, is_short=data.setting.short_trade)
             else:
@@ -857,7 +885,8 @@ class Combination(StrategyCreator, StrategyUtil):
             conditions = conditions + [
                 self.apply_common(data, self.common.stop_loss) and self.apply(data, self.conditions.stop_loss),
             ]
-        if any(conditions):
+
+        if data.position.gain(self.price(data)) < 0 and any(conditions):
             order = data.position.get_num()
             if self.setting.use_limit:
                 return simulator.ReverseLimitOrder(order, self.price(data), is_repay=True, is_short=data.setting.short_trade)
@@ -907,7 +936,7 @@ class CombinationChecker:
         return sources
 
     def get_strategy_sources(self, combination_strategy, setting):
-        new, taking, stop_loss, closing, x2, x4, x8 = [], [], [], [], [], [], []
+        new, taking, stop_loss, closing, x2, x4, x8, x0_5 = [], [], [], [], [], [], [], []
         s = setting["setting"][0]
         new         = new       + [utils.combination(s["new"], combination_strategy.new_conditions)] if "new" in s.keys() else []
         taking      = taking    + [utils.combination(s["taking"], combination_strategy.taking_conditions)] if "taking" in s.keys() else []
@@ -916,6 +945,7 @@ class CombinationChecker:
         x2          = x2        + [utils.combination(s["x2"], combination_strategy.x2_conditions)] if "x2" in s.keys() else []
         x4          = x4        + [utils.combination(s["x4"], combination_strategy.x4_conditions)] if "x4" in s.keys() else []
         x8          = x8        + [utils.combination(s["x8"], combination_strategy.x8_conditions)] if "x8" in s.keys() else []
+        x0_5        = x0_5      + [utils.combination(s["x0_5"], combination_strategy.x0_5_conditions)] if "x0_5" in s.keys() else []
 
         conditions = {
             "new": new,
@@ -924,7 +954,8 @@ class CombinationChecker:
             "closing": closing,
             "x2": x2,
             "x4": x4,
-            "x8": x8
+            "x8": x8,
+            "x0_5": x0_5
         }
 
         results = {}
