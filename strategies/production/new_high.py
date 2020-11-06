@@ -73,7 +73,7 @@ class CombinationStrategy(CombinationCreator):
 
     def break_precondition(self, d):
         conditions = [
-            d.data.daily["high_update"][-2:].max() == 0 and (d.position.gain(self.price(d)) <= 0 or sum(d.stats.gain()) <= 0) and d.position.get_num() >= 0,
+            d.data.daily["high_update"][-2:].max() == 0 and (d.position.gain(self.price(d), d.position.get_num()) <= 0 or sum(d.stats.gain()) <= 0) and d.position.get_num() >= 0,
             d.data.daily["high_update"][-10:].sum() <= 5
         ]
 

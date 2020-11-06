@@ -39,18 +39,17 @@ def add_options(parser):
     parser.add_argument("--open_close", action="store_true", default=False, dest="open_close", help="寄せ引け")
     parser.add_argument("--futures", action="store_true", default=False, dest="futures", help="先物")
     parser.add_argument("--new_high", action="store_true", default=False, dest="new_high", help="新高値")
+    parser.add_argument("--simple", action="store_true", default=False, dest="simple", help="シンプル")
     return parser
 
 def create_parser():
     parser = ArgumentParser()
     return add_options(parser)
 
-def get_prefix(args, ignore_code=False):
-    return create_prefix(args, args.production, args.short, ignore_code)
+def get_prefix(args):
+    return create_prefix(args, args.production, args.short)
 
-def create_prefix(args, is_production, is_short, ignore_code=False):
-    code = "" if args.code is None or ignore_code else "%s_" % args.code
-
+def create_prefix(args, is_production, is_short):
     prefix = "production_" if is_production else ""
 
     method = "short_" if is_short else ""
@@ -60,10 +59,10 @@ def create_prefix(args, is_production, is_short, ignore_code=False):
     target = get_strategy_name(args)
     target = "" if target == "combination" else "%s_" % target
 
-    return "%s%s%s%s%s" % (prefix, code, target, method, instant)
+    return "%s%s%s%s" % (prefix, target, method, instant)
 
-def get_filename(args, ignore_code=False):
-    prefix = get_prefix(args, ignore_code=ignore_code)
+def get_filename(args):
+    prefix = get_prefix(args)
     filename = create_filename(prefix)
     return filename
 
@@ -76,6 +75,7 @@ class StrategyType:
     OPEN_CLOSE="open_close"
     FUTURES="futures"
     NEW_HIGH="new_high"
+    SIMPLE="simple"
 
     def list(self):
         return [
@@ -83,7 +83,8 @@ class StrategyType:
             self.COMBINATION,
             self.OPEN_CLOSE,
             self.FUTURES,
-            self.NEW_HIGH
+            self.NEW_HIGH,
+            self.SIMPLE
         ]
 
 def get_strategy_name(args):
@@ -96,6 +97,8 @@ def get_strategy_name(args):
         return strategy_types.FUTURES
     elif args.new_high:
         return strategy_types.NEW_HIGH
+    elif args.simple:
+        return strategy_types.SIMPLE
     else:
         return strategy_types.COMBINATION
 
@@ -129,6 +132,9 @@ def load_strategy_creator_by_type(strategy_type, is_production, combination_sett
         elif strategy_types.NEW_HIGH == strategy_type:
             from strategies.new_high import CombinationStrategy
             return CombinationStrategy(combination_setting)
+        elif strategy_types.SIMPLE == strategy_type:
+            from strategies.simple import SimpleStrategy
+            return SimpleStrategy()
         else:
             from strategies.combination import CombinationStrategy
             return CombinationStrategy(combination_setting)
@@ -145,7 +151,7 @@ def load_strategy_setting(args):
 
     # 個別銘柄の設定がなければ共通の設定を読む
     if args.code is not None and setting_dict is None:
-        filename = get_filename(args, ignore_code=True)
+        filename = get_filename(args)
         setting_dict = Loader.simulate_setting(filename)
 
     return setting_dict, strategy_setting
@@ -317,15 +323,15 @@ class StrategyUtil:
     def drawdown(self, data):
         term = self.term(data)
         price = self.price(data)
-        gain = data.position.gain(price)
+        gain = data.position.gain(price, data.position.get_num())
         max_gain = self.max_gain(data)
         return max_gain - gain
 
     def max_gain(self, data):
         if data.setting.short_trade:
-            max_gain = data.position.gain(data.data.daily["low"].min())
+            max_gain = data.position.gain(data.data.daily["low"].min(), data.position.get_num())
         else:
-            max_gain = data.position.gain(data.data.daily["high"].max())
+            max_gain = data.position.gain(data.data.daily["high"].max(), data.position.get_num())
         return max_gain
 
     def take_gain(self, data):
@@ -386,7 +392,7 @@ class StrategyUtil:
         conditions = [
             self.risk(data) == 0, # セーフティーを下回っている
             data.position.get_num() == 0, # 初回の仕掛け
-            data.position.gain(self.price(data)) < 0, # 損益がマイナス
+            data.position.gain(self.price(data), data.position.get_num()) < 0, # 損益がマイナス
             gain[-1] < 0 if len(gain) > 0 else False, # 最後のトレードで損失
         ]
         return any(conditions)
@@ -396,7 +402,7 @@ class StrategyUtil:
         gain = data.stats.gain()
         conditions = [
             gain[-1] > 0 if len(gain) > 0 else False, # 最後のトレードで利益
-            data.position.gain(self.price(data)) > 0, # 損益がプラス
+            data.position.gain(self.price(data), data.position.get_num()) > 0, # 損益がプラス
         ]
         return any(conditions)
 
@@ -543,33 +549,40 @@ class StrategyConditions():
 # ========================================================================
 
 class StrategyCreator:
-    def __init__(self, new=None, taking=None, stop_loss=None, closing=None):
-        self.new = new
-        self.taking = taking
-        self.stop_loss = stop_loss
-        self.closing = closing
+    def create_new_orders(self, data):
+        raise Exception("Need override create_new_orders.")
 
-    def create_new_rules(self, data):
-        return simulator.Order(0, [lambda x: True]) if self.new is None else self.new(data)
+    def create_taking_orders(self, data):
+        raise Exception("Need override create_taking_orders.")
 
-    def create_taking_rules(self, data):
-        return simulator.Order(0, [lambda x: True]) if self.taking is None else self.taking(data)
+    def create_stop_loss_orders(self, data):
+        raise Exception("Need override create_stop_loss_orders.")
 
-    def create_stop_loss_rules(self, data):
-        return simulator.Order(0, [lambda x: True]) if self.stop_loss is None else self.stop_loss(data)
+    def create_closing_orders(self, data):
+        raise Exception("Need override create_closing_orders.")
 
-    def create_closing_rules(self, data):
-        return simulator.Order(0, [lambda x: True]) if self.closing is None else self.closing(data)
+    def subject(self, date):
+        raise Exception("Need override subject.")
 
-    def create(self):
-        new_rules = [lambda x: self.create_new_rules(x)]
-        taking_rules = [lambda x: self.create_taking_rules(x)]
-        stop_loss_rules = [lambda x: self.create_stop_loss_rules(x)]
-        closing_rules = [lambda x: self.create_closing_rules(x)]
+    def conditions_index(self): # TODO このクラスのものではない
+        raise Exception("Need override conditions_index.")
+
+    # 何か追加データが欲しいときはoverrideする
+    def add_data(self, data):
+        return data
+
+    def select_dates(self, start_date, end_date, instant):
+        return list(utils.daterange(utils.to_datetime(start_date), utils.to_datetime(end_date)))
+
+    def create(self, settings):
+        new_rules = [lambda x: self.create_new_orders(x)]
+        taking_rules = [lambda x: self.create_taking_orders(x)]
+        stop_loss_rules = [lambda x: self.create_stop_loss_orders(x)]
+        closing_rules = [lambda x: self.create_closing_orders(x)]
         return Strategy(new_rules, taking_rules, stop_loss_rules, closing_rules)
 
     def ranges(self):
-        return []
+        return [[0], [0], [0], [0]]
 
 class CombinationCreator(StrategyCreator, StrategyUtil):
     def __init__(self, setting=None):
@@ -599,7 +612,7 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
     def create(self, settings):
         strategy_settings = [StrategySetting()] if len(settings) == 0 else settings
         conditions = self.conditions(strategy_settings)
-        return Combination(conditions, self.common(settings), self.setting).create()
+        return Combination(conditions, self.common(settings), self.setting).create(settings)
 
     # インデックスから直接条件を生成
     def condition(self, setting):
@@ -625,9 +638,6 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
                 condition = condition + self.condition(settings[i])
         return condition
 
-    def select_dates(self, start_date, end_date, instant):
-        return list(utils.daterange(utils.to_datetime(start_date), utils.to_datetime(end_date)))
-
     def choice(self, conditions, size, weights):
         conditions_with_index = list(map(lambda x: {"x": x}, list(enumerate(conditions))))
         choiced = numpy.random.choice(conditions_with_index, size, p=weights, replace=False).tolist()
@@ -648,21 +658,12 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
     def conditions_by_seed(self, seed):
         raise Exception("Need override conditions_by_seed.")
 
-    def subject(self):
-        raise Exception("Need override subject.")
-
-    def conditions_index(self):
-        raise Exception("Need override conditions_index.")
-
-    # 何か追加データが欲しいときはoverrideする
-    def add_data(self, data):
-        return data
 
     def default_common(self):
         rules = [lambda d: True]
-        return StrategyCreator(new=rules, taking=rules, stop_loss=rules, closing=[lambda d: False])
+        return StrategyConditions().by_array([rules, rules, rules, [lambda d: False]])
 
-    # @return StrategyCreator
+    # @return StrategyConditions
     def common(self, settings):
         return self.default_common()
 
@@ -793,7 +794,7 @@ class Combination(StrategyCreator, StrategyUtil):
         return allow
 
     # 買い
-    def create_new_rules(self, data):
+    def create_new_orders(self, data):
 
         if self.setting.position_adjust:
             risk = self.risk(data)
@@ -848,13 +849,13 @@ class Combination(StrategyCreator, StrategyUtil):
         return None
 
     # 利食い
-    def create_taking_rules(self, data):
+    def create_taking_orders(self, data):
         taking = [
             data.position.gain_rate(data.data.daily["close"].iloc[-1]) > self.taking_rate(data, self.setting.max_position_size),
         ]
 
         conditions = [
-            data.position.gain(self.price(data)) > 0
+            data.position.gain(self.price(data), data.position.get_num()) > 0
         ]
 
         if self.setting.simple["taking"]:
@@ -862,10 +863,12 @@ class Combination(StrategyCreator, StrategyUtil):
         else:
             conditions = conditions + [
                 self.apply_common(data, self.common.taking),
-                self.apply(data, self.conditions.taking)
+                self.apply(data, self.conditions.taking) or self.apply(data, self.conditions.x0_5) # TODO strictどうするか
             ]
 
         order = data.position.get_num()
+        if self.apply(data, self.conditions.x0_5): # x0.5なら半分にする
+            order = math.ceil(order / 2)
 
         if all(conditions):
             if self.setting.use_limit:
@@ -875,7 +878,7 @@ class Combination(StrategyCreator, StrategyUtil):
         return None
 
     # 損切
-    def create_stop_loss_rules(self, data):
+    def create_stop_loss_orders(self, data):
         conditions = [
             data.position.gain_rate(data.data.daily["close"].iloc[-1]) < -self.stop_loss_rate(data, self.setting.max_position_size), # 保有数最大で最大の損切ラインを適用
         ]
@@ -886,7 +889,7 @@ class Combination(StrategyCreator, StrategyUtil):
                 self.apply_common(data, self.common.stop_loss) and self.apply(data, self.conditions.stop_loss),
             ]
 
-        if data.position.gain(self.price(data)) < 0 and any(conditions):
+        if data.position.gain(self.price(data), data.position.get_num()) < 0 and any(conditions):
             order = data.position.get_num()
             if self.setting.use_limit:
                 return simulator.ReverseLimitOrder(order, self.price(data), is_repay=True, is_short=data.setting.short_trade)
@@ -895,7 +898,7 @@ class Combination(StrategyCreator, StrategyUtil):
         return None
 
     # 手仕舞い
-    def create_closing_rules(self, data):
+    def create_closing_orders(self, data):
         if self.setting.simple["closing"]:
             conditions = [self.apply_common(data, self.common.closing)]
         else:

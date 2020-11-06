@@ -35,7 +35,7 @@ class Position:
 
     def cost(self, value, num):
         price = self.eval(self.get_value(), num)
-        price = price + self.gain(value)
+        price = price + self.gain(value, num)
         return price
 
     def commission(self, value, num):
@@ -75,13 +75,13 @@ class Position:
         return self.initial
 
     # 損益
-    def gain(self, value):
+    def gain(self, value, num):
         if self.get_value() is None:
             return 0
         if self.is_short():
-            return self.eval(self.get_value() - value, self.get_num())
+            return self.eval(self.get_value() - value, num)
         else:
-            return self.eval(value - self.get_value(), self.get_num())
+            return self.eval(value - self.get_value(), num)
 
     # 損益レシオ
     def gain_rate(self, value):
@@ -599,20 +599,20 @@ class Simulator:
             return False
 
         gain_rate = self.position.gain_rate(value)
-        gain = self.position.gain(value)
+        gain = self.position.gain(value, num)
         commission = self.position.commission(value, num)
         cost = self.position.repay(num, value)
         self.assets += cost
         self.capacity += cost
 
-        self.log("[%s] repay: %s yen x %s, total %s, ave %s, assets %s, cost %s, commission %s : gain %s" % (self.position.method, value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost, commission, gain))
+        self.log("[%s] repay: %s yen x %s, total %s, ave %s, assets %s, cost %s, commission %s, term %s : gain %s" % (self.position.method, value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost, commission, self.position.get_term(), gain))
         return True
 
     # 全部売る
     def closing(self, date, low, high, value, data=None):
         trade_data = self.create_trade_data(date, low, high, value)
         num = self.position.get_num()
-        gain = self.position.gain(value)
+        gain = self.position.gain(value, num)
         gain_rate = self.position.gain_rate(value)
         cost = self.position.cost(num, value)
         if self.repay(value, num):
@@ -883,12 +883,12 @@ class Simulator:
             self.repay_orders = []
             trade_data["canceled"] = "repay"
 
-        # 新規・返済が同時に出ている場合何もしない
+        # 新規・返済が同時に出ている場合返済を優先
         if len(self.new_orders) > 0 and len(self.repay_orders) > 0:
-            self.log("[cancel] new/repay order")
+            self.log("[cancel] new order")
             self.new_orders = []
-            self.repay_orders = []
-            trade_data["canceled"] = "all"
+#            self.repay_orders = []
+#            trade_data["canceled"] = "all"
 
         return trade_data
 
@@ -988,7 +988,7 @@ class Simulator:
                 self.repay_orders = [] # ポジションがなくなってたら以降の注文はキャンセル
                 break
             agreed_price = self.repay_agreed_price(data, order)
-            gain        = self.position.gain(agreed_price)
+            gain        = self.position.gain(agreed_price, order.num)
             gain_rate   = self.position.gain_rate(agreed_price)
             commission  = self.position.commission(agreed_price, order.num)
             if self.repay(agreed_price, order.num):

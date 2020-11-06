@@ -62,15 +62,16 @@ class CombinationStrategy(CombinationCreator):
         x2, self.x2_conditions                 = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("x2"))
         x4, self.x4_conditions                 = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("x4"))
         x8, self.x8_conditions                 = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("x8"))
+        x0_5, self.x0_5_conditions             = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("x0_5"))
 
         # 選択された条件のインデックスを覚えておく
         self.selected_condition_index = {
-            "new":new, "taking": taking, "stop_loss": stop_loss, "x2": x2, "x4": x4, "x8": x8
+            "new":new, "taking": taking, "stop_loss": stop_loss, "x2": x2, "x4": x4, "x8": x8, "x0_5": x0_5
         }
 
     def break_precondition(self, d):
         conditions = [
-            d.data.daily["high_update"][-2:].max() == 0 and (d.position.gain(self.price(d)) <= 0 or sum(d.stats.gain()) <= 0) and d.position.get_num() >= 0,
+            d.data.daily["high_update"][-2:].max() == 0 and (d.position.gain(self.price(d), d.position.get_num()) <= 0 or sum(d.stats.gain()) <= 0) and d.position.get_num() >= 0,
             d.data.daily["high_update"][-10:].sum() <= 5
         ]
 
@@ -110,3 +111,6 @@ class CombinationStrategy(CombinationCreator):
 
     def x8(self):
         return self.x8_conditions
+
+    def x0_5(self):
+        return self.x0_5_conditions
