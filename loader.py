@@ -792,8 +792,8 @@ class Loader:
     @staticmethod
     def load_industry_index(code):
         try:
-            data = pandas.read_csv("%s/index/industry/%s.csv" % (Loader.base_dir, code), header=None)
-            data.columns = ["date", "price", "volume"]
+            data = pandas.read_csv("%s/index/industry/%s.csv" % (Loader.base_dir, code))
+            #data.columns = ["date", "price", "volume", "gradient"]
             data['date'] = pandas.to_datetime(data['date'], format='%Y-%m-%d')
             return data.sort_values(by=["date"])
         except:
@@ -837,6 +837,15 @@ class Loader:
             return data["token"]
         except:
             data = None
+
+    @staticmethod
+    def illegal_data():
+        try:
+            data = pandas.read_csv("settings/illegal_data.csv", header=None)
+            data.columns = ["code"]
+            return data
+        except:
+            return None
 
     @staticmethod
     def five_times():
