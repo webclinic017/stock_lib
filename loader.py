@@ -800,7 +800,7 @@ class Loader:
             return None
 
     @staticmethod
-    def featured_industry():
+    def industry_trend():
         try:
             data = pandas.read_csv("%s/settings/industry_trend.csv" % (Loader.base_dir))
             data['date'] = pandas.to_datetime(data['date'], format='%Y-%m-%d')
