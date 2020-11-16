@@ -27,7 +27,7 @@ class CombinationStrategy(CombinationCreator):
         try:
             data = pandas.read_csv("portfolio/high_update/%s.csv" % d, header=None)
             data.columns = ["code", "price", "count", "date"]
-            data = data[data["price"] <= (self.setting.assets / 250)]
+            data = data[data["price"] <= (self.setting.assets / 500)]
             data = data.iloc[:10]
         except:
             data = None
@@ -53,7 +53,7 @@ class CombinationStrategy(CombinationCreator):
         numpy.random.seed(seed)
 
         targets = ["daily", "nikkei", "dow"]
-        self.conditions_all         = conditions.all_with_index(targets)
+        self.conditions_all         = conditions.all_with_index(targets) + conditions.industry_score_conditions()
 
         new, self.new_conditions               = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("new"))
         taking, self.taking_conditions         = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("taking"))
@@ -62,11 +62,10 @@ class CombinationStrategy(CombinationCreator):
         x2, self.x2_conditions                 = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("x2"))
         x4, self.x4_conditions                 = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("x4"))
         x8, self.x8_conditions                 = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("x8"))
-        x0_5, self.x0_5_conditions             = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("x0_5"))
 
         # 選択された条件のインデックスを覚えておく
         self.selected_condition_index = {
-            "new":new, "taking": taking, "stop_loss": stop_loss, "x2": x2, "x4": x4, "x8": x8, "x0_5": x0_5
+            "new":new, "taking": taking, "stop_loss": stop_loss, "x2": x2, "x4": x4, "x8": x8
         }
 
     def break_precondition(self, d):
@@ -82,12 +81,12 @@ class CombinationStrategy(CombinationCreator):
         default.new = [
             lambda d: d.index.data["new_score"].daily["score"].iloc[-1] > -400,
             lambda d: d.data.daily["stop_low"].iloc[-1] == 0,
-            lambda d: not self.break_precondition(d)
+#            lambda d: not self.break_precondition(d),
         ]
 
-        default.closing = [
-            lambda d: self.break_precondition(d)
-        ]
+#        default.closing = [
+#            lambda d: self.break_precondition(d)
+#        ]
 
         return default
 
@@ -111,6 +110,3 @@ class CombinationStrategy(CombinationCreator):
 
     def x8(self):
         return self.x8_conditions
-
-    def x0_5(self):
-        return self.x0_5_conditions

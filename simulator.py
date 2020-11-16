@@ -6,6 +6,7 @@ import pandas
 import utils
 import copy
 import math
+from itertools import groupby
 
 # 売買の状態
 class Position:

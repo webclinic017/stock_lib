@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import time
 import re
 import math
 import numpy
@@ -32,6 +33,7 @@ def add_options(parser):
     parser.add_argument("--assets", type=int, action="store", default=None, dest="assets", help="assets")
     parser.add_argument("--instant", action="store_true", default=False, dest="instant", help="日次トレード")
     parser.add_argument("--max_leverage", type=int, action="store", default=None, dest="max_leverage", help="max_leverage")
+    parser.add_argument("--condition_size", type=int, action="store", default=None, dest="condition_size", help="条件数")
 
     # strategy
     parser.add_argument("--ensemble_dir", action="store", default=None, dest="ensemble_dir", help="アンサンブルディレクトリ")
@@ -203,6 +205,7 @@ def load_index(args, start_date, end_date):
         index[k] = d
 
     index["new_score"] = SimulatorData("new_score", Loader.new_score(), "D")
+    index["industry_score"] = SimulatorData("industry_score", Loader.industry_trend(), "D")
 
     return SimulatorIndexData(index)
 
@@ -240,6 +243,7 @@ def create_combination_setting(args, use_json=True):
     combination_setting.position_sizing = args.position_sizing if args.position_sizing else combination_setting.position_sizing
     combination_setting.max_position_size = combination_setting.max_position_size if args.max_position_size is None else int(args.max_position_size)
     combination_setting.max_leverage = combination_setting.max_leverage if args.max_leverage is None else int(args.max_leverage)
+    combination_setting.condition_size = combination_setting.condition_size if args.condition_size is None else int(args.condition_size)
     combination_setting.ensemble = [] if args.ensemble_dir is None else ensemble_files(args.ensemble_dir)
     return combination_setting
 
@@ -257,6 +261,7 @@ def create_combination_setting_by_dict(args, setting_dict):
     combination_setting.seed = setting_dict["seed"] if "seed" in setting_dict.keys() else combination_setting.seed
     combination_setting.ensemble = ensemble_files(setting_dict["ensemble"]) if "ensemble" in setting_dict.keys() else combination_setting.ensemble
     combination_setting.weights = setting_dict["weights"] if "weights" in setting_dict.keys() else combination_setting.weights
+    combination_setting.condition_size = setting_dict["condition_size"] if "condition_size" in setting_dict.keys() else combination_setting.condition_size
     combination_setting = apply_assets(args, combination_setting)
     return combination_setting
 
@@ -319,23 +324,12 @@ class StrategyUtil:
     def price(self, data):
         return data.data.daily["close"].iloc[-1]
 
-    # ドローダウン
-    def drawdown(self, data):
-        term = self.term(data)
-        price = self.price(data)
-        gain = data.position.gain(price, data.position.get_num())
-        max_gain = self.max_gain(data)
-        return max_gain - gain
-
     def max_gain(self, data):
         if data.setting.short_trade:
-            max_gain = data.position.gain(data.data.daily["low"].min(), data.position.get_num())
+            max_gain = data.position.gain(data.data.daily["low"].iloc[-data.position.get_term():].min(), data.position.get_num())
         else:
-            max_gain = data.position.gain(data.data.daily["high"].max(), data.position.get_num())
+            max_gain = data.position.gain(data.data.daily["high"].iloc[-data.position.get_term():].max(), data.position.get_num())
         return max_gain
-
-    def take_gain(self, data):
-        return data.assets * data.setting.taking_rate
 
     # 最大許容損失
     def max_risk(self, data):
@@ -428,10 +422,16 @@ class StrategyUtil:
         position_rate = data.position.get_num() / max_position_size
         return data.setting.stop_loss_rate * position_rate
 
+    def stop_loss(self, data, max_position_size):
+        return data.assets * self.stop_loss_rate(data, max_position_size)
+
     # 保有数最大で最大の利食ラインを適用
     def taking_rate(self, data, max_position_size):
         position_rate = data.position.get_num() / max_position_size
         return data.setting.taking_rate * position_rate
+
+    def taking_gain(self, data, max_position_size):
+        return data.assets * self.taking_rate(data, max_position_size)
 
 # ========================================================================
 
@@ -631,7 +631,6 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
         condition = None
         for i in range(len(settings)):
             self.conditions_by_seed(self.setting.seed[i])
-            debug = True
             if condition is None:
                 condition = self.condition(settings[i])
             else:
@@ -731,7 +730,8 @@ def selectable_data():
         "daily": lambda d: d.data.daily,
         "nikkei": lambda d: d.index.data["nikkei"].daily,
         "dow": lambda d: d.index.data["dow"].daily,
-        "new_score": lambda d: d.index.data["new_score"].daily
+        "new_score": lambda d: d.index.data["new_score"].daily,
+        "industry_score": lambda d: d.index.data["industry_score"].daily
 #        "usdjpy": data.index.data["usdjpy"].daily,
 #        "xbtusd": data.index.data["xbtusd"].daily
     }
@@ -769,6 +769,7 @@ class CombinationSetting:
     seed = [int(t.time())]
     ensemble = []
     weights = {}
+    montecarlo = False
 
 class Combination(StrategyCreator, StrategyUtil):
     def __init__(self, conditions, common, setting=None):
@@ -838,7 +839,12 @@ class Combination(StrategyCreator, StrategyUtil):
         ]
 
         if not self.setting.simple["new"]:
-            conditions = conditions + [any(additional)]
+            if self.setting.montecarlo:
+                seed = int(time.time())
+                numpy.random.seed(seed)
+                conditions = conditions + [numpy.random.rand() > 0.5]
+            else:
+                conditions = conditions + [any(additional)]
 
         if all(conditions):
             if self.setting.use_limit:
@@ -850,27 +856,36 @@ class Combination(StrategyCreator, StrategyUtil):
 
     # 利食い
     def create_taking_orders(self, data):
-        taking = [
-            data.position.gain_rate(data.data.daily["close"].iloc[-1]) > self.taking_rate(data, self.setting.max_position_size),
-        ]
-
-        conditions = [
-            data.position.gain(self.price(data), data.position.get_num()) > 0
-        ]
+        order = data.position.get_num()
+        gain = data.position.gain(self.price(data), order)
+        take_gain = self.taking_gain(data, self.setting.max_position_size)
+        atr_take_gain = data.data.daily["atr"].iloc[-1] * data.setting.min_unit * order
+        stop_loss = self.stop_loss(data, self.setting.max_position_size)
+        max_gain = self.max_gain(data)
+        conditions = []
 
         if self.setting.simple["taking"]:
             conditions = conditions + [self.apply_common(data, self.common.taking)]
         else:
+            protect_gain = any([
+                all([ # 利食いラインを超えて下がった
+                    max_gain > take_gain,
+                    max_gain - gain > atr_take_gain
+                ])
+            ])
+
             conditions = conditions + [
                 self.apply_common(data, self.common.taking),
-                self.apply(data, self.conditions.taking) or self.apply(data, self.conditions.x0_5) # TODO strictどうするか
+                any([
+                    self.apply(data, self.conditions.taking),
+                ])
             ]
 
-        order = data.position.get_num()
         if self.apply(data, self.conditions.x0_5): # x0.5なら半分にする
             order = math.ceil(order / 2)
 
-        if all(conditions):
+        if gain > 0 and all(conditions):
+
             if self.setting.use_limit:
                 return simulator.LimitOrder(order, self.price(data), is_repay=True, is_short=data.setting.short_trade)
             else:
@@ -879,8 +894,12 @@ class Combination(StrategyCreator, StrategyUtil):
 
     # 損切
     def create_stop_loss_orders(self, data):
+        order = data.position.get_num()
+        gain = data.position.gain(self.price(data), order)
+        stop_loss = self.stop_loss(data, self.setting.max_position_size)
         conditions = [
-            data.position.gain_rate(data.data.daily["close"].iloc[-1]) < -self.stop_loss_rate(data, self.setting.max_position_size), # 保有数最大で最大の損切ラインを適用
+            gain < -stop_loss
+#            data.position.gain_rate(self.price(data)) < -self.stop_loss_rate(data, self.setting.max_position_size), # 保有数最大で最大の損切ラインを適用
         ]
         if self.setting.simple["stop_loss"]:
             conditions = conditions + [self.apply_common(data, self.common.stop_loss)]
@@ -889,8 +908,7 @@ class Combination(StrategyCreator, StrategyUtil):
                 self.apply_common(data, self.common.stop_loss) and self.apply(data, self.conditions.stop_loss),
             ]
 
-        if data.position.gain(self.price(data), data.position.get_num()) < 0 and any(conditions):
-            order = data.position.get_num()
+        if gain < 0 and any(conditions):
             if self.setting.use_limit:
                 return simulator.ReverseLimitOrder(order, self.price(data), is_repay=True, is_short=data.setting.short_trade)
             else:

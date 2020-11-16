@@ -163,7 +163,7 @@ def cs_conditions(legs=["daily"]):
 
     return conditions
 
-def index_conditions():
+def new_score_conditions():
     conditions = [
         lambda d: select(d, "new_score")["score"].iloc[-1] < select(d, "new_score")["score"].iloc[-2],
         lambda d: select(d, "new_score")["score"].iloc[-1] > select(d, "new_score")["score"].iloc[-2],
@@ -191,7 +191,19 @@ def index_conditions():
         lambda d: select(d, "new_score")["score"].iloc[-5:].min() > 200,
         lambda d: select(d, "new_score")["score"].iloc[-10:].min() > 200,
         lambda d: select(d, "new_score")["score"].iloc[-20:].min() > 200,
+    ]
+    return conditions
 
+def industry_score_conditions():
+    conditions = [
+        lambda d: select(d, "industry_score")["featured_falling"].iloc[-5:].max() < 10,
+        lambda d: select(d, "industry_score")["featured_falling"].iloc[-5:].max() > 10,
+        lambda d: select(d, "industry_score")["featured_rising"].iloc[-5:].max() < 10,
+        lambda d: select(d, "industry_score")["featured_rising"].iloc[-5:].max() > 10,
+        lambda d: select(d, "industry_score")["rising"].iloc[-5:].max() < 20,
+        lambda d: select(d, "industry_score")["rising"].iloc[-5:].max() > 20,
+        lambda d: select(d, "industry_score")["falling"].iloc[-5:].max() < 20,
+        lambda d: select(d, "industry_score")["falling"].iloc[-5:].max() > 20,
     ]
     return conditions
 
