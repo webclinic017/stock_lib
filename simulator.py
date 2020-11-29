@@ -520,6 +520,7 @@ class Simulator:
         self.position = position if position is not None else Position(system=system, method=method, min_unit=self.setting.min_unit)
         self.assets = setting.assets
         self.capacity = setting.assets * 3.33
+        self.binding = 0
         self.stats = SimulatorStats()
         self.logs = []
         self.new_orders = []
@@ -548,6 +549,9 @@ class Simulator:
     def total_assets(self, value):
         holdings = self.position.cost(value, self.position.get_num())
         return self.assets + holdings
+
+    def total_capacity(self):
+        return self.capacity - self.binding
 
     def get_stats(self): 
         stats = dict()
@@ -588,6 +592,7 @@ class Simulator:
         commission = self.position.commission(value, num)
         self.assets += cost
         self.capacity += cost
+        self.binding = 0
 
         self.log("[%s] new: %s yen x %s, total %s, ave %s, assets %s, cost %s, commission %s" % (self.position.method, value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost, commission))
 
@@ -769,8 +774,14 @@ class Simulator:
     def new_signals(self, strategy, data, index):
         signal = None
         for order in self.new_signal(strategy, data, index):
-            self.log(" - new_order: num %s, price %s" % (order.num, order.price))
+            price = data.daily["close"].iloc[-1] if order.price is None else order.price
+            cost = self.position.eval(price, order.num)
+            if (self.total_capacity() - cost) <= 0:
+                self.log(" - [over capacity] new_order: num %s, price %s, cost %s - %s" % (order.num, order.price, self.total_capacity(), cost))
+                return signal
+            self.log(" - new_order: num %s, price %s, cost %s - %s" % (order.num, order.price, self.total_capacity(), cost))
             self.new_orders = [order]
+            self.binding += cost
             signal = order
 
         return signal
@@ -852,21 +863,22 @@ class Simulator:
             return
 
         if position.get_num() > 0:
-            allowable_loss = position.get_value() * self.setting.auto_stop_loss
+#            allowable_loss = position.get_value() * self.setting.auto_stop_loss
+            allowable_loss = (self.setting.assets * self.setting.auto_stop_loss) / (position.get_num() * position.min_unit)
             price_range = allowable_loss
 
             if position.is_short():
-                price = position.get_value() + price_range
+                limit = position.get_value() + price_range
             else:
-                price = position.get_value() - price_range
+                limit = position.get_value() - price_range
 
-            if price > 0:
-                self.log("[auto_stop_loss][%s] price: %s, stop: %s, %s - %s" % (position.method, position.get_value(), price, position.get_value(), price_range))
-                self.repay_orders = self.repay_orders + [ReverseLimitOrder(position.get_num(), price, is_repay=True, is_short=position.is_short(), valid_term=1)]
+            if limit > 0:
+                self.log("[auto_stop_loss][%s] price: %s, stop: %s, %s - %s" % (position.method, position.get_value(), limit, position.get_value(), price_range))
+                self.repay_orders = self.repay_orders + [ReverseLimitOrder(position.get_num(), limit, is_repay=True, is_short=position.is_short(), valid_term=1)]
 
     def order_adjust(self, trade_data):
         # 手仕舞いの場合全部キャンセル
-        if self.position.get_num() > 0 and len(self.closing_orders) > 0 or len(self.stats.auto_stop_loss()) > 2:
+        if self.position.get_num() > 0 and len(self.closing_orders) > 0 or len(self.stats.auto_stop_loss()) > 0:
             self.log("[cancel] new/repay order. force closed")
             self.new_orders = []
             self.repay_orders = []
@@ -915,13 +927,19 @@ class Simulator:
 
         term_index = index.split_to(date)
 
-        today = term_data.daily.iloc[-1]
+        today = term_data.at(date).daily
 
-        assert len(today) > 0, "not found %s data" % date
+        if len(today) == 0:
+            self.log("less data: %s" % (date))
+            trade_data = self.create_trade_data(date, term_data.daily["low"].iloc[-1], term_data.daily["high"].iloc[-1], term_data.daily["close"].iloc[-1])
+            self.stats.append(trade_data)
+            return
+
+        today = today.iloc[-1]
 
         price = today["open"].item() # 約定価格
         volume = None if self.setting.ignore_volume else math.ceil(today["volume"].item() * 10)
-        self.log("date: %s, price: %s, volume: %s" % (date, price, volume))
+        self.log("date: %s, price: %s, volume: %s, capacity: %s, biding: %s" % (date, price, volume, self.capacity, self.binding))
 
         self.trade(self.setting.strategy, price, volume, term_data, term_index)
 

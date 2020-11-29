@@ -303,7 +303,7 @@ def apply_long_short(args, setting):
 
 class StrategyUtil:
     def apply(self, data, conditions, debug=False):
-        if len(conditions) == 0:
+        if len(conditions) == 0 or (len(conditions[0]) == 0 and len(conditions[1]) == 0):
             return False
         if debug:
             checker = CombinationChecker()

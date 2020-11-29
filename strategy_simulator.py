@@ -34,7 +34,7 @@ class StrategySimulator:
 
     def get_targets(self, args, targets, date):
         if args.code is None:
-            date = utils.to_format(utils.to_datetime(date))
+            date = utils.to_format(utils.select_weekday(utils.to_datetime(date), to_before=False))
             targets = list(self.strategy_creator(args).subject(date))
         else:
             targets = [args.code]
@@ -43,17 +43,6 @@ class StrategySimulator:
     def log(self, message):
         if self.verbose:
              print(message)
-
-    def get_data_by_date(data, date):
-        # filter -> ohlc をすべてoにする-> add_stats
-        d = data.daily
-        d = d[d["date"] <= date].iloc[-300:].copy()
-        for column in ["high", "low", "close"]:
-            tmp = d[column].values.tolist()
-            tmp[-1] = d["open"].iloc[-1]
-            d[column] = tmp
-        d = strategy.add_stats(data.code, d, data.rule)
-        return d
 
     def simulates(self, strategy_setting, data, start_date, end_date):
         self.log("simulating %s %s" % (start_date, end_date))
@@ -90,6 +79,7 @@ class StrategySimulator:
         dates = sorted(dates, key=lambda x: utils.to_datetime(x))
         self.log("targets: %s" % list(simulators.keys()))
         capacity = None
+        binding = None
 
         for date in dates:
             # 休日はスキップ
@@ -103,13 +93,12 @@ class StrategySimulator:
                 if not code in simulators.keys():
                     continue
                 # 対象日までのデータの整形
-                if date in dates_dict[code]:
-                    self.log("[%s]" % code)
-                    simulators[code].capacity = simulators[code].capacity if capacity is None else capacity
-                    simulators[code].simulate_by_date(date, stocks[code], index)
-                    capacity = simulators[code].capacity
-                else:
-                    self.log("[%s] is less data: %s" % (code, date))
+                self.log("[%s]" % code)
+                simulators[code].capacity = simulators[code].capacity if capacity is None else capacity
+                simulators[code].binding = simulators[code].binding if binding is None else binding
+                simulators[code].simulate_by_date(date, stocks[code], index)
+                capacity = simulators[code].capacity
+                binding = simulators[code].binding
 
         # 手仕舞い
         if len(dates) > 0:
@@ -167,6 +156,8 @@ class StrategySimulator:
         oneday_commission = list(map(lambda x: rakuten.oneday_commission(x), agg_contract_price))
         interest = list(map(lambda x: int(x * 0.028 / 365), unavailable_assets))
         auto_stop_loss = list(map(lambda x: len(x[1].auto_stop_loss()), stats.items()))
+        drawdown = list(map(lambda x: x.drawdown(), stats.values()))
+        drawdown = numpy.array(drawdown).T
 
         if self.verbose:
             print(start_date, end_date, "assets:", self.simulator_setting.assets, "gain:", gain, sum(gain))
@@ -186,8 +177,8 @@ class StrategySimulator:
             "interest": sum(interest),
             "return": round(sum(gain) / self.simulator_setting.assets, 2),
             "min_assets": min(min_assets) if len(min_assets) > 0 else 0,
-            "drawdown": round(numpy.average(list(map(lambda x: x.max_drawdown(), s))).item() if len(s) > 0 else 0, 2),
-            "max_drawdown": round(max(list(map(lambda x: x.max_drawdown(), s))) if len(s) > 0 else 0, 2),
+            "drawdown": round(max(list(map(lambda x: max(x), drawdown))) if len(drawdown) > 0 else 0, 2),
+            "max_drawdown": round(max(list(map(lambda x: sum(x), drawdown))) if len(drawdown) > 0 else 0, 2),
             "win_trade": sum(list(map(lambda x: x.win_trade_num(), s))) if len(s) > 0 else 0,
             "trade": sum(list(map(lambda x: x.trade_num(), s))) if len(s) > 0 else 0,
             "position_size": round(numpy.average(position_size).item(), -2) if len(position_size) > 0 else 0,

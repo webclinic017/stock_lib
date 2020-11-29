@@ -662,10 +662,13 @@ def to_datetime_by_term(date, with_time=False):
 def is_weekday(date):
     return date.weekday() < 5 and jpholiday.is_holiday_name(date.date()) is None
 
-def select_weekday(date):
+def select_weekday(date, to_before=True):
     select = date
     while(not is_weekday(select)):
-        select = select - relativeterm(1, with_time=True)
+        if to_before:
+            select = select - relativeterm(1, with_time=True)
+        else:
+            select = select + relativeterm(1, with_time=True)
     return select
 
 # end_dateは含まない
