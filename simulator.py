@@ -865,7 +865,8 @@ class Simulator:
         if position.get_num() > 0:
 #            allowable_loss = position.get_value() * self.setting.auto_stop_loss
             allowable_loss = (self.setting.assets * self.setting.auto_stop_loss) / (position.get_num() * position.min_unit)
-            price_range = allowable_loss
+            tick_price = self.tick_price(price)
+            price_range = tick_price * int(allowable_loss / tick_price)
 
             if position.is_short():
                 limit = position.get_value() + price_range
