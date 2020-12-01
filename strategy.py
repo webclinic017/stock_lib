@@ -41,6 +41,7 @@ def add_options(parser):
     parser.add_argument("--open_close", action="store_true", default=False, dest="open_close", help="寄せ引け")
     parser.add_argument("--futures", action="store_true", default=False, dest="futures", help="先物")
     parser.add_argument("--new_high", action="store_true", default=False, dest="new_high", help="新高値")
+    parser.add_argument("--low_update", action="store_true", default=False, dest="low_update", help="安値更新")
     parser.add_argument("--simple", action="store_true", default=False, dest="simple", help="シンプル")
     return parser
 
@@ -78,6 +79,7 @@ class StrategyType:
     FUTURES="futures"
     NEW_HIGH="new_high"
     SIMPLE="simple"
+    LOW_UPDATE="low_update"
 
     def list(self):
         return [
@@ -86,7 +88,8 @@ class StrategyType:
             self.OPEN_CLOSE,
             self.FUTURES,
             self.NEW_HIGH,
-            self.SIMPLE
+            self.SIMPLE,
+            self.LOW_UPDATE
         ]
 
 def get_strategy_name(args):
@@ -101,6 +104,8 @@ def get_strategy_name(args):
         return strategy_types.NEW_HIGH
     elif args.simple:
         return strategy_types.SIMPLE
+    elif args.low_update:
+        return strategy_types.LOW_UPDATE
     else:
         return strategy_types.COMBINATION
 
@@ -133,6 +138,9 @@ def load_strategy_creator_by_type(strategy_type, is_production, combination_sett
             return CombinationStrategy(combination_setting)
         elif strategy_types.NEW_HIGH == strategy_type:
             from strategies.new_high import CombinationStrategy
+            return CombinationStrategy(combination_setting)
+        elif strategy_types.NEW_HIGH == strategy_type:
+            from strategies.low_update import CombinationStrategy
             return CombinationStrategy(combination_setting)
         elif strategy_types.SIMPLE == strategy_type:
             from strategies.simple import SimpleStrategy
