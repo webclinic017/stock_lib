@@ -72,3 +72,7 @@ def screenshot(driver, channel="stock"):
     except:
         print("failed screenshot")
 
+def scroll(element):
+    element.location_once_scrolled_into_view
+    return element
+
