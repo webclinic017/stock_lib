@@ -152,6 +152,9 @@ class Order:
     def is_valid(self):
         return True if self.valid_term is None else self.term <= self.valid_term
 
+    def only_on_the_day(self):
+        return False if self.valid_term is None else self.valid_term == 0
+
     def signal(self, price, position):
         data = {
             "price": price,
@@ -486,6 +489,9 @@ class SimulatorStats:
 
     def repay_canceled(self):
         return self.trade_history[-1]["canceled"] == "repay"
+
+    def closing_canceled(self):
+        return self.trade_history[-1]["canceled"] == "closing"
 
     def all_canceled(self):
         return self.trade_history[-1]["canceled"] == "all"
@@ -875,9 +881,14 @@ class Simulator:
 
             if limit > 0:
                 self.log("[auto_stop_loss][%s] price: %s, stop: %s, %s - %s" % (position.method, position.get_value(), limit, position.get_value(), price_range))
-                self.repay_orders = self.repay_orders + [ReverseLimitOrder(position.get_num(), limit, is_repay=True, is_short=position.is_short(), valid_term=1)]
+                self.repay_orders = self.repay_orders + [ReverseLimitOrder(position.get_num(), limit, is_repay=True, is_short=position.is_short(), valid_term=0)]
 
     def order_adjust(self, trade_data):
+
+        # 期限切れの注文を消す
+        self.new_orders = list(filter(lambda x: not x.only_on_the_day() , self.new_orders))
+        self.repay_orders = list(filter(lambda x: not x.only_on_the_day() , self.repay_orders))
+
         # 手仕舞いの場合全部キャンセル
         if self.position.get_num() > 0 and len(self.closing_orders) > 0 or len(self.stats.auto_stop_loss()) > 0:
             self.log("[cancel] new/repay order. force closed")
@@ -901,8 +912,7 @@ class Simulator:
         if len(self.new_orders) > 0 and len(self.repay_orders) > 0:
             self.log("[cancel] new order")
             self.new_orders = []
-#            self.repay_orders = []
-#            trade_data["canceled"] = "all"
+            trade_data["canceled"] = "new"
 
         return trade_data
 
