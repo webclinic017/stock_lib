@@ -869,18 +869,20 @@ class Simulator:
             return
 
         if position.get_num() > 0:
-#            allowable_loss = position.get_value() * self.setting.auto_stop_loss
             allowable_loss = (self.setting.assets * self.setting.auto_stop_loss) / (position.get_num() * position.min_unit)
+
             tick_price = self.tick_price(price)
             price_range = tick_price * int(allowable_loss / tick_price)
 
+            hold = tick_price * int(position.get_value() / tick_price)
+
             if position.is_short():
-                limit = position.get_value() + price_range
+                limit = hold + price_range
             else:
-                limit = position.get_value() - price_range
+                limit = hold - price_range
 
             if limit > 0:
-                self.log("[auto_stop_loss][%s] price: %s, stop: %s, %s - %s" % (position.method, position.get_value(), limit, position.get_value(), price_range))
+                self.log("[auto_stop_loss][%s] price: %s, stop: %s, %s - %s" % (position.method, position.get_value(), limit, hold, price_range))
                 self.repay_orders = self.repay_orders + [ReverseLimitOrder(position.get_num(), limit, is_repay=True, is_short=position.is_short(), valid_term=0)]
 
     def order_adjust(self, trade_data):
