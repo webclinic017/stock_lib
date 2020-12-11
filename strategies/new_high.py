@@ -23,7 +23,8 @@ class CombinationStrategy(CombinationCreator):
         return self.selected_condition_index
 
     def load_portfolio(self, date):
-        d = utils.to_format(datetime(date.year, date.month, 1))
+        d = utils.to_format(date)
+#        d = utils.to_format(datetime(date.year, date.month, 1))
         try:
             data = pandas.read_csv("portfolio/new_high/%s.csv" % d, header=None)
             data.columns = ["code", "price"]
