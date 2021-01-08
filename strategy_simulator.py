@@ -79,7 +79,6 @@ class StrategySimulator:
         dates = sorted(dates, key=lambda x: utils.to_datetime(x))
         self.log("targets: %s" % list(simulators.keys()))
         capacity = None
-        binding = None
 
         for date in dates:
             # 休日はスキップ
@@ -89,23 +88,21 @@ class StrategySimulator:
 
             self.log("=== [%s] ===" % date)
 
-            for code in codes:
-                if not code in simulators.keys():
-                    continue
+            binding = sum(list(map(lambda x: simulators[x].order_binding(), simulators.keys())))
+
+            for code in simulators.keys():
                 # 対象日までのデータの整形
                 self.log("[%s]" % code)
                 simulators[code].capacity = simulators[code].capacity if capacity is None else capacity
-                simulators[code].binding = simulators[code].binding if binding is None else binding
+                simulators[code].binding = binding - simulators[code].order_binding()
                 simulators[code].simulate_by_date(date, stocks[code], index)
                 capacity = simulators[code].capacity
-                binding = simulators[code].binding
+                binding += simulators[code].order_binding() - simulators[code].unbound
 
         # 手仕舞い
         if len(dates) > 0:
             self.log("=== [closing] ===")
-            for code in codes:
-                if not code in simulators.keys():
-                    continue
+            for code in simulators.keys():
                 split_data = stocks[code].split(dates[0], dates[-1])
                 if len(split_data.daily) == 0:
                     continue

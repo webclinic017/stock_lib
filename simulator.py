@@ -46,7 +46,7 @@ class Position:
     # 新規
     def new(self, num, value):
         self.add_history(num, value)
-        price = -self.eval(value, num)
+        price = self.eval(value, num)
         return price
 
     # 返済
@@ -138,6 +138,7 @@ class Order:
         self.on_close = False
         self.valid_term = None
         self.order_type = None
+        self.binding = 0
 
 
     def is_market(self):
@@ -525,8 +526,9 @@ class Simulator:
         self.setting = setting
         self.position = position if position is not None else Position(system=system, method=method, min_unit=self.setting.min_unit)
         self.assets = setting.assets
-        self.capacity = setting.assets * 3.33
+        self.capacity = setting.assets * 3.33 # 要調整
         self.binding = 0
+        self.unbound = 0
         self.stats = SimulatorStats()
         self.logs = []
         self.new_orders = []
@@ -557,7 +559,14 @@ class Simulator:
         return self.assets + holdings
 
     def total_capacity(self):
-        return self.capacity - self.binding
+        total = self.capacity - self.total_binding() + self.unbound
+        return 0 if total <= 0 else total
+
+    def total_binding(self):
+        return self.binding + self.order_binding()
+
+    def order_binding(self):
+        return sum(list(map(lambda x: x.binding, self.new_orders)))
 
     def get_stats(self): 
         stats = dict()
@@ -596,9 +605,8 @@ class Simulator:
 
         cost = self.position.new(num, value)
         commission = self.position.commission(value, num)
-        self.assets += cost
-        self.capacity += cost
-        self.binding = 0
+        self.assets -= cost
+        self.capacity -= cost
 
         self.log("[%s] new: %s yen x %s, total %s, ave %s, assets %s, cost %s, commission %s" % (self.position.method, value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost, commission))
 
@@ -786,8 +794,8 @@ class Simulator:
                 self.log(" - [over capacity] new_order: num %s, price %s, cost %s - %s" % (order.num, order.price, self.total_capacity(), cost))
                 return signal
             self.log(" - new_order: num %s, price %s, cost %s - %s" % (order.num, order.price, self.total_capacity(), cost))
+            order.binding = cost
             self.new_orders = [order]
-            self.binding += cost
             signal = order
 
         return signal
@@ -952,7 +960,7 @@ class Simulator:
 
         price = today["open"].item() # 約定価格
         volume = None if self.setting.ignore_volume else math.ceil(today["volume"].item() * 10)
-        self.log("date: %s, price: %s, volume: %s, capacity: %s, binding: %s" % (date, price, volume, self.total_capacity(), self.binding))
+        self.log("date: %s, price: %s, volume: %s, capacity: %s, binding: %s" % (date, price, volume, self.capacity, self.total_binding()))
 
         self.trade(self.setting.strategy, price, volume, term_data, term_index)
 
@@ -1007,6 +1015,8 @@ class Simulator:
             self.position.system = "credit" if order.is_short else "actual"
             self.position.method = "short" if order.is_short else "long"
             if self.new(agreed_price, order.num):
+                # 拘束資金の解放
+                self.unbound += order.binding
                 trade_data["new"] = agreed_price
                 trade_data["order_type"] = order.order_type
                 trade_data["assets"]              = self.total_assets(agreed_price)
@@ -1035,6 +1045,8 @@ class Simulator:
         return trade_data
 
     def create_trade_data(self, date, low, high, price):
+        self.unbound = 0
+
         trade_data = self.stats.create_trade_data()
         trade_data["date"]                = date
         trade_data["assets"]              = self.total_assets(price)
