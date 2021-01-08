@@ -952,7 +952,7 @@ class Simulator:
 
         price = today["open"].item() # 約定価格
         volume = None if self.setting.ignore_volume else math.ceil(today["volume"].item() * 10)
-        self.log("date: %s, price: %s, volume: %s, capacity: %s, biding: %s" % (date, price, volume, self.capacity, self.binding))
+        self.log("date: %s, price: %s, volume: %s, capacity: %s, binding: %s" % (date, price, volume, self.total_capacity(), self.binding))
 
         self.trade(self.setting.strategy, price, volume, term_data, term_index)
 
