@@ -697,7 +697,7 @@ class Loader:
     def assets_history():
         try:
             data = pandas.read_csv('settings/assets_history.csv', header=None)
-            data.columns = ['date', 'assets']
+            data.columns = ['date', 'assets', 'deposit']
             data['date'] = pandas.to_datetime(data['date'], format='%Y-%m-%d')
             data.sort_values("date")
         except:
