@@ -559,7 +559,7 @@ class Simulator:
         return self.assets + holdings
 
     def total_capacity(self):
-        total = self.capacity - self.total_binding() + self.unbound
+        total = self.capacity - self.total_binding()
         return 0 if total <= 0 else total
 
     def total_binding(self):
@@ -791,7 +791,7 @@ class Simulator:
             price = data.daily["close"].iloc[-1] if order.price is None else order.price
             cost = self.position.eval(price, order.num)
             if (self.total_capacity() - cost) <= 0:
-                self.log(" - [over capacity] new_order: num %s, price %s, cost %s - %s" % (order.num, order.price, self.total_capacity(), cost))
+                self.log(" - [over capacity] new_order: num %s, price %s, cost %d - %s unbound: %s" % (order.num, order.price, self.total_capacity(), cost, self.unbound))
                 return signal
             self.log(" - new_order: num %s, price %s, cost %s - %s" % (order.num, order.price, self.total_capacity(), cost))
             order.binding = cost

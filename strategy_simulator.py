@@ -107,7 +107,7 @@ class StrategySimulator:
                 self.log("%s is not weekday" % date)
                 continue
 
-            self.log("=== [%s] ===" % date)
+            self.log("\n=== [%s] ===" % date)
 
             binding = sum(list(map(lambda x: simulators[x].order_binding(), simulators.keys())))
 
@@ -115,7 +115,7 @@ class StrategySimulator:
                 # 対象日までのデータの整形
                 self.log("[%s]" % code)
                 simulators[code].capacity = simulators[code].capacity if capacity is None else capacity
-                simulators[code].binding = binding - simulators[code].order_binding()
+                simulators[code].binding = binding - simulators[code].order_binding() # 自分の拘束分はsimulator側で加算するので引いておく
                 simulators[code].simulate_by_date(date, stocks[code], index)
                 capacity = simulators[code].capacity
                 binding += simulators[code].order_binding() - simulators[code].unbound
