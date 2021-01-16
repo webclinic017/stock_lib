@@ -596,10 +596,10 @@ class Simulator:
     # 新規
     def new(self, value, num):
         value = value * (1 + random.uniform(0.0, self.setting.error_rate))
-        if (self.capacity - self.position.eval(value, num)) <= 0:
-            # 資産が足りなければスルー
-            self.log(" - assets_not_enough: num %s, value %s" % (num, value))
-            return False
+#        if (self.capacity - self.position.eval(value, num)) <= 0:
+#            # 資産が足りなければスルー
+#            self.log(" - assets_not_enough: num %s, value %s" % (num, value))
+#            return False
         if num <= 0:
             return False
 

@@ -44,16 +44,7 @@ class StrategySimulator:
         if self.verbose:
              print(message)
 
-    def simulates(self, strategy_setting, data, start_date, end_date):
-        self.log("simulating %s %s" % (start_date, end_date))
-
-        args = data["args"]
-        stocks = data["data"]
-        index = data["index"]
-
-        codes = self.get_targets(args, [], start_date)
-
-        # シミュレーター準備
+    def create_simulator(self, args, codes, stocks, start_date, end_date, strategy_setting):
         simulators = {}
         simulator_setting = self.simulator_setting
         simulator_setting.debug = self.verbose
@@ -66,8 +57,9 @@ class StrategySimulator:
                 self.log("skip. M&A. %s" % code)
                 continue
             simulators[code] = Simulator(simulator_setting)
+        return simulators
 
-        # 日付のリストを取得
+    def simulate_dates(self, codes, stocks, start_date, end_date):
         dates = []
         dates_dict = {}
         for code in codes:
@@ -77,6 +69,35 @@ class StrategySimulator:
 
         # 日付ごとにシミュレーション
         dates = sorted(dates, key=lambda x: utils.to_datetime(x))
+        return dates
+
+
+    def closing(self, dates, stocks, simulators):
+        if len(dates) > 0:
+            self.log("=== [closing] ===")
+            for code in simulators.keys():
+                split_data = stocks[code].split(dates[0], dates[-1])
+                if len(split_data.daily) == 0:
+                    continue
+                self.log("[%s] closing: %s" % (code, split_data.daily["date"].iloc[-1]))
+                simulators[code].closing(dates[-1], split_data.daily["low"].iloc[-1], split_data.daily["high"].iloc[-1], split_data.daily["close"].iloc[-1])
+        return simulators
+
+    def simulates(self, strategy_setting, data, start_date, end_date, with_closing=True):
+        self.log("simulating %s %s" % (start_date, end_date))
+
+        args = data["args"]
+        stocks = data["data"]
+        index = data["index"]
+
+        codes = self.get_targets(args, [], start_date)
+
+        # シミュレーター準備
+        simulators = self.create_simulator(args, codes, stocks, start_date, end_date, strategy_setting)
+
+        # 日付のリストを取得
+        dates = self.simulate_dates(codes, stocks, start_date, end_date)
+
         self.log("targets: %s" % list(simulators.keys()))
         capacity = None
 
@@ -100,21 +121,18 @@ class StrategySimulator:
                 binding += simulators[code].order_binding() - simulators[code].unbound
 
         # 手仕舞い
-        if len(dates) > 0:
-            self.log("=== [closing] ===")
-            for code in simulators.keys():
-                split_data = stocks[code].split(dates[0], dates[-1])
-                if len(split_data.daily) == 0:
-                    continue
-                self.log("[%s] closing: %s" % (code, split_data.daily["date"].iloc[-1]))
-                simulators[code].closing(dates[-1], split_data.daily["low"].iloc[-1], split_data.daily["high"].iloc[-1], split_data.daily["close"].iloc[-1])
+        if with_closing:
+            simulators = self.closing(dates, stocks, simulators)
 
+        return simulators
+
+    def get_stats(self, simulators, start_date, end_date):
         # 統計 ====================================
         stats = {}
         for code in simulators.keys():
             stats[code] = simulators[code].stats
 
-        return self.get_results(stats, start_date, end_date)
+        return self.create_stats(stats, start_date, end_date)
 
 
     def agg(self, stats, target, proc=None):
@@ -131,7 +149,7 @@ class StrategySimulator:
                     results[date] = d
         return results
 
-    def get_results(self, stats, start_date, end_date):
+    def create_stats(self, stats, start_date, end_date):
         # 統計 =======================================
         wins = list(filter(lambda x: sum(x[1].gain_rate()) > 0, stats.items()))
         lose = list(filter(lambda x: sum(x[1].gain_rate()) < 0, stats.items()))
