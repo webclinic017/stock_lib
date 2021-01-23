@@ -84,6 +84,9 @@ class Position:
         else:
             return self.eval(value - self.get_value(), num)
 
+    def current_gain(self, value):
+        return self.gain(value, self.get_num())
+
     # 損益レシオ
     def gain_rate(self, value):
         if self.get_value() is None or self.get_value() == 0:
@@ -321,6 +324,7 @@ class SimulatorStats:
             "repay_order": None,
             "closing_order": None,
             "gain": None,
+            "unrealized_gain": None,
             "gain_rate": None,
             "assets": None,
             "min_assets": None,
@@ -328,6 +332,7 @@ class SimulatorStats:
             "term": 0,
             "size": 0,
             "canceled": None,
+            "closing": False,
             "contract_price": None,
             "order_type": None,
             "commission": None
@@ -403,12 +408,7 @@ class SimulatorStats:
         return sum(list(filter(lambda x: x is not None, self.contract_price())))
 
     def drawdown(self):
-        assets = numpy.array(self.assets())
-        max_assets = numpy.maximum.accumulate(assets)
-        drawdown = max_assets - assets
-        drawdown = drawdown / max_assets
-
-        return drawdown.tolist()
+        return utils.drawdown(self.assets())
 
     # 最大ドローダウン
     def max_drawdown(self):
@@ -419,6 +419,14 @@ class SimulatorStats:
 
     def gain(self):
         return list(filter(lambda x: x is not None, map(lambda x: x["gain"], self.trade_history)))
+
+    def unrealized_gain(self):
+        history = utils.split_list(self.trade_history, lambda x: x["closing"]==True)
+        return list(filter(lambda x: x is not None, map(lambda x: x["unrealized_gain"], history[-1])))
+
+    def max_unrealized_gain(self):
+        unrealized_gain = self.unrealized_gain()
+        return 0 if len(unrealized_gain) == 0 else max(unrealized_gain) # TODO 手仕舞いされてたらそれ以降のものを取得する
 
     def gain_rate(self):
         return list(filter(lambda x: x is not None, map(lambda x: x["gain_rate"], self.trade_history)))
@@ -628,23 +636,37 @@ class Simulator:
         self.log("[%s] repay: %s yen x %s, total %s, ave %s, assets %s, cost %s, commission %s, term %s : gain %s" % (self.position.method, value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost, commission, self.position.get_term(), gain))
         return True
 
-    # 全部売る
-    def closing(self, date, low, high, value, data=None):
+    # 強制手仕舞い(以降トレードしない)
+    def force_closing(self, date, data):
+        low, high, value = data.daily["low"].iloc[-1], data.daily["high"].iloc[-1], data.daily["close"].iloc[-1]
         trade_data = self.create_trade_data(date, low, high, value)
         num = self.position.get_num()
         gain = self.position.gain(value, num)
         gain_rate = self.position.gain_rate(value)
         cost = self.position.cost(num, value)
         if self.repay(value, num):
-            self.log(" - closing: price %s x %s" % (value, num))
+            self.log(" - force closing: price %s x %s" % (value, num))
             trade_data["repay"] = value
             trade_data["gain"] = gain
             trade_data["gain_rate"] = gain_rate
+            trade_data["closing"] = True
 
         self.new_orders = []
         self.repay_orders = []
         self.stats.append(trade_data)
         self.force_stop = True
+
+    # 手仕舞い
+    def closing(self):
+        if self.position.get_num() > 0:
+            self.log(" - closing_order: num %s, price %s" % (self.position.get_num(), self.position.get_value()))
+            self.repay_orders = [MarketOrder(self.position.get_num(), is_short=self.position.is_short())]
+
+            if len(self.stats.trade_history) > 0:
+                trade_data = self.stats.trade_history[-1]
+                trade_data["closing"] = True
+                self.stats.apply(trade_data)
+
 
     def tick_price(self, price):
         tick_prices = [
@@ -905,6 +927,7 @@ class Simulator:
             self.new_orders = []
             self.repay_orders = []
             self.force_stop = True
+            trade_data["closing"] = True
 
         # ポジションがなければ返済シグナルは捨てる
         if self.position.get_num() <= 0 and len(self.closing_orders) > 0:
@@ -934,7 +957,7 @@ class Simulator:
             self.simulate_by_date(date, data, index)
 
         # 統計取得のために全部手仕舞う
-        self.closing(dates[-1], data.daily["low"].iloc[-1], data.daily["high"].iloc[-1], data.daily["close"].iloc[-1])
+        self.force_closing(dates[-1], data)
 
         stats = self.get_stats()
 
@@ -960,7 +983,7 @@ class Simulator:
 
         price = today["open"].item() # 約定価格
         volume = None if self.setting.ignore_volume else math.ceil(today["volume"].item() * 10)
-        self.log("date: %s, price: %s, volume: %s, capacity: %s, binding: %s" % (date, price, volume, self.capacity, self.total_binding()))
+        self.log("date: %s, price: %s, volume: %s, hold: %s, capacity: %s, binding: %s" % (date, price, volume, self.position.get_num(), self.capacity, self.total_binding()))
 
         self.trade(self.setting.strategy, price, volume, term_data, term_index)
 
@@ -1060,6 +1083,12 @@ class Simulator:
 
         date = data.daily["date"].iloc[-1]
 
+        # トレード履歴に直前のシグナルを反映
+        if len(self.stats.trade_history) > 0:
+            trade_data = self.stats.trade_history[-1]
+            trade_data["signal"] = "new" if len(self.new_orders) > 0 else "repay" if len(self.repay_orders) > 0 else None
+            self.stats.apply(trade_data)
+
         # stats
         trade_data = self.create_trade_data(date, data.daily["low"].iloc[-1], data.daily["high"].iloc[-1], price)
 
@@ -1096,6 +1125,7 @@ class Simulator:
         trade_data["term"] = self.position.get_term()
         trade_data["contract_price"] = list(filter(lambda x: x is not None, [trade_data["new"], trade_data["repay"]]))
         trade_data["contract_price"] = None if len(trade_data["contract_price"]) == 0 else trade_data["contract_price"][0] * trade_data["size"] * self.setting.min_unit
+        trade_data["unrealized_gain"] = self.position.current_gain(data.daily["close"].iloc[-1])
         self.stats.append(trade_data)
 
         # 手仕舞い後はもう何もしない
@@ -1109,8 +1139,4 @@ class Simulator:
         # 引け
         if self.setting.virtual_trade:
             trade_data = self.close_trade(volume, data, trade_data)
-
-        # トレード履歴にシグナルを反映
-        trade_data["signal"] = "new" if len(self.new_orders) > 0 else "repay" if len(self.repay_orders) > 0 else None
-        self.stats.apply(trade_data)
 

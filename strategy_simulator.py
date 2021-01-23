@@ -8,8 +8,7 @@ import checker
 import cache
 import utils
 import strategy
-from simulator import Simulator
-
+from simulator import Simulator, SimulatorStats
 
 class StrategySimulator:
     def __init__(self, simulator_setting, combination_setting, strategy_settings, verbose=False):
@@ -17,6 +16,7 @@ class StrategySimulator:
         self.combination_setting = combination_setting
         self.strategy_settings = strategy_settings
         self.verbose = verbose
+        self.stats = SimulatorStats()
 
     def strategy_creator(self, args):
         return strategy.load_strategy_creator(args, self.combination_setting)
@@ -72,7 +72,7 @@ class StrategySimulator:
         return dates
 
 
-    def closing(self, dates, stocks, simulators):
+    def force_closing(self, dates, stocks, simulators):
         if len(dates) > 0:
             self.log("=== [closing] ===")
             for code in simulators.keys():
@@ -80,8 +80,21 @@ class StrategySimulator:
                 if len(split_data.daily) == 0:
                     continue
                 self.log("[%s] closing: %s" % (code, split_data.daily["date"].iloc[-1]))
-                simulators[code].closing(dates[-1], split_data.daily["low"].iloc[-1], split_data.daily["high"].iloc[-1], split_data.daily["close"].iloc[-1])
+                simulators[code].force_closing(dates[-1], split_data)
         return simulators
+
+    def closing(self, stats, simulators):
+        drawdown = utils.drawdown(self.stats.unrealized_gain())
+        max_gain = self.stats.max_unrealized_gain()
+        taking = self.simulator_setting.assets * self.simulator_setting.taking_rate
+
+        # 目標価格を超えた上で一定以上のドローダウンがあったら手仕舞い
+        if max_gain > taking and drawdown[-1] >= 0.25:
+            for code in simulators.keys():
+                simulators[code].closing()
+            stats["closing"] = True
+        return stats
+
 
     def simulates(self, strategy_setting, data, start_date, end_date, with_closing=True):
         self.log("simulating %s %s" % (start_date, end_date))
@@ -109,7 +122,10 @@ class StrategySimulator:
 
             self.log("\n=== [%s] ===" % date)
 
-            binding = sum(list(map(lambda x: simulators[x].order_binding(), simulators.keys())))
+            stats = self.stats.create_trade_data()
+            stats["date"] = date
+
+            binding = sum(list(map(lambda x: x.order_binding(), simulators.values())))
 
             for code in simulators.keys():
                 # 対象日までのデータの整形
@@ -120,9 +136,14 @@ class StrategySimulator:
                 capacity = simulators[code].capacity
                 binding += simulators[code].order_binding() - simulators[code].unbound
 
+            stats["unrealized_gain"] = sum(list(map(lambda x: 0 if len(x.stats.unrealized_gain()) == 0 else x.stats.unrealized_gain()[-1], simulators.values())))
+
+#            self.closing(stats, simulators)
+            self.stats.append(stats)
+
         # 手仕舞い
         if with_closing:
-            simulators = self.closing(dates, stocks, simulators)
+            simulators = self.force_closing(dates, stocks, simulators)
 
         return simulators
 
@@ -206,5 +227,4 @@ class StrategySimulator:
         }
 
         return results
-
 

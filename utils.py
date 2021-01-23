@@ -579,6 +579,15 @@ def dead_cross(d1, d2):
             return True
     return False
 
+# ドローダウン
+def drawdown(data):
+    base = numpy.array(data, dtype=float)
+    maximums = numpy.maximum.accumulate(base)
+    drawdown = maximums - base
+    drawdown = numpy.divide(drawdown, maximums, out=numpy.zeros_like(drawdown), where=maximums!=0)
+    drawdown = drawdown.tolist()
+    return drawdown
+
 # 値幅制限
 def price_limit(price):
     index, price_range = price_limit_with_index(price)
@@ -722,6 +731,14 @@ def combination(index, conditions):
         return ([], cond[1])
     else:
         return cond
+
+def split_list(data, condition):
+#    if len(data) <= 1:
+#        return data
+    for i, d in enumerate(data):
+        if condition(d):
+            return [data[:i+1]] + split_list(data[i+1:], condition)
+    return [data]
 
 def stop_watch(func) :
     @wraps(func)
