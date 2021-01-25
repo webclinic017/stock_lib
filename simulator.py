@@ -302,7 +302,7 @@ class SimulatorSetting:
         self.short_trade = False
         self.long_short_trade = {"long": None, "short": None}
         self.stop_loss_rate = 0.02
-        self.taking_rate = 0.04
+        self.taking_rate = 1.0
         self.min_unit = 100
         self.trade_step = 1
         self.use_before_stick = False

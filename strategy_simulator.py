@@ -138,7 +138,7 @@ class StrategySimulator:
 
             stats["unrealized_gain"] = sum(list(map(lambda x: 0 if len(x.stats.unrealized_gain()) == 0 else x.stats.unrealized_gain()[-1], simulators.values())))
 
-#            self.closing(stats, simulators)
+            self.closing(stats, simulators)
             self.stats.append(stats)
 
         # 手仕舞い

@@ -81,12 +81,12 @@ class CombinationStrategy(CombinationCreator):
         default.new = [
             lambda d: d.index.data["new_score"].daily["score"].iloc[-1] > -400,
             lambda d: d.data.daily["stop_low"].iloc[-1] == 0,
-#            lambda d: not self.break_precondition(d),
+            lambda d: not self.break_precondition(d),
         ]
 
-#        default.closing = [
-#            lambda d: self.break_precondition(d)
-#        ]
+        default.closing = [
+            lambda d: self.break_precondition(d)
+        ]
 
         return default
 
