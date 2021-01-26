@@ -90,6 +90,7 @@ class StrategySimulator:
 
         # 目標価格を超えた上で一定以上のドローダウンがあったら手仕舞い
         if max_gain > taking and drawdown[-1] >= 0.25:
+            self.log("=== [closing %s, %s %s] ===" % (max_gain, taking, drawdown[-1]))
             for code in simulators.keys():
                 simulators[code].closing()
             stats["closing"] = True
