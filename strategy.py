@@ -257,7 +257,7 @@ def create_combination_setting(args, use_json=True):
     combination_setting.max_leverage = combination_setting.max_leverage if args.max_leverage is None else int(args.max_leverage)
     combination_setting.passive_leverage = combination_setting.passive_leverage if args.passive_leverage is None else args.passive_leverage
     combination_setting.condition_size = combination_setting.condition_size if args.condition_size is None else int(args.condition_size)
-    combination_setting.ensemble = [] if args.ensemble_dir is None else ensemble_files(args.ensemble_dir)
+    combination_setting.ensemble = combination_setting.ensemble if args.ensemble_dir is None else ensemble_files(args.ensemble_dir)
     return combination_setting
 
 def create_combination_setting_by_json(args):
@@ -277,9 +277,9 @@ def apply_combination_setting_by_dict(combination_setting, setting_dict):
     combination_setting.position_sizing = setting_dict["position_sizing"] if "position_sizing" in setting_dict.keys() else combination_setting.position_sizing
     combination_setting.max_position_size = setting_dict["max_position_size"] if "max_position_size" in setting_dict.keys() else combination_setting.max_position_size
     combination_setting.seed = setting_dict["seed"] if "seed" in setting_dict.keys() else combination_setting.seed
-    combination_setting.ensemble = ensemble_files(setting_dict["ensemble"]) if "ensemble" in setting_dict.keys() else combination_setting.ensemble
     combination_setting.weights = setting_dict["weights"] if "weights" in setting_dict.keys() else combination_setting.weights
     combination_setting.condition_size = setting_dict["condition_size"] if "condition_size" in setting_dict.keys() else combination_setting.condition_size
+    combination_setting.ensemble = ensemble_files(setting_dict["ensemble_dir"]) if "ensemble_dir" in setting_dict.keys() else combination_setting.ensemble
     return combination_setting
 
 def create_simulator_setting(args, use_json=True):
