@@ -421,11 +421,16 @@ class SimulatorStats:
         return list(filter(lambda x: x is not None, map(lambda x: x["gain"], self.trade_history)))
 
     def unrealized_gain(self):
-        history = utils.split_list(self.trade_history, lambda x: x["closing"]==True)
-        return list(filter(lambda x: x is not None, map(lambda x: x["unrealized_gain"], history[-1])))
+        histories = utils.split_list(self.trade_history, lambda x: x["closing"]==True)
+        choice = lambda history: list(filter(lambda x: x is not None, list(map(lambda x: x["unrealized_gain"], history))))
+        return list(map(choice, histories))
+
+    def last_unrealized_gain(self):
+        history = self.unrealized_gain()
+        return [] if len(history) == 0 else history[-1]
 
     def max_unrealized_gain(self):
-        unrealized_gain = self.unrealized_gain()
+        unrealized_gain = self.last_unrealized_gain()
         return 0 if len(unrealized_gain) == 0 else max(unrealized_gain) # TODO 手仕舞いされてたらそれ以降のものを取得する
 
     def gain_rate(self):
@@ -983,7 +988,7 @@ class Simulator:
 
         price = today["open"].item() # 約定価格
         volume = None if self.setting.ignore_volume else math.ceil(today["volume"].item() * 10)
-        self.log("date: %s, price: %s, volume: %s, hold: %s, capacity: %s, binding: %s" % (date, price, volume, self.position.get_num(), self.capacity, self.total_binding()))
+        self.log("date: %s, price: %s, volume: %s, hold: %s, capacity: %d, binding: %d" % (date, price, volume, self.position.get_num(), self.capacity, self.total_binding()))
 
         self.trade(self.setting.strategy, price, volume, term_data, term_index)
 

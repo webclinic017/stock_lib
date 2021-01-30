@@ -4,49 +4,52 @@ import utils
 import simulator
 import random
 import strategy
+import pandas
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
 from strategy import CombinationCreator
 from loader import Loader
 
-class CombinationStrategy(CombinationCreator):
+# どの戦略をアンサンブルするかはここのimportで指定する
+from strategies.combination import CombinationStrategy
+
+class CombinationStrategy(CombinationStrategy):
     def __init__(self, setting):
+        self.files = setting.ensemble
         super().__init__(setting)
-        self.conditions_by_seed(setting.seed[0], setting.ensemble)
 
-    def conditions_by_seed(self, seed, files):
+    def common(self, setting):
+        return self.default_common()
 
-        strategies = strategy.create_ensemble_strategies(files)
+    def get_size(self, size):
+        return size if size < self.setting.condition_size else self.setting.condition_size
+
+    def conditions_by_seed(self, seed):
+        strategies = strategy.create_ensemble_strategies(self.files)
 
         new_rules         = list(map(lambda x: x.new_rules[0].callback, strategies))
         taking_rules      = list(map(lambda x: x.taking_rules[0].callback, strategies))
         stop_loss_rules   = list(map(lambda x: x.stop_loss_rules[0].callback, strategies))
-
-        conditions_all = new_rules + taking_rules + stop_loss_rules
-
-        size = len(strategies) if len(strategies) < self.setting.condition_size else self.setting.condition_size
+        closing_rules     = list(map(lambda x: x.closing_rules[0].callback, strategies))
+        x2_rules          = list(map(lambda x: x.x2_rules[0].callback, strategies))
+        x4_rules          = list(map(lambda x: x.x4_rules[0].callback, strategies))
+        x8_rules          = list(map(lambda x: x.x8_rules[0].callback, strategies))
 
         random.seed(seed)
-        self.new_conditions         = random.sample(conditions_all, size)
-        self.taking_conditions      = random.sample(conditions_all, size)
-        self.stop_loss_conditions   = random.sample(conditions_all, size)
+        numpy.random.seed(seed)
 
-    def subject(self, date):
-        return ["nikkei"]
+        size = self.get_size(len(strategies))
 
-    def common(self, setting):
-        default = self.default_common()
-        return default
+        new, self.new_conditions                = self.choice(new_rules, size, self.apply_weights("new", len(new_rules)))
+        taking, self.taking_conditions          = self.choice(taking_rules, size, self.apply_weights("taking", len(taking_rules)))
+        stop_loss, self.stop_loss_conditions    = self.choice(stop_loss_rules, size, self.apply_weights("stop_loss", len(stop_loss_rules)))
+        closing, self.closing_conditions        = self.choice(closing_rules, size, self.apply_weights("closing", len(closing_rules)))
+        x2, self.x2_conditions                  = self.choice(x2_rules, size, self.apply_weights("x2", len(x2_rules)))
+        x4, self.x4_conditions                  = self.choice(x4_rules, size, self.apply_weights("x4", len(x4_rules)))
+        x8, self.x8_conditions                  = self.choice(x8_rules, size, self.apply_weights("x8", len(x8_rules)))
 
-    def new(self):
-        return self.new_conditions
-
-    def taking(self):
-        return self.taking_conditions
-
-    def stop_loss(self):
-        return self.stop_loss_conditions
-
-    def closing(self):
-        return [
-            lambda d: False,
-        ]
+        # 選択された条件のインデックスを覚えておく
+        self.selected_condition_index = {
+            "new":new, "taking": taking, "stop_loss": stop_loss, "closing": closing, "x2": x2, "x4": x4, "x8": x8
+        }
 

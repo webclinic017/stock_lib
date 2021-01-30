@@ -33,6 +33,7 @@ def add_options(parser):
     parser.add_argument("--assets", type=int, action="store", default=None, dest="assets", help="assets")
     parser.add_argument("--instant", action="store_true", default=False, dest="instant", help="日次トレード")
     parser.add_argument("--max_leverage", type=int, action="store", default=None, dest="max_leverage", help="max_leverage")
+    parser.add_argument("--passive_leverage", action="store_true", default=False, dest="passive_leverage", help="passive_leverage")
     parser.add_argument("--condition_size", type=int, action="store", default=None, dest="condition_size", help="条件数")
 
     # strategy
@@ -200,7 +201,10 @@ def load_simulator_data(code, start_date, end_date, args):
         return None
 
     simulator_data = add_stats(code, data, rule)
-    print("loaded:", utils.timestamp(), code, data["date"].iloc[0], data["date"].iloc[-1])
+    if args.verbose:
+        print("loaded:", utils.timestamp(), code, data["date"].iloc[0], data["date"].iloc[-1])
+    else:
+        print(".", end="")
     return simulator_data
 
 def load_index(args, start_date, end_date):
@@ -251,6 +255,7 @@ def create_combination_setting(args, use_json=True):
     combination_setting.position_sizing = args.position_sizing if args.position_sizing else combination_setting.position_sizing
     combination_setting.max_position_size = combination_setting.max_position_size if args.max_position_size is None else int(args.max_position_size)
     combination_setting.max_leverage = combination_setting.max_leverage if args.max_leverage is None else int(args.max_leverage)
+    combination_setting.passive_leverage = combination_setting.passive_leverage if args.passive_leverage is None else args.passive_leverage
     combination_setting.condition_size = combination_setting.condition_size if args.condition_size is None else int(args.condition_size)
     combination_setting.ensemble = [] if args.ensemble_dir is None else ensemble_files(args.ensemble_dir)
     return combination_setting
@@ -263,6 +268,11 @@ def create_combination_setting_by_dict(args, setting_dict):
     combination_setting = CombinationSetting()
     if setting_dict is None:
         return combination_setting
+    combination_setting = apply_combination_setting_by_dict(combination_setting, setting_dict)
+    combination_setting = apply_assets(args, combination_setting)
+    return combination_setting
+
+def apply_combination_setting_by_dict(combination_setting, setting_dict):
     combination_setting.use_limit = setting_dict["use_limit"] if "use_limit" in setting_dict.keys() else combination_setting.use_limit
     combination_setting.position_sizing = setting_dict["position_sizing"] if "position_sizing" in setting_dict.keys() else combination_setting.position_sizing
     combination_setting.max_position_size = setting_dict["max_position_size"] if "max_position_size" in setting_dict.keys() else combination_setting.max_position_size
@@ -270,7 +280,6 @@ def create_combination_setting_by_dict(args, setting_dict):
     combination_setting.ensemble = ensemble_files(setting_dict["ensemble"]) if "ensemble" in setting_dict.keys() else combination_setting.ensemble
     combination_setting.weights = setting_dict["weights"] if "weights" in setting_dict.keys() else combination_setting.weights
     combination_setting.condition_size = setting_dict["condition_size"] if "condition_size" in setting_dict.keys() else combination_setting.condition_size
-    combination_setting = apply_assets(args, combination_setting)
     return combination_setting
 
 def create_simulator_setting(args, use_json=True):
@@ -454,11 +463,15 @@ class Rule:
 # ========================================================================
 # 売買戦略
 class Strategy:
-    def __init__(self, new_rules, taking_rules, stop_loss_rules, closing_rules):
-        self.new_rules = list(map(lambda x: Rule(x), new_rules))
-        self.taking_rules = list(map(lambda x: Rule(x), taking_rules))
-        self.stop_loss_rules = list(map(lambda x: Rule(x), stop_loss_rules))
-        self.closing_rules = list(map(lambda x: Rule(x), closing_rules))
+    def __init__(self, new, taking, stop_loss, closing, x2, x4, x8, x0_5):
+        self.new_rules = list(map(lambda x: Rule(x), new))
+        self.taking_rules = list(map(lambda x: Rule(x), taking))
+        self.stop_loss_rules = list(map(lambda x: Rule(x), stop_loss))
+        self.closing_rules = list(map(lambda x: Rule(x), closing))
+        self.x2_rules = list(map(lambda x: Rule(x), x2))
+        self.x4_rules = list(map(lambda x: Rule(x), x4))
+        self.x8_rules = list(map(lambda x: Rule(x), x8))
+        self.x0_5_rules = list(map(lambda x: Rule(x), x0_5))
 
 class StrategySetting():
     def __init__(self):
@@ -557,6 +570,17 @@ class StrategyConditions():
 # ========================================================================
 
 class StrategyCreator:
+    def __init__(self):
+        self.new_conditions = []
+        self.taking_conditions = []
+        self.stop_loss_conditions = []
+        self.closing_conditions = []
+        self.x2_conditions = []
+        self.x4_conditions = []
+        self.x8_conditions = []
+        self.x0_5_conditions = []
+        self.selected_conditions_index = {}
+
     def create_new_orders(self, data):
         raise Exception("Need override create_new_orders.")
 
@@ -569,11 +593,23 @@ class StrategyCreator:
     def create_closing_orders(self, data):
         raise Exception("Need override create_closing_orders.")
 
+    def create_x2(self, data):
+        raise Exception("Need override create_x2.")
+
+    def create_x4(self, data):
+        raise Exception("Need override create_x4.")
+
+    def create_x8(self, data):
+        raise Exception("Need override create_x8.")
+
+    def create_x0_5(self, data):
+        raise Exception("Need override create_x0_5.")
+
     def subject(self, date):
         raise Exception("Need override subject.")
 
-    def conditions_index(self): # TODO このクラスのものではない
-        raise Exception("Need override conditions_index.")
+    def conditions_index(self):
+        return self.selected_conditions_index
 
     # 何か追加データが欲しいときはoverrideする
     def add_data(self, data):
@@ -583,11 +619,15 @@ class StrategyCreator:
         return list(utils.daterange(utils.to_datetime(start_date), utils.to_datetime(end_date)))
 
     def create(self, settings):
-        new_rules = [lambda x: self.create_new_orders(x)]
-        taking_rules = [lambda x: self.create_taking_orders(x)]
-        stop_loss_rules = [lambda x: self.create_stop_loss_orders(x)]
-        closing_rules = [lambda x: self.create_closing_orders(x)]
-        return Strategy(new_rules, taking_rules, stop_loss_rules, closing_rules)
+        new = [lambda x: self.create_new_orders(x)]
+        taking = [lambda x: self.create_taking_orders(x)]
+        stop_loss = [lambda x: self.create_stop_loss_orders(x)]
+        closing = [lambda x: self.create_closing_orders(x)]
+        x2 = [lambda x: self.create_x2(x)]
+        x4 = [lambda x: self.create_x4(x)]
+        x8 = [lambda x: self.create_x8(x)]
+        x0_5 = [lambda x: self.create_x0_5(x)]
+        return Strategy(new, taking, stop_loss, closing, x2, x4, x8, x0_5)
 
     def ranges(self):
         return [[0], [0], [0], [0]]
@@ -596,14 +636,7 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
     def __init__(self, setting=None):
         self.setting = CombinationSetting() if setting is None else setting
         self.default_weights = 200
-        self.new_conditions = []
-        self.taking_conditions = []
-        self.stop_loss_conditions = []
-        self.closing_conditions = []
-        self.x2_conditions = []
-        self.x4_conditions = []
-        self.x8_conditions = []
-        self.x0_5_conditions = []
+        super().__init__()
 
     def ranges(self):
         return [
@@ -651,8 +684,10 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
         choiced = list(map(lambda x: x["x"], choiced))
         return list(zip(*choiced))
 
-    def apply_weights(self, method):
-        base = numpy.array([self.default_weights] * len(self.conditions_all))
+    def apply_weights(self, method, all_condition_size=None):
+        if all_condition_size is None:
+            all_condition_size = len(self.conditions_all) # TODO conditions_all
+        base = numpy.array([self.default_weights] * all_condition_size)
 
         if method in self.weights.keys():
             for index, weight in self.weights[method].items():
@@ -676,44 +711,28 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
 
     # 継承したクラスから条件のリストから組み合わせを生成する
     def new(self):
-        return [
-            lambda d: False
-        ]
+        return [lambda d: False]
 
     def taking(self):
-        return [
-            lambda d: False
-        ]
+        return [lambda d: False]
 
     def stop_loss(self):
-        return [
-            lambda d: False
-        ]
+        return [lambda d: False]
 
     def closing(self):
-        return [
-            lambda d: False
-        ]
+        return [lambda d: False]
 
     def x2(self):
-        return [
-            lambda d: False
-        ]
+        return [lambda d: False]
 
     def x4(self):
-        return [
-            lambda d: False
-        ]
+        return [lambda d: False]
 
     def x8(self):
-        return [
-            lambda d: False
-        ]
+        return [lambda d: False]
 
     def x0_5(self):
-        return [
-            lambda d: False
-        ]
+        return [lambda d: False]
 
 # ensemble用
 class StrategyCreateSetting:
@@ -722,7 +741,7 @@ class StrategyCreateSetting:
         self.is_production = "production" in filename
         self.setting_dict = Loader.simulate_setting(filename, "")
         self.strategy_setting = create_strategy_setting(self.setting_dict)
-        self.combination_setting = create_combination_setting_by_dict(self.setting_dict)
+        self.combination_setting = apply_combination_setting_by_dict(CombinationSetting(), self.setting_dict)
 
     def get_strategy_name(self, filename):
         strategy_types = StrategyType()
@@ -771,8 +790,9 @@ class CombinationSetting:
     position_adjust = True
     strict = True
     assets = 0
-    max_position_size = 5
+    max_position_size = 8
     max_leverage = None
+    passive_leverage = False
     condition_size = 5
     seed = [int(t.time())]
     ensemble = []
@@ -802,6 +822,33 @@ class Combination(StrategyCreator, StrategyUtil):
 
         return allow
 
+    def position_sizing(self, data, order, max_position):
+        available_leverage = lambda x: self.setting.max_leverage is None or x <= self.setting.max_leverage
+
+        if self.setting.passive_leverage:
+            order = 8 if self.apply(data, self.conditions.x8) and available_leverage(8) else order
+            order = 4 if self.apply(data, self.conditions.x4) and available_leverage(4) else order
+            order = 2 if self.apply(data, self.conditions.x2) and available_leverage(2) else order
+        else:
+            order = 2 if self.apply(data, self.conditions.x2) and available_leverage(2) else order
+            order = 4 if self.apply(data, self.conditions.x4) and available_leverage(4) else order
+            order = 8 if self.apply(data, self.conditions.x8) and available_leverage(8) else order
+
+        # 最大を超える場合は調整
+        if order + data.position.get_num() > max_position:
+            order = max_position - data.position.get_num()
+        return order
+
+    def additional_new_signals(self, data):
+        if self.setting.strict:
+            return []
+        else:
+            return [
+                self.apply(data, self.conditions.x2),
+                self.apply(data, self.conditions.x4),
+                self.apply(data, self.conditions.x8)
+            ]
+
     # 買い
     def create_new_orders(self, data):
 
@@ -820,24 +867,9 @@ class Combination(StrategyCreator, StrategyUtil):
         order = 1
         if self.setting.position_sizing:
             # レバレッジ
-            available_leverage = lambda x: self.setting.max_leverage is None or x <= self.setting.max_leverage
-            order = 2 if self.apply(data, self.conditions.x2) and available_leverage(2) else order
-            order = 4 if self.apply(data, self.conditions.x4) and available_leverage(4) else order
-            order = 8 if self.apply(data, self.conditions.x8) and available_leverage(8) else order
-
-            # 最大を超える場合は調整
-            if order + data.position.get_num() > max_position:
-#                if data.setting.debug:
-#                    print("order(+position) > max_position: ", order, data.position.get_num(), max_position)
-                order = max_position - data.position.get_num()
-
+            order = self.position_sizing(data, order, max_position)
             # レバレッジシグナルも買いシグナルとする
-            if not self.setting.strict:
-                additional = additional + [
-                    self.apply(data, self.conditions.x2),
-                    self.apply(data, self.conditions.x4),
-                    self.apply(data, self.conditions.x8)
-                ]
+            additional = additional + self.additional_new_signals(data)
 
         conditions = [
             self.drawdown_allowable(data), # ドローダウンが問題ない状態
@@ -866,22 +898,11 @@ class Combination(StrategyCreator, StrategyUtil):
     def create_taking_orders(self, data):
         order = data.position.get_num()
         gain = data.position.gain(self.price(data), order)
-        take_gain = self.taking_gain(data, self.setting.max_position_size)
-        atr_take_gain = data.data.daily["atr"].iloc[-1] * data.setting.min_unit * order
-        stop_loss = self.stop_loss(data, self.setting.max_position_size)
-        max_gain = self.max_gain(data)
         conditions = []
 
         if self.setting.simple["taking"]:
             conditions = conditions + [self.apply_common(data, self.common.taking)]
         else:
-            protect_gain = any([
-                all([ # 利食いラインを超えて下がった
-                    max_gain > take_gain,
-                    max_gain - gain > atr_take_gain
-                ])
-            ])
-
             conditions = conditions + [
                 self.apply_common(data, self.common.taking),
                 any([
@@ -937,6 +958,18 @@ class Combination(StrategyCreator, StrategyUtil):
             return simulator.MarketOrder(order, on_close=True, is_short=data.setting.short_trade)
 
         return None
+
+    def create_x2(self, data):
+        return self.apply(data, self.conditions.x2)
+
+    def create_x4(self, data):
+        return self.apply(data, self.conditions.x4)
+
+    def create_x8(self, data):
+        return self.apply(data, self.conditions.x8)
+
+    def create_x0_5(self, data):
+        return self.apply(data, self.conditions.x0_5)
 
 
 class CombinationChecker:

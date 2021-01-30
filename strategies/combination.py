@@ -19,9 +19,6 @@ class CombinationStrategy(CombinationCreator):
         self.weights = setting.weights
         self.conditions_by_seed(setting.seed[0])
 
-    def conditions_index(self):
-        return self.selected_condition_index
-
     def load_portfolio(self, date):
         d = utils.to_format(date)
         try:
