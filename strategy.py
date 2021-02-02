@@ -19,6 +19,7 @@ from simulator import SimulatorSetting
 from argparse import ArgumentParser
 
 def add_options(parser):
+    parser.add_argument("-v", action="store_true", default=False, dest="verbose", help="debug log")
     parser.add_argument("--code", type=str, action="store", default=None, dest="code", help="code")
     parser.add_argument("--use_limit", action="store_true", default=False, dest="use_limit", help="指値を使う")
     parser.add_argument("--position_sizing", action="store_true", default=False, dest="position_sizing", help="ポジションサイジング")
