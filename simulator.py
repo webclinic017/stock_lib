@@ -531,6 +531,10 @@ class SimulatorStats:
     def auto_stop_loss(self):
         return list(filter(lambda x: x["repay"] is not None and x["order_type"] == "reverse_limit", self.trade_history))
 
+    def crash(self, loss=0):
+        history = list(filter(lambda x: x["term"] == 1 and x["gain"] is not None and x["gain"] < loss, self.trade_history))
+        return list(map(lambda x: x["gain"], history))
+
 # シミュレーター
 class Simulator:
     def __init__(self, setting, position = None):
@@ -1082,27 +1086,7 @@ class Simulator:
         trade_data["unavailable_assets"]  = trade_data["assets"] - self.assets
         return trade_data
 
-    # トレード
-    def trade(self, strategy, price, volume, data, index):
-        assert type(data) is SimulatorData, "data is not SimulatorData."
-
-        date = data.daily["date"].iloc[-1]
-
-        # トレード履歴に直前のシグナルを反映
-        if len(self.stats.trade_history) > 0:
-            trade_data = self.stats.trade_history[-1]
-            trade_data["signal"] = "new" if len(self.new_orders) > 0 else "repay" if len(self.repay_orders) > 0 else None
-            self.stats.apply(trade_data)
-
-        # stats
-        trade_data = self.create_trade_data(date, data.daily["low"].iloc[-1], data.daily["high"].iloc[-1], price)
-
-        # 判断に必要なデータ数がない
-        if price == 0 or len(data.daily) < self.setting.min_data_length:
-            self.log("less data. skip trade. [%s - %s]. price: %s == 0 or length: %s < %s" % (data.daily["date"].iloc[0], date, price, len(data.daily), self.setting.min_data_length))
-            self.stats.append(trade_data)
-            return
-
+    def increment_term(self):
         # ポジションの保有期間を増やす
         if self.position.get_num() > 0:
             self.position.increment_term()
@@ -1113,6 +1097,35 @@ class Simulator:
 
         for i in range(len(self.repay_orders)):
             self.repay_orders[i].increment_term()
+
+    def apply_signal(self):
+        if len(self.stats.trade_history) > 0:
+            trade_data = self.stats.trade_history[-1]
+            trade_data["signal"] = "new" if len(self.new_orders) > 0 else "repay" if len(self.repay_orders) > 0 else None
+            self.stats.apply(trade_data)
+
+    # トレード
+    def trade(self, strategy, price, volume, data, index):
+        assert type(data) is SimulatorData, "data is not SimulatorData."
+
+        date = data.daily["date"].iloc[-1]
+
+        # トレード履歴に直前のシグナルを反映
+        self.apply_signal()
+
+        # stats
+        trade_data = self.create_trade_data(date, data.daily["low"].iloc[-1], data.daily["high"].iloc[-1], price)
+
+        # 判断に必要なデータ数がない
+        if price == 0 or len(data.daily) < self.setting.min_data_length:
+            self.log("less data. skip trade. [%s - %s]. price: %s == 0 or length: %s < %s" % (data.daily["date"].iloc[0], date, price, len(data.daily), self.setting.min_data_length))
+            self.stats.append(trade_data)
+            return
+
+        # 注文・ポジションの保有日数をインクリメント
+        self.increment_term()
+        trade_data["size"] = self.position.get_num()
+        trade_data["term"] = self.position.get_term()
 
         # 寄り付き====================================================================
         if self.setting.virtual_trade: # 注文の約定チェック
@@ -1126,8 +1139,6 @@ class Simulator:
             trade_data = self.intraday_trade(volume, data, trade_data)
 
         # トレード履歴に追加
-        trade_data["size"] = self.position.get_num()
-        trade_data["term"] = self.position.get_term()
         trade_data["contract_price"] = list(filter(lambda x: x is not None, [trade_data["new"], trade_data["repay"]]))
         trade_data["contract_price"] = None if len(trade_data["contract_price"]) == 0 else trade_data["contract_price"][0] * trade_data["size"] * self.setting.min_unit
         trade_data["unrealized_gain"] = self.position.current_gain(data.daily["close"].iloc[-1])

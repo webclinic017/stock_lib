@@ -227,7 +227,7 @@ def add_stats(code, data, rule):
         data = utils.add_cs_stats(data)
         return SimulatorData(code, data, rule)
     except Exception as e:
-        print("load_error: %s" % e)
+        print(code, "load_error: %s" % e)
         return None
 
 # create ================================================
@@ -278,6 +278,7 @@ def apply_combination_setting_by_dict(combination_setting, setting_dict):
     combination_setting.max_position_size = setting_dict["max_position_size"] if "max_position_size" in setting_dict.keys() else combination_setting.max_position_size
     combination_setting.seed = setting_dict["seed"] if "seed" in setting_dict.keys() else combination_setting.seed
     combination_setting.weights = setting_dict["weights"] if "weights" in setting_dict.keys() else combination_setting.weights
+    combination_setting.passive_leverage = setting_dict["passive_leverage"] if "passive_leverage" in setting_dict.keys() else combination_setting.passive_leverage
     combination_setting.condition_size = setting_dict["condition_size"] if "condition_size" in setting_dict.keys() else combination_setting.condition_size
     combination_setting.ensemble = ensemble_files(setting_dict["ensemble_dir"]) if "ensemble_dir" in setting_dict.keys() else combination_setting.ensemble
     return combination_setting
@@ -579,7 +580,7 @@ class StrategyCreator:
         self.x4_conditions = []
         self.x8_conditions = []
         self.x0_5_conditions = []
-        self.selected_conditions_index = {}
+        self.selected_condition_index = {}
 
     def create_new_orders(self, data):
         raise Exception("Need override create_new_orders.")
@@ -609,7 +610,7 @@ class StrategyCreator:
         raise Exception("Need override subject.")
 
     def conditions_index(self):
-        return self.selected_conditions_index
+        return self.selected_condition_index
 
     # 何か追加データが欲しいときはoverrideする
     def add_data(self, data):

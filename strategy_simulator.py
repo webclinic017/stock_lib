@@ -53,7 +53,7 @@ class StrategySimulator:
         simulator_setting = strategy.apply_long_short(args, simulator_setting)
         simulator_setting.strategy = strategy_creator.create(strategy_settings)
         for code in codes:
-            if stocks[code].split(start_date, end_date).daily["manda"].isin([1]).any(): # M&Aがあった銘柄はスキップ
+            if not code in stocks.keys() or stocks[code].split(start_date, end_date).daily["manda"].isin([1]).any(): # M&Aがあった銘柄はスキップ
                 self.log("skip. M&A. %s" % code)
                 continue
             simulators[code] = Simulator(simulator_setting)
@@ -63,6 +63,8 @@ class StrategySimulator:
         dates = []
         dates_dict = {}
         for code in codes:
+            if not code in stocks.keys():
+                continue
             dates_dict[code] = stocks[code].dates(start_date, end_date)
             dates = list(set(dates + dates_dict[code]))
         self.log("dates: %s" % dates)
@@ -201,8 +203,8 @@ class StrategySimulator:
         auto_stop_loss = list(map(lambda x: len(x[1].auto_stop_loss()), stats.items()))
         drawdown = list(map(lambda x: x.drawdown(), stats.values()))
         drawdown = numpy.array(drawdown).T
-
         max_unrealized_gain = list(map(lambda x: max(x) if len(x) > 0 else 0, self.stats.unrealized_gain()))
+        crash = list(map(lambda x: sum(x.crash()), stats.values()))
 
         if self.verbose:
             print(start_date, end_date, "assets:", self.simulator_setting.assets, "gain:", gain, sum(gain))
@@ -233,7 +235,8 @@ class StrategySimulator:
             "max_unavailable_assets": max(unavailable_assets) if len(s) > 0 and len(unavailable_assets) > 0 else 0,
             "sum_contract_price": sum(sum_contract_price) if len(s) > 0 else 0,
             "auto_stop_loss": sum(auto_stop_loss) if len(s) > 0 else 0,
-            "max_unrealized_gain": max(max_unrealized_gain) if len(max_unrealized_gain) > 0 else 0
+            "max_unrealized_gain": max(max_unrealized_gain) if len(max_unrealized_gain) > 0 else 0,
+            "crash": sum(crash) if len(s) > 0 else 0
         }
 
         return results
