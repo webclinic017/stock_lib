@@ -462,6 +462,9 @@ class Rule:
     def apply(self, data):
         return self.callback(data)
 
+    def applyNot(self, data):
+        return not self.callback(data)
+
 # ========================================================================
 # 売買戦略
 class Strategy:

@@ -24,16 +24,20 @@ class CombinationStrategy(CombinationStrategy):
     def get_size(self, size):
         return size if size < self.setting.condition_size else self.setting.condition_size
 
+    def rules(self, rule):
+#        return [rule.apply]
+        return [rule.apply, rule.applyNot]
+
     def conditions_by_seed(self, seed):
         strategies = strategy.create_ensemble_strategies(self.files)
 
-        new_rules         = list(map(lambda x: x.new_rules[0].callback, strategies))
-        taking_rules      = list(map(lambda x: x.taking_rules[0].callback, strategies))
-        stop_loss_rules   = list(map(lambda x: x.stop_loss_rules[0].callback, strategies))
-        closing_rules     = list(map(lambda x: x.closing_rules[0].callback, strategies))
-        x2_rules          = list(map(lambda x: x.x2_rules[0].callback, strategies))
-        x4_rules          = list(map(lambda x: x.x4_rules[0].callback, strategies))
-        x8_rules          = list(map(lambda x: x.x8_rules[0].callback, strategies))
+        new_rules         = sum(list(map(lambda x: self.rules(x.new_rules[0]), strategies)), [])
+        taking_rules      = sum(list(map(lambda x: self.rules(x.taking_rules[0]), strategies)), [])
+        stop_loss_rules   = sum(list(map(lambda x: self.rules(x.stop_loss_rules[0]), strategies)), [])
+        closing_rules     = sum(list(map(lambda x: self.rules(x.closing_rules[0]), strategies)), [])
+        x2_rules          = sum(list(map(lambda x: self.rules(x.x2_rules[0]), strategies)), [])
+        x4_rules          = sum(list(map(lambda x: self.rules(x.x4_rules[0]), strategies)), [])
+        x8_rules          = sum(list(map(lambda x: self.rules(x.x8_rules[0]), strategies)), [])
 
         random.seed(seed)
         numpy.random.seed(seed)
