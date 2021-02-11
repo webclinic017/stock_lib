@@ -311,7 +311,7 @@ def create_simulator_setting_by_json(args):
 
 def apply_assets(args, setting):
     assets = Loader.assets()
-    setting.assets = assets["assets"] if args.assets is None else args.assets
+    setting.assets = assets["assets"] - assets["itrust"] if args.assets is None else args.assets
     return setting
 
 def apply_long_short(args, setting):

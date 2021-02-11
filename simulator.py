@@ -678,22 +678,12 @@ class Simulator:
 
 
     def tick_price(self, price):
-        tick_prices = [
-            [3000, 1],
-            [5000, 5],
-            [30000, 10],
-            [50000, 50],
-        ]
-        tick_price = None
-        for t in tick_prices:
-            if price < t[0]:
-                tick_price = t[1]
-                break
+        import rakuten
+        return rakuten.tick_price(price)
 
-        if tick_price is None:
-            tick_price = 100
-
-        return tick_price
+    def price_limit(self, price):
+        import rakuten
+        return rakuten.price_limit(price)
 
     # 注文を分割する
     def split_order(self, order, num):
@@ -820,6 +810,8 @@ class Simulator:
         signal = None
         for order in self.new_signal(strategy, data, index):
             price = data.daily["close"].iloc[-1] if order.price is None else order.price
+            # 成り行き注文なら値幅の上限を基準にcostを計算する
+            price = price + self.price_limit(price)[1] if order.is_market() else price
             cost = self.position.eval(price, order.num)
             if (self.total_capacity() - cost) <= 0:
                 self.log(" - [over capacity] new_order: num %s, price %s, cost %d - %s unbound: %s" % (order.num, order.price, self.total_capacity(), cost, self.unbound))
