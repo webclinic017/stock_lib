@@ -300,7 +300,6 @@ class SimulatorSetting:
         self.error_rate = 0.00
         self.virtual_trade = True # 仮想取引 Falseにすると注文を処理しない
         self.short_trade = False
-        self.long_short_trade = {"long": None, "short": None}
         self.stop_loss_rate = 0.02
         self.taking_rate = 1.0
         self.min_unit = 100
@@ -848,47 +847,12 @@ class Simulator:
         return None
 
     def signals(self, strategy, data, index, trade_data):
-        strategies = self.setting.long_short_trade
-        if None in strategies.values():
-            # 新規ルールに当てはまる場合買う
-            trade_data["new_order"] = self.new_signals(strategy, data, index)
-            # 返済注文
-            trade_data["repay_order"] = self.repay_signals(strategy, data, index)
-            # 手仕舞い注文
-            trade_data["closing_order"] = self.closing_signals(strategy, data, index)
-        else:
-            self.setting.short_trade = False
-            long_new = self.new_signals(strategies["long"], data, index)
-            self.setting.short_trade = True
-            short_new = self.new_signals(strategies["short"], data, index)
-
-            trade_data["new_order"] = short_new if long_new is None else long_new
-
-            if self.position.get_num() > 0:
-                self.setting.short_trade = self.position.is_short()
-                if self.position.is_short() and long_new is not None:
-                    self.log(" - long active.")
-                    trade_data["new_order"] = None
-                    trade_data["repay_order"] = MarketOrder(self.position.get_num(), is_short=self.position.is_short())
-                    trade_data["closing_order"] = None
-                elif not self.position.is_short() and short_new is not None:
-                    self.log(" - short active.")
-                    trade_data["new_order"] = None
-                    trade_data["repay_order"] = MarketOrder(self.position.get_num(), is_short=self.position.is_short())
-                    trade_data["closing_order"] = None
-                else:
-                    trade_data["new_order"] = short_new if self.setting.short_trade else long_new
-                    trade_data["repay_order"] = self.repay_signals(strategies["short"], data, index) if self.setting.short_trade else self.repay_signals(strategies["long"], data, index)
-                    trade_data["closing_order"] = self.closing_signals(strategies["short"], data, index) if self.setting.short_trade else self.closing_signals(strategies["long"], data, index)
-            else:
-                self.setting.short_trade = long_new is None
-                trade_data["repay_order"] = self.repay_signals(strategies["short"], data, index) if self.setting.short_trade else self.repay_signals(strategies["long"], data, index)
-                trade_data["closing_order"] = self.closing_signals(strategies["short"], data, index) if self.setting.short_trade else self.closing_signals(strategies["long"], data, index)
-
-
-            self.new_orders = [] if trade_data["new_order"] is None else [trade_data["new_order"]]
-            self.repay_orders = [] if trade_data["repay_order"] is None else [trade_data["repay_order"]]
-            self.closing_orders = [] if trade_data["closing_order"] is None else [trade_data["closing_order"]]
+        # 新規ルールに当てはまる場合買う
+        trade_data["new_order"] = self.new_signals(strategy, data, index)
+        # 返済注文
+        trade_data["repay_order"] = self.repay_signals(strategy, data, index)
+        # 手仕舞い注文
+        trade_data["closing_order"] = self.closing_signals(strategy, data, index)
 
         # 注文の整理
         trade_data = self.order_adjust(trade_data)

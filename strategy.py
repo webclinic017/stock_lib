@@ -26,7 +26,6 @@ def add_options(parser):
     parser.add_argument("--max_position_size", action="store", default=None, dest="max_position_size", help="最大ポジションサイズ")
     parser.add_argument("--production", action="store_true", default=False, dest="production", help="本番向け") # 実行環境の選択
     parser.add_argument("--short", action="store_true", default=False, dest="short", help="空売り戦略")
-    parser.add_argument("--long_short", action="store_true", default=False, dest="long_short", help="ロングショート戦略")
     parser.add_argument("--auto_stop_loss", type=float, action="store", default=None, dest="auto_stop_loss", help="自動損切")
     parser.add_argument("--stop_loss_rate", action="store", default=None, dest="stop_loss_rate", help="損切レート")
     parser.add_argument("--taking_rate", action="store", default=None, dest="taking_rate", help="利食いレート")
@@ -312,10 +311,6 @@ def create_simulator_setting_by_json(args):
 def apply_assets(args, setting):
     assets = Loader.assets()
     setting.assets = assets["assets"] - assets["itrust"] if args.assets is None else args.assets
-    return setting
-
-def apply_long_short(args, setting):
-    setting.long_short_trade = {"long": load_strategy_by_option(args, is_short=False), "short": load_strategy_by_option(args, is_short=True)} if args.long_short else setting.long_short_trade
     return setting
 
 # ========================================================================

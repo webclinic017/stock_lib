@@ -50,7 +50,6 @@ class StrategySimulator:
         simulator_setting.debug = self.verbose
         strategy_settings = self.strategy_settings[:-1] + [strategy_setting] # 最後の設定を変えて検証
         strategy_creator = self.strategy_creator(args)
-        simulator_setting = strategy.apply_long_short(args, simulator_setting)
         simulator_setting.strategy = strategy_creator.create(strategy_settings)
         for code in codes:
             if not code in stocks.keys() or stocks[code].split(start_date, end_date).daily["manda"].isin([1]).any(): # M&Aがあった銘柄はスキップ
