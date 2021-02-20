@@ -2,6 +2,7 @@ import sys
 import numpy
 import time
 from datetime import datetime
+from itertools import groupby
 
 sys.path.append("lib")
 import checker
@@ -85,17 +86,23 @@ class StrategySimulator:
         return simulators
 
     def closing(self, stats, simulators):
-        drawdown = utils.drawdown(self.stats.last_unrealized_gain())
+        gain = zip(self.stats.last_unrealized_gain(), self.stats.get("gain", 0))
+        gain = list(map(lambda x: x[0] + x[1], gain))
+
+        drawdown = utils.drawdown(gain)
         max_gain = self.stats.max_unrealized_gain()
         taking = self.simulator_setting.assets * self.simulator_setting.taking_rate
         stop_loss = self.simulator_setting.assets * self.simulator_setting.stop_loss_rate
 
+        updated, data = list(groupby(drawdown, key=lambda x: x == 0))[-1]
+
         conditions = [
-            max_gain > taking and drawdown[-1] >= 0.25, # 目標価格を超えた上で一定以上のドローダウンがあったら手仕舞い
-#            sum(self.stats.last_unrealized_gain()) < -stop_loss
+            drawdown[-1] >= 0.25, # 目標価格を超えた上で一定以上のドローダウンがあったら手仕舞い
+            updated and len(list(data)) >= 2,
+            not updated and len(list(data)) >= 1
         ]
 
-        if any(conditions):
+        if max_gain > taking and any(conditions):
             for code in simulators.keys():
                 simulators[code].closing()
             stats["closing"] = True
@@ -144,6 +151,7 @@ class StrategySimulator:
                 binding += simulators[code].order_binding() - simulators[code].unbound
 
             stats["unrealized_gain"] = sum(list(map(lambda x: 0 if len(x.stats.last_unrealized_gain()) == 0 else x.stats.last_unrealized_gain()[-1], simulators.values())))
+            stats["gain"] = sum(list(map(lambda x: 0 if len(x.stats.get("gain")) == 0 else x.stats.get("gain", 0)[-1], simulators.values())))
             self.stats.append(stats)
 
             self.closing(stats, simulators)

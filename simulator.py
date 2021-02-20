@@ -344,6 +344,9 @@ class SimulatorStats:
     def apply(self, trade_data):
         self.trade_history = self.trade_history[:-1] + [trade_data]
 
+    def get(self, key, default=None):
+        return list(map(lambda x: default if x[key] is None else x[key], self.trade_history))
+
     def size(self):
         return list(map(lambda x: x["size"], self.trade_history))
 
