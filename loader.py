@@ -812,7 +812,7 @@ class Loader:
     def stock_split():
         try:
             data = pandas.read_csv("settings/stock_split.csv", header=None)
-            data.columns = ["date", "code"]
+            data.columns = ["date", "code", "ratio"]
             data['date'] = pandas.to_datetime(data['date'], format='%Y-%m-%d')
             return data.sort_values(by=["date"])
         except:
@@ -822,7 +822,7 @@ class Loader:
     def reverse_stock_split():
         try:
             data = pandas.read_csv("settings/reverse_stock_split.csv", header=None)
-            data.columns = ["date", "code"]
+            data.columns = ["date", "code", "ratio"]
             data['date'] = pandas.to_datetime(data['date'], format='%Y-%m-%d')
             return data.sort_values(by=["date"])
         except:
