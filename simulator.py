@@ -60,6 +60,10 @@ class Position:
     def get_num(self):
         return self.num
 
+    def apply_split_ratio(self, ratio):
+        self.num = int(math.ceil(self.num * ratio))
+        self.value = list(map(lambda x: x / ratio, self.value))
+
     # 平均取得価格
     def get_value(self):
         if len(self.value) == 0:
@@ -951,7 +955,7 @@ class Simulator:
 
         price = today["open"].item() # 約定価格
         volume = None if self.setting.ignore_volume else math.ceil(today["volume"].item() * 10)
-        self.log("date: %s, price: %s, volume: %s, hold: %s, capacity: %d, binding: %d" % (date, price, volume, self.position.get_num(), self.capacity, self.total_binding()))
+        self.log("date: %s, price: %s, volume: %s, ave: %s, hold: %s, capacity: %d, binding: %d" % (date, price, volume, self.position.get_value(), self.position.get_num(), self.capacity, self.total_binding()))
 
         self.trade(self.setting.strategy, price, volume, term_data, term_index)
 

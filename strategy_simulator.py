@@ -9,6 +9,7 @@ import checker
 import cache
 import utils
 import strategy
+from loader import Loader
 from simulator import Simulator, SimulatorStats
 
 class StrategySimulator:
@@ -18,6 +19,21 @@ class StrategySimulator:
         self.strategy_settings = strategy_settings
         self.verbose = verbose
         self.stats = SimulatorStats()
+
+        self.load_manda()
+
+    def select_weekday(self, date, days):
+        current = utils.to_datetime(date)
+        for i in range(days):
+            current = utils.select_weekday(current - utils.relativeterm(1, True))
+        return utils.to_format(current)
+
+    def load_manda(self):
+        self.stock_split = Loader.stock_split()
+        self.reverse_stock_split = Loader.reverse_stock_split()
+
+        self.stock_split["date"] = list(map(lambda x: self.select_weekday(x, 3), self.stock_split["date"].astype(str).values.tolist()))
+        self.reverse_stock_split["date"] = list(map(lambda x: self.select_weekday(x, 3), self.reverse_stock_split["date"].astype(str).values.tolist()))
 
     def strategy_creator(self, args):
         return strategy.load_strategy_creator(args, self.combination_setting)
@@ -53,9 +69,6 @@ class StrategySimulator:
         strategy_creator = self.strategy_creator(args)
         simulator_setting.strategy = strategy_creator.create(strategy_settings)
         for code in codes:
-            if not code in stocks.keys() or stocks[code].split(start_date, end_date).daily["manda"].isin([1]).any(): # M&Aがあった銘柄はスキップ
-                self.log("skip. M&A. %s" % code)
-                continue
             simulators[code] = Simulator(simulator_setting)
         return simulators
 
@@ -72,7 +85,6 @@ class StrategySimulator:
         # 日付ごとにシミュレーション
         dates = sorted(dates, key=lambda x: utils.to_datetime(x))
         return dates
-
 
     def force_closing(self, dates, stocks, simulators):
         if len(dates) > 0:
@@ -106,8 +118,18 @@ class StrategySimulator:
             for code in simulators.keys():
                 simulators[code].closing()
             stats["closing"] = True
-        return stats
+        return stats, simulators
 
+    def manda(self, date, code, simulators):
+        stock_split = self.stock_split[(self.stock_split["date"] == date) & (self.stock_split["code"] == int(code))]
+        reverse_stock_split = self.reverse_stock_split[(self.reverse_stock_split["date"] == date) & (self.reverse_stock_split["code"] == int(code))]
+
+        if len(stock_split) > 0:
+            simulators[code].position.apply_split_ratio(stock_split["ratio"].iloc[0])
+        if len(reverse_stock_split) > 0:
+            simulators[code].position.apply_split_ratio(reverse_stock_split["ratio"].iloc[0])
+
+        return simulators
 
     def simulates(self, strategy_setting, data, start_date, end_date, with_closing=True):
         self.log("simulating %s %s" % (start_date, end_date))
@@ -139,11 +161,15 @@ class StrategySimulator:
             stats = self.stats.create_trade_data()
             stats["date"] = date
 
+
             binding = sum(list(map(lambda x: x.order_binding(), simulators.values())))
 
             for code in simulators.keys():
                 # 対象日までのデータの整形
                 self.log("[%s]" % code)
+                # M&A 適用
+                simulators = self.manda(date, code, simulators)
+
                 simulators[code].capacity = simulators[code].capacity if capacity is None else capacity
                 simulators[code].binding = binding - simulators[code].order_binding() # 自分の拘束分はsimulator側で加算するので引いておく
                 simulators[code].simulate_by_date(date, stocks[code], index)
@@ -154,7 +180,7 @@ class StrategySimulator:
             stats["gain"] = sum(list(map(lambda x: 0 if len(x.stats.get("gain")) == 0 else x.stats.get("gain", 0)[-1], simulators.values())))
             self.stats.append(stats)
 
-            self.closing(stats, simulators)
+            stats, simulators = self.closing(stats, simulators)
             self.log("gain: %s" % stats["unrealized_gain"])
 
         # 手仕舞い

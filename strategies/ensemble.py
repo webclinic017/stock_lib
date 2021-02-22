@@ -25,7 +25,6 @@ class CombinationStrategy(CombinationStrategy):
         return size if size < self.setting.condition_size else self.setting.condition_size
 
     def rules(self, rule):
-#        return [rule.apply]
         return [rule.apply, rule.applyNot]
 
     def conditions_by_seed(self, seed):
