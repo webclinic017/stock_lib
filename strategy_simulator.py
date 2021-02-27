@@ -61,7 +61,7 @@ class StrategySimulator:
         if self.verbose:
              print(message)
 
-    def create_simulator(self, args, codes, stocks, start_date, end_date, strategy_setting):
+    def create_simulator(self, args, codes, stocks, start_date, end_date, strategy_setting, ignore_manda=True):
         simulators = {}
         simulator_setting = self.simulator_setting
         simulator_setting.debug = self.verbose
@@ -70,6 +70,8 @@ class StrategySimulator:
         combination = strategy_creator.create_combination(strategy_settings)
         simulator_setting.strategy = strategy_creator.create(strategy_settings)
         for code in codes:
+            if ignore_manda and self.is_manda(start_date, end_date, code):
+                continue
             simulators[code] = Simulator(simulator_setting)
         return combination, simulators
 
@@ -121,9 +123,33 @@ class StrategySimulator:
             stats["closing"] = True
         return stats, simulators
 
-    def manda(self, date, code, simulators):
-        stock_split = self.stock_split[(self.stock_split["date"] == date) & (self.stock_split["code"] == int(code))]
-        reverse_stock_split = self.reverse_stock_split[(self.reverse_stock_split["date"] == date) & (self.reverse_stock_split["code"] == int(code))]
+
+    def get_stock_split(self, start_date, end_date, code):
+        stock_split = self.stock_split[
+            (self.stock_split["date"] >= start_date) &
+            (self.stock_split["date"] <= end_date) &
+            (self.stock_split["code"] == int(code))
+        ]
+
+        return stock_split
+
+    def get_reverse_stock_split(self, start_date, end_date, code):
+        reverse_stock_split = self.reverse_stock_split[
+            (self.reverse_stock_split["date"] >= start_date) &
+            (self.reverse_stock_split["date"] <= end_date) &
+            (self.reverse_stock_split["code"] == int(code))
+        ]
+        return reverse_stock_split
+
+    def is_manda(self, start_date, end_date, code):
+        stock_split = self.get_stock_split(start_date, end_date, code)
+        reverse_stock_split = self.get_reverse_stock_split(start_date, end_date, code)
+
+        return len(stock_split) > 0 or len(reverse_stock_split) > 0
+
+    def manda_by_date(self, date, code, simulators):
+        stock_split = self.get_stock_split(date, date, code)
+        reverse_stock_split = self.get_reverse_stock_split(date, date, code)
 
         if len(stock_split) > 0:
             simulators[code].position.apply_split_ratio(stock_split["ratio"].iloc[0])
@@ -132,7 +158,7 @@ class StrategySimulator:
 
         return simulators
 
-    def simulates(self, strategy_setting, data, start_date, end_date, with_closing=True):
+    def simulates(self, strategy_setting, data, start_date, end_date, with_closing=True, ignore_manda=True):
         self.log("simulating %s %s" % (start_date, end_date))
 
         self.stats = SimulatorStats()
@@ -143,7 +169,7 @@ class StrategySimulator:
         codes = self.get_targets(args, [], start_date)
 
         # シミュレーター準備
-        combination, simulators = self.create_simulator(args, codes, stocks, start_date, end_date, strategy_setting)
+        combination, simulators = self.create_simulator(args, codes, stocks, start_date, end_date, strategy_setting, ignore_manda)
 
         # 日付のリストを取得
         dates = self.simulate_dates(codes, stocks, start_date, end_date)
@@ -168,7 +194,7 @@ class StrategySimulator:
                 # 対象日までのデータの整形
                 self.log("[%s]" % code)
                 # M&A 適用
-                simulators = self.manda(date, code, simulators)
+                simulators = self.manda_by_date(date, code, simulators)
 
                 simulators[code].capacity = simulators[code].capacity if capacity is None else capacity
                 simulators[code].binding = binding - simulators[code].order_binding() # 自分の拘束分はsimulator側で加算するので引いておく
