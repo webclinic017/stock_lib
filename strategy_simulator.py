@@ -67,10 +67,11 @@ class StrategySimulator:
         simulator_setting.debug = self.verbose
         strategy_settings = self.strategy_settings[:-1] + [strategy_setting] # 最後の設定を変えて検証
         strategy_creator = self.strategy_creator(args)
+        combination = strategy_creator.create_combination(strategy_settings)
         simulator_setting.strategy = strategy_creator.create(strategy_settings)
         for code in codes:
             simulators[code] = Simulator(simulator_setting)
-        return simulators
+        return combination, simulators
 
     def simulate_dates(self, codes, stocks, start_date, end_date):
         dates = []
@@ -142,7 +143,7 @@ class StrategySimulator:
         codes = self.get_targets(args, [], start_date)
 
         # シミュレーター準備
-        simulators = self.create_simulator(args, codes, stocks, start_date, end_date, strategy_setting)
+        combination, simulators = self.create_simulator(args, codes, stocks, start_date, end_date, strategy_setting)
 
         # 日付のリストを取得
         dates = self.simulate_dates(codes, stocks, start_date, end_date)
@@ -161,7 +162,6 @@ class StrategySimulator:
             stats = self.stats.create_trade_data()
             stats["date"] = date
 
-
             binding = sum(list(map(lambda x: x.order_binding(), simulators.values())))
 
             for code in simulators.keys():
@@ -176,8 +176,8 @@ class StrategySimulator:
                 capacity = simulators[code].capacity
                 binding += simulators[code].order_binding() - simulators[code].unbound
 
-            stats["unrealized_gain"] = sum(list(map(lambda x: 0 if len(x.stats.last_unrealized_gain()) == 0 else x.stats.last_unrealized_gain()[-1], simulators.values())))
-            stats["gain"] = sum(list(map(lambda x: 0 if len(x.stats.get("gain")) == 0 else x.stats.get("gain", 0)[-1], simulators.values())))
+            stats["unrealized_gain"] = self.sum_stats(simulators, lambda x: x.stats.last_unrealized_gain())
+            stats["gain"] = self.sum_stats(simulators, lambda x: x.stats.get("gain", 0))
             self.stats.append(stats)
 
             stats, simulators = self.closing(stats, simulators)
@@ -188,6 +188,9 @@ class StrategySimulator:
             simulators = self.force_closing(dates, stocks, simulators)
 
         return simulators
+
+    def sum_stats(self, simulators, callback):
+        return sum(list(map(lambda x: 0 if len(callback(x)) == 0 else callback(x)[-1], simulators.values())))
 
     def get_stats(self, simulators, start_date, end_date):
         # 統計 ====================================

@@ -672,7 +672,14 @@ class Simulator:
         self.force_stop = True
 
     # 手仕舞い
-    def closing(self):
+    def closing(self, force_stop=False):
+        self.force_stop = force_stop
+
+        if self.force_stop:
+            self.log("[cancel] new/repay order. force closed")
+            self.new_orders = []
+            self.repay_orders = []
+
         if self.position.get_num() > 0:
             self.log(" - closing_order: num %s, price %s" % (self.position.get_num(), self.position.get_value()))
             self.repay_orders = [MarketOrder(self.position.get_num(), is_short=self.position.is_short())]

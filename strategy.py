@@ -651,9 +651,12 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
         ]
 
     def create(self, settings):
+        return self.create_combination(settings).create(settings)
+
+    def create_combination(self, settings):
         strategy_settings = [StrategySetting()] if len(settings) == 0 else settings
         conditions = self.conditions(strategy_settings)
-        return Combination(conditions, self.common(settings), self.setting).create(settings)
+        return Combination(conditions, self.common(settings), self.setting)
 
     # インデックスから直接条件を生成
     def condition(self, setting):
@@ -805,20 +808,17 @@ class Combination(StrategyCreator, StrategyUtil):
         self.common = common
         self.setting = CombinationSetting() if setting is None else setting
 
-    def drawdown_allowable(self, data):
+    def drawdown_allowable(self, data, term=20):
         allowable_dd = data.setting.stop_loss_rate
-        drawdown = data.stats.drawdown()[-20:]
+        drawdown = data.stats.drawdown()[-term:]
         drawdown_diff = list(filter(lambda x: x > allowable_dd, drawdown)) if len(drawdown) > 1 else []
         drawdown_sum = list(filter(lambda x: x > 0, numpy.diff(drawdown))) if len(drawdown) > 1 else []
         drawdown_conditions = [
-            len(drawdown_diff) == 0, # 6%ルール条件外(-6%を超えて一定期間たった)
-            sum(drawdown_sum) < allowable_dd # 6%ルール(直近のドローダウン合計が6%以下)
+            len(drawdown_diff) == 0, # -n%を超えて一定期間たった
+            sum(drawdown_sum) < allowable_dd # 直近のドローダウン合計がn%以下
         ]
 
         allow = all(drawdown_conditions)
-
-        if not allow and data.setting.debug:
-            print("over drawdown: ", drawdown_conditions, len(drawdown_diff), sum(drawdown_sum))
 
         return allow
 

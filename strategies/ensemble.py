@@ -38,12 +38,14 @@ class CombinationStrategy(CombinationStrategy):
         x4_rules          = sum(list(map(lambda x: self.rules(x.x4_rules[0]), strategies)), [])
         x8_rules          = sum(list(map(lambda x: self.rules(x.x8_rules[0]), strategies)), [])
 
+        new_rules = new_rules + taking_rules + stop_loss_rules
+
         random.seed(seed)
         numpy.random.seed(seed)
 
         size = self.get_size(len(strategies))
 
-        new, self.new_conditions                = self.choice(new_rules, size, self.apply_weights("new", len(new_rules)))
+        new, self.new_conditions                = self.choice(new_rules, size*2, self.apply_weights("new", len(new_rules)))
         taking, self.taking_conditions          = self.choice(taking_rules, size, self.apply_weights("taking", len(taking_rules)))
         stop_loss, self.stop_loss_conditions    = self.choice(stop_loss_rules, size, self.apply_weights("stop_loss", len(stop_loss_rules)))
         closing, self.closing_conditions        = self.choice(closing_rules, size, self.apply_weights("closing", len(closing_rules)))
