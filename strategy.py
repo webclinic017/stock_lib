@@ -316,10 +316,10 @@ def apply_assets(args, setting):
 # ========================================================================
 
 class StrategyUtil:
-    def apply(self, data, conditions, debug=False):
+    def apply(self, data, conditions, debug=False, detail=False):
         if len(conditions) == 0 or (len(conditions[0]) == 0 and len(conditions[1]) == 0):
             return False
-        if debug:
+        if detail:
             checker = CombinationChecker()
             print(checker.get_source(conditions[0]), checker.get_source(conditions[1]))
 
@@ -456,9 +456,6 @@ class Rule:
 
     def apply(self, data):
         return self.callback(data)
-
-    def applyNot(self, data):
-        return not self.callback(data)
 
 # ========================================================================
 # 売買戦略
@@ -612,7 +609,7 @@ class StrategyCreator:
         return self.selected_condition_index
 
     # 何か追加データが欲しいときはoverrideする
-    def add_data(self, data):
+    def add_data(self, data, index):
         return data
 
     def select_dates(self, start_date, end_date, instant):
@@ -630,7 +627,7 @@ class StrategyCreator:
         return Strategy(new, taking, stop_loss, closing, x2, x4, x8, x0_5)
 
     def ranges(self):
-        return [[0], [0], [0], [0]]
+        return [[0], [0], [0], [0], [0], [0], [0], [0]]
 
 class CombinationCreator(StrategyCreator, StrategyUtil):
     def __init__(self, setting=None):
@@ -822,17 +819,32 @@ class Combination(StrategyCreator, StrategyUtil):
 
         return allow
 
-    def position_sizing(self, data, order, max_position):
-        available_leverage = lambda x: self.setting.max_leverage is None or x <= self.setting.max_leverage
+    def available_leverage(self, level):
+        return self.setting.max_leverage is None or level <= self.setting.max_leverage
 
+    def active_leverage(self, data, order, max_position):
+        if self.apply(data, self.conditions.x8) and self.available_leverage(8):
+            return 8
+        if self.apply(data, self.conditions.x4) and self.available_leverage(4):
+            return 4
+        if self.apply(data, self.conditions.x2) and self.available_leverage(2):
+            return 2
+        return order
+
+    def passive_leverage(self, data, order, max_position):
+        if self.apply(data, self.conditions.x2) and self.available_leverage(2):
+            return 2
+        if self.apply(data, self.conditions.x4) and self.available_leverage(4):
+            return 4
+        if self.apply(data, self.conditions.x8) and self.available_leverage(8):
+            return 8
+        return order
+
+    def position_sizing(self, data, order, max_position):
         if self.setting.passive_leverage:
-            order = 8 if self.apply(data, self.conditions.x8) and available_leverage(8) else order
-            order = 4 if self.apply(data, self.conditions.x4) and available_leverage(4) else order
-            order = 2 if self.apply(data, self.conditions.x2) and available_leverage(2) else order
+            order = self.passive_leverage(data, order, max_position)
         else:
-            order = 2 if self.apply(data, self.conditions.x2) and available_leverage(2) else order
-            order = 4 if self.apply(data, self.conditions.x4) and available_leverage(4) else order
-            order = 8 if self.apply(data, self.conditions.x8) and available_leverage(8) else order
+            order = self.active_leverage(data, order, max_position)
 
         # 最大を超える場合は調整
         if order + data.position.get_num() > max_position:
@@ -849,19 +861,25 @@ class Combination(StrategyCreator, StrategyUtil):
                 self.apply(data, self.conditions.x8)
             ]
 
+    def position_adjust(self, data):
+        risk = self.risk(data)
+        max_risk = self.max_risk(data)
+
+        max_position = self.max_position(data, max_risk, risk)
+        max_position = max_position if max_position < self.setting.max_position_size else self.setting.max_position_size
+
+        return max_position
+
     # 買い
     def create_new_orders(self, data):
 
         if self.setting.position_adjust:
-            risk = self.risk(data)
-            max_risk = self.max_risk(data)
-
-            max_position = self.max_position(data, max_risk, risk)
-            max_position = max_position if max_position < self.setting.max_position_size else self.setting.max_position_size
+            max_position = self.position_adjust(data)
         else:
             max_position = self.setting.max_position_size
 
-        additional = [self.apply(data, self.conditions.new)]
+        conditions = []
+        additional = []
 
         # 数量
         order = 1
@@ -871,12 +889,16 @@ class Combination(StrategyCreator, StrategyUtil):
             # レバレッジシグナルも買いシグナルとする
             additional = additional + self.additional_new_signals(data)
 
-        conditions = [
-            self.drawdown_allowable(data), # ドローダウンが問題ない状態
-            data.position.get_num() < max_position, # 最大ポジションサイズ以下
-            order > 0,
-            self.apply_common(data, self.common.new)
-        ]
+        if not self.drawdown_allowable(data): # ドローダウンが問題ない状態
+            return None
+        if not order > 0:
+            return None
+        if not data.position.get_num() < max_position: # 最大ポジションサイズ以下
+            return None
+        if not self.apply_common(data, self.common.new):
+            return None
+
+        additional = additional + [self.apply(data, self.conditions.new)]
 
         if not self.setting.simple["new"]:
             if self.setting.montecarlo:
@@ -898,23 +920,16 @@ class Combination(StrategyCreator, StrategyUtil):
     def create_taking_orders(self, data):
         order = data.position.get_num()
         gain = data.position.gain(self.price(data), order)
-        conditions = []
 
-        if self.setting.simple["taking"]:
-            conditions = conditions + [self.apply_common(data, self.common.taking)]
-        else:
-            conditions = conditions + [
-                self.apply_common(data, self.common.taking),
-                any([
-                    self.apply(data, self.conditions.taking),
-                ])
-            ]
+        if not gain > 0:
+            return None
+        if not self.apply_common(data, self.common.taking):
+            return None
 
         if self.apply(data, self.conditions.x0_5): # x0.5なら半分にする
             order = math.ceil(order / 2)
 
-        if gain > 0 and all(conditions):
-
+        if self.setting.simple["taking"] or self.apply(data, self.conditions.taking):
             if self.setting.use_limit:
                 return simulator.LimitOrder(order, self.price(data), is_repay=True, is_short=data.setting.short_trade)
             else:
@@ -926,9 +941,12 @@ class Combination(StrategyCreator, StrategyUtil):
         order = data.position.get_num()
         gain = data.position.gain(self.price(data), order)
         stop_loss = self.stop_loss(data, self.setting.max_position_size)
+
+        if not gain < 0:
+            return None
+
         conditions = [
             gain < -stop_loss
-#            data.position.gain_rate(self.price(data)) < -self.stop_loss_rate(data, self.setting.max_position_size), # 保有数最大で最大の損切ラインを適用
         ]
         if self.setting.simple["stop_loss"]:
             conditions = conditions + [self.apply_common(data, self.common.stop_loss)]
@@ -937,7 +955,7 @@ class Combination(StrategyCreator, StrategyUtil):
                 self.apply_common(data, self.common.stop_loss) and self.apply(data, self.conditions.stop_loss),
             ]
 
-        if gain < 0 and any(conditions):
+        if any(conditions):
             if self.setting.use_limit:
                 return simulator.ReverseLimitOrder(order, self.price(data), is_repay=True, is_short=data.setting.short_trade)
             else:
@@ -946,14 +964,10 @@ class Combination(StrategyCreator, StrategyUtil):
 
     # 手仕舞い
     def create_closing_orders(self, data):
-        if self.setting.simple["closing"]:
-            conditions = [self.apply_common(data, self.common.closing)]
-        else:
-            conditions = [
-                self.apply_common(data, self.common.closing),
-                self.apply(data, self.conditions.closing),
-            ]
-        if all(conditions):
+        if not self.apply_common(data, self.common.closing):
+            return None
+
+        if self.setting.simple["closing"] or self.apply(data, self.conditions.closing):
             order = data.position.get_num()
             return simulator.MarketOrder(order, on_close=True, is_short=data.setting.short_trade)
 
@@ -970,7 +984,6 @@ class Combination(StrategyCreator, StrategyUtil):
 
     def create_x0_5(self, data):
         return self.apply(data, self.conditions.x0_5)
-
 
 class CombinationChecker:
 

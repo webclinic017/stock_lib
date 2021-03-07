@@ -200,7 +200,19 @@ class ReverseLimitOrder(Order):
         assert price is not None, "require 'price'"
 
 # ルール適用用データ
-class AppliableData:
+class Appliable:
+    def __init__(self, data, index):
+        self.data = data # データ
+        self.index = index # 指標データ
+
+    def dates(self, start_date, end_date):
+        dates = list(set(self.data.dates(start_date, end_date)) & set(self.index.dates(start_date, end_date)))
+        return sorted(dates, key=lambda x: utils.to_datetime_by_term(x))
+
+    def at(self, date):
+        return Appliable(self.data.at(date), self.index.at(date))
+
+class AppliableData(Appliable):
     def __init__(self, data, index, position, assets, setting, stats):
         self.data = data # データ
         self.index = index # 指標データ
@@ -209,12 +221,9 @@ class AppliableData:
         self.setting = setting # 設定
         self.stats = stats # 統計データ
 
-    def dates(self, start_date, end_date):
-        dates = list(set(self.data.dates(start_date, end_date)) & set(self.index.dates(start_date, end_date)))
-        return sorted(dates, key=lambda x: utils.to_datetime_by_term(x))
-
     def at(self, date):
         return AppliableData(self.data.at(date), self.index.at(date), self.position, self.assets, self.setting, self.stats)
+
 
 class SimulatorData:
     def __init__(self, code, daily, rule):

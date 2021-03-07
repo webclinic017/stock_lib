@@ -117,10 +117,12 @@ class StrategySimulator:
             not updated and len(list(data)) >= 1
         ]
 
-        if max_gain > taking and any(conditions):
-            for code in simulators.keys():
+        for code in simulators.keys():
+            # 一定期間以降保有したら厳しく
+            taking = taking / 2 if simulators[code].position.get_term() >= 5 else taking
+            if max_gain > taking and any(conditions):
                 simulators[code].closing()
-            stats["closing"] = True
+                stats["closing"] = True
         return stats, simulators
 
 

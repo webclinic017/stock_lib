@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import math
 import numpy
 import utils
 import simulator
@@ -19,13 +20,17 @@ class CombinationStrategy(CombinationCreator):
         self.weights = setting.weights
         self.conditions_by_seed(setting.seed[0])
 
-    def load_portfolio(self, date):
+    def load_portfolio(self, date, length=10):
         d = utils.to_format(date)
         try:
             data = pandas.read_csv("portfolio/high_update/%s.csv" % d, header=None)
             data.columns = ["code", "price", "count", "date"]
             data = data[data["price"] <= (self.setting.assets / 500)]
-            data = data.iloc[:10]
+
+            if len(data) < 50:
+                data = None
+            else:
+                data = data.iloc[:length]
         except:
             data = None
         return data
@@ -38,7 +43,13 @@ class CombinationStrategy(CombinationCreator):
             return list(set(map(lambda x: datetime(x.year, x.month, 1), dates)))
 
     def subject(self, date):
-        data = self.load_portfolio(utils.to_datetime(date))
+        before = self.load_portfolio(utils.to_datetime(date) - utils.relativeterm(1))
+
+        # 前月のポートフォリオの状況次第で変える
+        length = 10
+        length = int(length/2) if before is None else length
+
+        data = self.load_portfolio(utils.to_datetime(date), length=length)
         if data is None:
             codes = []
         else:
