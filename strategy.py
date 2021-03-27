@@ -194,7 +194,7 @@ def load_strategy_by_option(args, is_short):
 def load_simulator_data(code, start_date, end_date, args):
     rule = "D"
     start = utils.to_format(utils.to_datetime(start_date) - utils.relativeterm(6))
-    data = Loader.load_with_realtime(code, start, end_date)
+    data = Loader.load_by_code(code, start, end_date)
 
     if data is None:
         print("%s: %s is None" % (start_date, code))

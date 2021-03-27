@@ -312,7 +312,7 @@ class Loader:
         return data
 
     @staticmethod
-    def load_with_realtime(code, start_date, end_date):
+    def load_by_code(code, start_date, end_date):
         if str(code).isdigit():
             data = Loader.load(code, start_date, end_date)
         elif "_" in str(code):
