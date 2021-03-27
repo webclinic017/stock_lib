@@ -253,7 +253,7 @@ class StrategySimulator:
         commission = list(map(lambda x: sum(x[1].commission()), stats.items()))
         gain = list(map(lambda x: sum(x[1].gain()), stats.items()))
         position_size = self.agg(stats, "size").values()
-        position_size = list(filter(lambda x: x != 0, position_size,))
+        position_size = list(filter(lambda x: x != 0, position_size))
         position_term = list(map(lambda x: x[1].term(), stats.items()))
         position_term = list(filter(lambda x: x != 0, sum(position_term, [])))
         unavailable_assets = self.agg(stats, "unavailable_assets").values()

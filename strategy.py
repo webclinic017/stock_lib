@@ -245,7 +245,7 @@ def create_ensemble_strategies(files):
     return ensembles
 
 def ensemble_files(directory):
-    files = glob.glob("%s/*" % directory)
+    files = sorted(glob.glob("%s/*" % directory))
     return files
 
 # args > json > default の優先度
@@ -316,20 +316,19 @@ def apply_assets(args, setting):
 # ========================================================================
 
 class StrategyUtil:
-    def apply(self, data, conditions, debug=False, detail=False):
-        if len(conditions) == 0 or (len(conditions[0]) == 0 and len(conditions[1]) == 0):
+    def apply(self, data, conditions):
+        and_cond, or_cond = conditions
+
+        if len(conditions) == 0 or (len(and_cond) == 0 and len(or_cond) == 0):
             return False
-        if detail:
-            checker = CombinationChecker()
-            print(checker.get_source(conditions[0]), checker.get_source(conditions[1]))
 
-        a = list(map(lambda x: x(data), conditions[0]))
-        b = list(map(lambda x: x(data), conditions[1]))
+        for condition in and_cond:
+            if not condition(data):
+                return False
 
-        if debug:
-            print(a, b)
+        or_cond = list(map(lambda x: x(data), or_cond))
 
-        return all(a) and (any(b) or len(b) == 0)
+        return any(or_cond) or len(or_cond) == 0
 
     def apply_common(self, data, conditions):
         common = list(map(lambda x: x(data), conditions))
