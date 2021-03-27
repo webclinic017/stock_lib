@@ -72,15 +72,6 @@ class Loader:
         return data
 
     @staticmethod
-    def hold_realtime():
-        try:
-            data = pandas.read_csv("%s/hold_realtime.csv" % Loader.realtime_dir, header=None)
-            data.columns = ["code", "high", "low", "price", "volume", "update_time"]
-        except:
-            data = None
-        return data
-
-    @staticmethod
     def load_bitcoin_ohlc(code, start_date, end_date, with_filter=True, strict=False, time=None):
         start = utils.to_datetime(start_date)
         end = utils.to_datetime(end_date)
@@ -346,102 +337,6 @@ class Loader:
             if len(filtered) == 0:
               return None
             return filtered
-        return data
-
-    @staticmethod
-    def realtime_monitor_codes(date):
-        try:
-            path = '%s/%s' % (Loader.realtime_dir, date)
-            files = os.scandir(path)
-            codes = list(map(lambda x: x.name.replace(".csv", ""), files))
-            codes = list(filter(lambda x: str(x).isdigit(), codes)) # 指標系・その他は除外
-            return codes
-        except:
-            return []
-
-    @staticmethod
-    def load_realtime(code, date, how="any"):
-        try:
-            if code in Index().map():
-                code = Index().map()[code]
-                code = code.replace("/", "")
-            path = '%s/%s/%s.csv' % (Loader.realtime_dir, date, code)
-            data = pandas.read_csv(path, header=None)
-            data = Loader.format(data, "float", replace=" ", how=how, columns=['date', 'high', 'low', 'price', 'volume', 'update_time'], date_format="%Y-%m-%d %H:%M:%S")
-            data["volume"] = utils.diff(data["volume"].values / 1000)
-            data["volume"] = list(map(lambda x: 0 if x < 0 else x, data["volume"].values.tolist()))
-        except:
-#            import traceback
-#            traceback.print_exc()
-            data = None
-        return data
-
-    @staticmethod
-    def load_realtime_ohlc(code, date, rule="5T"):
-        data = Loader.load_realtime(code, date)
-        if data is None:
-            return None
-        data = Loader.realtime_to_ohlc(data, rule=rule)
-        return data
-
-    @staticmethod
-    def load_realtime_minutes(code, date):
-        try:
-            data = pandas.read_csv("%s/%s/%s.csv" % (Loader.realtime_minutes_dir, date, code))
-            data.columns = ["date", "open", "high", "low", "close", "volume", "other"]
-            data['date'] = pandas.to_datetime(data['date'], format="%Y%m%d%H%M")
-            data = data[data['date'] >= "%s 00:00:00" % date]
-            data = data[data['date'] <= "%s 23:59:59" % date]
-            data = data.drop("other", axis=1)
-            data["volume"] = data["volume"].values / 1000
-            data = data.dropna()
-            data = data.reset_index()
-        except:
-            data = None
-        return data
-
-    @staticmethod
-    def loads_realtime(code, date, days, how="any", time=None, rule="5T"):
-        if str(code).isdigit():
-            is_stock = True
-        elif code in Index().list() or code in Bitcoin().exchanges:
-            is_stock = False
-
-        # 日本の休日を除外
-        data = Loader.load_realtime_ohlc(code, date, rule=rule) # 今日の分
-        if time is not None:
-            data = data[data["date"] <= "%s %s" % (date, time)]
-        length = 1
-        current = date
-        while length < days:
-            current = utils.to_format(utils.to_datetime(current) - relativedelta(days=1))
-            if utils.is_weekday(utils.to_datetime(current)):
-                if is_stock:
-                    d = Loader.load_realtime_minutes(code, current)
-                else:
-                    d = Loader.load_realtime_ohlc(code, current)
-                if d is not None:
-                    d = Loader.resample(d, rule=rule)
-                    data = pandas.concat([d, data])
-                length = length + 1
-        if is_stock:
-            data = Loader.zaraba_filter(data)
-        return data
-
-
-    @staticmethod
-    def realtime_to_ohlc(data, rule="5T", with_zaraba_filter=False):
-        if with_zaraba_filter:
-            data = Loader.zaraba_filter(data)
-        data = data.set_index("date")
-        volume = pandas.Series(data["volume"]).resample(rule).sum()
-        update_time = pandas.Series(data["update_time"]).resample(rule).last()
-        data = pandas.Series(data["price"]).resample(rule).ohlc()
-        data = data.rename(columns={"price": "close"})
-        data["volume"] = volume
-        data["update_time"] = update_time
-        data = data.dropna()
-        data = data.reset_index()
         return data
 
     @staticmethod
@@ -712,20 +607,6 @@ class Loader:
             return data
         except:
             return None
-
-    @staticmethod
-    def realtime_sheet_stocks(date):
-        codes = []
-        stocks = [
-            Loader.ordered_stocks(),
-            Loader.hold_stocks(),
-        ]
-        for stock in stocks:
-            if stock is not None:
-                codes.extend(stock["code"].values.tolist())
-
-        print(codes)
-        return list(set(codes))
 
     @staticmethod
     def before_ranking(date, ranking_type, before=1):
