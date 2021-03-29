@@ -317,9 +317,12 @@ def apply_assets(args, setting):
 
 class StrategyUtil:
     def apply(self, data, conditions):
+        if len(conditions) == 0:
+            return False
+
         and_cond, or_cond = conditions
 
-        if len(conditions) == 0 or (len(and_cond) == 0 and len(or_cond) == 0):
+         if len(and_cond) == 0 and len(or_cond) == 0:
             return False
 
         for condition in and_cond:
