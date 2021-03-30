@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import math
 import numpy
 import utils
 import simulator
@@ -20,36 +19,22 @@ class CombinationStrategy(CombinationCreator):
         self.weights = setting.weights
         self.conditions_by_seed(setting.seed[0])
 
-    def load_portfolio(self, date, length=10):
-        d = utils.to_format(date)
+    def conditions_index(self):
+        return self.selected_condition_index
+
+    def load_portfolio(self, date):
+        d = utils.to_format(datetime(date.year, date.month, 1))
         try:
             data = pandas.read_csv("portfolio/high_update/%s.csv" % d, header=None)
             data.columns = ["code", "price", "count", "date"]
-            data = data[data["price"] <= (self.setting.assets / 500)]
-
-            if len(data) < 50 or len(data) > 550:
-                data = None
-            else:
-                data = data.iloc[:length]
+            data = data[data["price"] <= (self.setting.assets / 250)]
+            data = data.iloc[:10]
         except:
             data = None
         return data
 
-    def select_dates(self, start_date, end_date, instant):
-        dates = super().select_dates(start_date, end_date, instant)
-        if instant:
-            return [utils.to_datetime(start_date)]
-        else:
-            return list(set(map(lambda x: datetime(x.year, x.month, 1), dates)))
-
     def subject(self, date):
-        before = self.load_portfolio(utils.to_datetime(date) - utils.relativeterm(1))
-
-        # 前月のポートフォリオの状況次第で変える
-        length = 10
-        length = int(length/2) if before is None else length
-
-        data = self.load_portfolio(utils.to_datetime(date), length=length)
+        data = self.load_portfolio(utils.to_datetime(date))
         if data is None:
             codes = []
         else:
@@ -61,7 +46,7 @@ class CombinationStrategy(CombinationCreator):
         numpy.random.seed(seed)
 
         targets = ["daily", "nikkei", "dow"]
-        self.conditions_all         = conditions.all_with_index(targets) + conditions.industry_score_conditions()
+        self.conditions_all         = conditions.all_with_index(targets)
 
         new, self.new_conditions               = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("new"))
         taking, self.taking_conditions         = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("taking"))
@@ -84,17 +69,24 @@ class CombinationStrategy(CombinationCreator):
 
         return any(conditions)
 
-    def common(self, settings):
+    def common(self, setting):
         default = self.default_common()
         default.new = [
             lambda d: d.index.data["new_score"].daily["score"].iloc[-1] > -400,
             lambda d: d.data.daily["stop_low"].iloc[-1] == 0,
-            lambda d: not self.break_precondition(d),
+            lambda d: not self.break_precondition(d)
         ]
 
         default.closing = [
             lambda d: self.break_precondition(d)
         ]
+
+        for i in range(1, len(setting[1:])):
+            default.new         = default.new           + [lambda d: self.apply(utils.combination(setting[i-1].new, self.new_conditions))]
+            default.taking      = default.taking        + [lambda d: self.apply(utils.combination(setting[i-1].taking, self.taking_conditions))]
+            default.stop_loss   = default.stop_loss     + [lambda d: self.apply(utils.combination(setting[i-1].stop_loss, self.stop_loss_conditions))]
+            default.closing     = default.closing       + [lambda d: self.apply(utils.combination(setting[i-1].closing, self.closing_conditions))]
+            self.conditions_by_seed(self.setting.seed[i])
 
         return default
 
