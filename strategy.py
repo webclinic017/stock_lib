@@ -322,7 +322,7 @@ class StrategyUtil:
 
         and_cond, or_cond = conditions
 
-         if len(and_cond) == 0 and len(or_cond) == 0:
+        if len(and_cond) == 0 and len(or_cond) == 0:
             return False
 
         for condition in and_cond:
