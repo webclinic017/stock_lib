@@ -833,7 +833,7 @@ class Simulator:
         for order in self.new_signal(strategy, data, index):
             price = data.daily["close"].iloc[-1] if order.price is None else order.price
             # 成り行き注文なら値幅の上限を基準にcostを計算する
-#            price = price + self.price_limit(price)[1] if order.is_market() else price
+            price = price + self.price_limit(price)[1] if order.is_market() else price
             cost = self.position.eval(price, order.num)
             if (self.total_capacity() - cost) <= 0:
                 self.log(" - [over capacity] new_order: num %s, price %s, cost %d - %s unbound: %s" % (order.num, order.price, self.total_capacity(), cost, self.unbound))
