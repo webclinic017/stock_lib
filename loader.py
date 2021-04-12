@@ -322,9 +322,6 @@ class Loader:
             code, month, session = name.split("_")
             data = pandas.read_csv("%s/%s/%s_%s.csv" % (Loader.futures_dir, code, month, session), header=None)
         except:
-            import traceback
-            traceback.print_exc()
-
             data = None
 
         if data is None:
