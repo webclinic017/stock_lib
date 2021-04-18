@@ -737,7 +737,7 @@ class Loader:
     @staticmethod
     def per():
         try:
-            data = pandas.read_csv("settings/per.csv")
+            data = pandas.read_csv("%s/settings/per.csv" % Loader.base_dir)
             data['date'] = pandas.to_datetime(data['date'], format='%Y-%m-%d')
             return data
         except:
