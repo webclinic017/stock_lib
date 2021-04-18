@@ -735,13 +735,10 @@ class Loader:
             return None
 
     @staticmethod
-    def five_times():
+    def per():
         try:
-            f = open("settings/five_times.json", "r")
-            data = json.load(f)
-            return data["data"]
+            data = pandas.read_csv("settings/per.csv")
+            data['date'] = pandas.to_datetime(data['date'], format='%Y-%m-%d')
+            return data
         except:
-            import traceback
-            traceback.print_exc()
-            data = None
-
+            return None
