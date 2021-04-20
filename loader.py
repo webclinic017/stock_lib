@@ -739,6 +739,8 @@ class Loader:
         try:
             data = pandas.read_csv("%s/settings/per.csv" % Loader.base_dir)
             data['date'] = pandas.to_datetime(data['date'], format='%Y-%m-%d')
+            data = data.set_index('date')
+            data.columns = data.columns.astype(int)
             return data
         except:
             return None
