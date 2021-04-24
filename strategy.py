@@ -44,6 +44,7 @@ def add_options(parser):
     parser.add_argument("--new_high", action="store_true", default=False, dest="new_high", help="新高値")
     parser.add_argument("--high_update", action="store_true", default=False, dest="high_update", help="高値更新")
     parser.add_argument("--low_update", action="store_true", default=False, dest="low_update", help="安値更新")
+    parser.add_argument("--per", action="store_true", default=False, dest="per", help="PER")
     parser.add_argument("--simple", action="store_true", default=False, dest="simple", help="シンプル")
     return parser
 
@@ -83,6 +84,7 @@ class StrategyType:
     SIMPLE="simple"
     HIGH_UPDATE="high_update"
     LOW_UPDATE="low_update"
+    PER="per"
 
     def list(self):
         return [
@@ -93,7 +95,8 @@ class StrategyType:
             self.NEW_HIGH,
             self.SIMPLE,
             self.HIGH_UPDATE,
-            self.LOW_UPDATE
+            self.LOW_UPDATE,
+            self.PER
         ]
 
 def get_strategy_name(args):
@@ -108,10 +111,12 @@ def get_strategy_name(args):
         return strategy_types.NEW_HIGH
     elif args.simple:
         return strategy_types.SIMPLE
-    elif args.low_update:
-        return strategy_types.LOW_UPDATE
     elif args.high_update:
         return strategy_types.HIGH_UPDATE
+    elif args.low_update:
+        return strategy_types.LOW_UPDATE
+    elif args.per:
+        return strategy_types.PER
     else:
         return strategy_types.COMBINATION
 
@@ -148,11 +153,14 @@ def load_strategy_creator_by_type(strategy_type, is_production, combination_sett
         elif strategy_types.NEW_HIGH == strategy_type:
             from strategies.new_high import CombinationStrategy
             return CombinationStrategy(combination_setting)
+        elif strategy_types.HIGH_UPDATE == strategy_type:
+            from strategies.high_update import CombinationStrategy
+            return CombinationStrategy(combination_setting)
         elif strategy_types.LOW_UPDATE == strategy_type:
             from strategies.low_update import CombinationStrategy
             return CombinationStrategy(combination_setting)
-        elif strategy_types.HIGH_UPDATE == strategy_type:
-            from strategies.high_update import CombinationStrategy
+        elif strategy_types.PER == strategy_type:
+            from strategies.per import CombinationStrategy
             return CombinationStrategy(combination_setting)
         elif strategy_types.SIMPLE == strategy_type:
             from strategies.simple import SimpleStrategy

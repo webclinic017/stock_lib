@@ -51,7 +51,8 @@ class StrategySimulator:
 
     def get_targets(self, args, targets, date):
         if args.code is None:
-            date = utils.to_format(utils.select_weekday(utils.to_datetime(date), to_before=False))
+            if args.instant:
+                date = utils.to_format(utils.select_weekday(utils.to_datetime(date), to_before=False))
             targets = list(self.strategy_creator(args).subject(date))
         else:
             targets = [args.code]
