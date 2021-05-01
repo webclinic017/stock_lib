@@ -73,6 +73,8 @@ class StrategySimulator:
         for code in codes:
             if ignore_manda and self.is_manda(start_date, end_date, code):
                 continue
+            if not code in stocks.keys():
+                continue
             simulators[code] = Simulator(simulator_setting)
         return combination, simulators
 

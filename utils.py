@@ -247,7 +247,6 @@ def add_cs_stats(data):
 
     return data
 
-
 def score(data):
     plus = ["yang_tsutsumi", "yang_harami", "lower_kenuki", "ake_mojo", "yin_sanku", "yin_sanpei"]
     minus = ["yin_tsutsumi", "yin_harami", "upper_kenuki", "yoi_mojo", "yang_sanku", "yang_sanpei"]
@@ -256,45 +255,6 @@ def score(data):
     minus_score = sum(list(map(lambda x: data[x], minus)))
 
     return plus_score - minus_score
-
-def feature_columns():
-    categorical_columns = [
-#        "daily_average_trend", "weekly_average_trend", "volume_average_trend", "macd_trend", "macdhist_trend",
-#        "rci_trend", "rci_long_trend", "stages_trend", "stages_average_trend", "rising_safety_trend", "fall_safety_trend",
-#        "average_cross", "macd_cross", "rci_cross", "env12_cross", "env11_cross", "env09_cross", "env08_cross",
-        "yang_tsutsumi", "yang_harami", "lower_kenuki", "ake_mojo", "yin_sanku", "yin_sanpei",
-        "yin_tsutsumi", "yin_harami", "upper_kenuki", "yoi_mojo", "yang_sanku", "yang_sanpei",
-        "long_upper_shadow", "long_lower_shadow", "yang", "yin", "long_yang", "long_yin", "low_roundup",
-        "high_roundup", "low_rounddown", "high_rounddown", "yang_gap", "yin_gap"
-    ]
-    return categorical_columns
-
-def to_features(data):
-    columns = feature_columns()
-
-    features = []
-    for i, d in data.iterrows():
-        index, _ = price_limit_with_index(d["close"])
-        numerical_feature = "{0:x}".format(index if index < 16 else 15)
-        categorical = list(map(lambda x: str(x), d[columns].values.tolist()))
-        categorical_feature = "{0:x}".format(int("".join(categorical), 2), "x")
-        features = features + [numerical_feature+categorical_feature]
-    return features
-
-def from_features(features):
-    columns = feature_columns()
-
-    data = {}
-    for column in columns:
-        data[column] = []
-
-    for f in features:
-        num = int(f, 16)
-        flags = ("{0:0%sb}" % len(columns)).format(num)
-        for column, flag in zip(columns, flags):
-            data[column].append(int(flag))
-    detail = pandas.DataFrame(data)
-    return detail
 
 def rising_divergence(data, verbose=False):
     patterns = pattern(data, [
@@ -588,6 +548,7 @@ def drawdown(data):
     drawdown = drawdown.tolist()
     return drawdown
 
+# =======================================
 # 値幅制限
 def price_limit(price):
     index, price_range = price_limit_with_index(price)
@@ -597,13 +558,7 @@ def price_limit_with_index(price):
     import rakuten
     return rakuten.price_limit(price)
 
-def proc_call(params, retry=3):
-    print(params)
-    for _ in range(retry):
-        ret = subprocess.call(params, timeout=300)
-        if ret == 0:
-            return
-
+# =======================================
 def timestamp():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -657,6 +612,7 @@ def daterange_by_month(start_date, end_date):
     for n in range(months):
         yield start_date + relativedelta(months=n)
 
+# =======================================
 # 全組み合わせを取得
 def combinations(conditions):
     num = combinations_size(conditions)
@@ -698,6 +654,7 @@ def combination(index, conditions):
     else:
         return cond
 
+# =======================================
 def split_list(data, condition):
 #    if len(data) <= 1:
 #        return data
@@ -705,6 +662,13 @@ def split_list(data, condition):
         if condition(d):
             return [data[:i+1]] + split_list(data[i+1:], condition)
     return [data]
+
+def proc_call(params, retry=3):
+    print(params)
+    for _ in range(retry):
+        ret = subprocess.call(params, timeout=300)
+        if ret == 0:
+            return
 
 def stop_watch(func) :
     @wraps(func)
