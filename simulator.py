@@ -673,6 +673,7 @@ class Simulator:
             trade_data["repay"] = value
             trade_data["gain"] = gain
             trade_data["gain_rate"] = gain_rate
+            trade_data["contract_price"] = value * num * self.setting.min_unit
             trade_data["closing"] = True
 
         self.new_orders = []
