@@ -11,6 +11,8 @@ from dateutil.relativedelta import relativedelta
 from strategy import CombinationCreator
 from loader import Loader
 
+from portfolio import futures
+
 class CombinationStrategy(CombinationCreator):
     def __init__(self, setting):
         setting.position_adjust = False
@@ -23,16 +25,7 @@ class CombinationStrategy(CombinationCreator):
         return self.selected_condition_index
 
     def subject(self, date):
-        d = utils.to_datetime(date)
-        year = d.year
-        month = (int(d.month / 3) + 1) * 3
-#        if d.month in [3, 6, 9, 12]:
-#            month = month + 3
-        if 12 < month:
-            year = d.year + 1
-            month = 3
-        code = "nikkei225mini_%s%02d_daytime" % (year, month)
-        return [code]
+        return futures.load_portfolio(date, self.setting.assets)["code"].values.tolist()
 
     def conditions_by_seed(self, seed):
         random.seed(seed)

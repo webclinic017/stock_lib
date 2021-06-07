@@ -11,6 +11,8 @@ from dateutil.relativedelta import relativedelta
 from strategy import CombinationCreator
 from loader import Loader
 
+from portfolio import low_update
+
 class CombinationStrategy(CombinationCreator):
     def __init__(self, setting):
         setting.position_adjust = False
@@ -23,22 +25,7 @@ class CombinationStrategy(CombinationCreator):
         return self.selected_condition_index
 
     def load_portfolio(self, date):
-        d = utils.to_format(date)
-        try:
-            data = pandas.read_csv("portfolio/low_update/%s.csv" % d, header=None)
-            data.columns = ["code", "price", "count", "date"]
-            data = data[data["price"] <= (self.setting.assets / 500)]
-            data = data.iloc[:10]
-        except:
-            data = None
-        return data
-
-    def select_dates(self, start_date, end_date, instant):
-        dates = super().select_dates(start_date, end_date, instant)
-        if instant:
-            return [utils.to_datetime(start_date)]
-        else:
-            return list(set(map(lambda x: datetime(x.year, x.month, 1), dates)))
+        return low_update.load_portfolio(date, self.setting.assets / 500)
 
     def subject(self, date):
         data = self.load_portfolio(utils.to_datetime(date))
@@ -53,7 +40,7 @@ class CombinationStrategy(CombinationCreator):
         numpy.random.seed(seed)
 
         targets = ["daily", "nikkei", "dow"]
-        self.conditions_all         = conditions.all_with_index(targets) + conditions.industry_score_conditions()
+        self.conditions_all         = conditions.all_with_index(targets)
 
         new, self.new_conditions               = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("new"))
         taking, self.taking_conditions         = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("taking"))
@@ -67,8 +54,6 @@ class CombinationStrategy(CombinationCreator):
         self.selected_condition_index = {
             "new":new, "taking": taking, "stop_loss": stop_loss, "x2": x2, "x4": x4, "x8": x8
         }
-
-        return any(conditions)
 
     def common(self, settings):
         default = self.default_common()

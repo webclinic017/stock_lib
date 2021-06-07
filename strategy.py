@@ -35,6 +35,7 @@ def add_options(parser):
     parser.add_argument("--max_leverage", type=int, action="store", default=None, dest="max_leverage", help="max_leverage")
     parser.add_argument("--passive_leverage", action="store_true", default=False, dest="passive_leverage", help="passive_leverage")
     parser.add_argument("--condition_size", type=int, action="store", default=None, dest="condition_size", help="条件数")
+    parser.add_argument("--portfolio", type=str, action="store", default=None, dest="portfolio", help="ポートフォリオ")
 
     # strategy
     parser.add_argument("--ensemble_dir", action="store", default=None, dest="ensemble_dir", help="アンサンブルディレクトリ")
@@ -121,6 +122,26 @@ def get_strategy_name(args):
         return strategy_types.COMBINATION
 
 # load ================================================
+
+def load_portfolio(strategy_type, date, price, length=10):
+    strategy_types = StrategyType()
+    if strategy_types.HIGH_UPDATE == strategy_type:
+        from portfolio import high_update
+        return high_update.load_portfolio(date, price, length)
+    elif strategy_types.LOW_UPDATE == strategy_type:
+        from portfolio import low_update
+        return low_update.load_portfolio(date, price, length)
+    elif strategy_types.NEW_HIGH == strategy_type:
+        from portfolio import new_high
+        return new_high.load_portfolio(date, price, length)
+    elif strategy_types.PER == strategy_type:
+        from portfolio import per
+        return per.load_portfolio(date, price, length)
+    elif strategy_types.FUTURES == strategy_type:
+        from portfolio import futures
+        return futures.load_portfolio(date, price, length)
+    else:
+        raise Exception("unsupported type: %s" % strategy_type)
 
 def load_strategy_creator_by_type(strategy_type, is_production, combination_setting, ignore_ensemble=False):
     strategy_types = StrategyType()
@@ -277,6 +298,7 @@ def create_combination_setting(args, use_json=True):
     combination_setting.passive_leverage = combination_setting.passive_leverage if args.passive_leverage is None else args.passive_leverage
     combination_setting.condition_size = combination_setting.condition_size if args.condition_size is None else int(args.condition_size)
     combination_setting.ensemble = combination_setting.ensemble if args.ensemble_dir is None else ensemble_files(args.ensemble_dir)
+    combination_setting.portfolio = combination_setting.portfolio if args.portfolio is None else args.portfolio
     return combination_setting
 
 def create_combination_setting_by_json(args):
@@ -300,6 +322,7 @@ def apply_combination_setting_by_dict(combination_setting, setting_dict):
     combination_setting.passive_leverage = setting_dict["passive_leverage"] if "passive_leverage" in setting_dict.keys() else combination_setting.passive_leverage
     combination_setting.condition_size = setting_dict["condition_size"] if "condition_size" in setting_dict.keys() else combination_setting.condition_size
     combination_setting.ensemble = ensemble_files(setting_dict["ensemble_dir"]) if "ensemble_dir" in setting_dict.keys() else combination_setting.ensemble
+    combination_setting.portfolio = setting_dict["portfolio"] if "portfolio" in setting_dict.keys() else combination_setting.portfolio
     return combination_setting
 
 def create_simulator_setting(args, use_json=True):
@@ -819,6 +842,7 @@ class CombinationSetting:
     ensemble = []
     weights = {}
     montecarlo = False
+    portfolio = None
 
 class Combination(StrategyCreator, StrategyUtil):
     def __init__(self, conditions, common, setting=None):

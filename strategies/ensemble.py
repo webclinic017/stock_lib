@@ -11,7 +11,7 @@ from strategy import CombinationCreator
 from loader import Loader
 from simulator import Appliable
 
-# どの戦略をアンサンブルするかはここのimportで指定する
+# どの戦略をベースにアンサンブルするかはここのimportで指定する
 from strategies.combination import CombinationStrategy
 
 class CombinationStrategy(CombinationStrategy):
@@ -19,6 +19,9 @@ class CombinationStrategy(CombinationStrategy):
         self.files = setting.ensemble
         self.strategies = strategy.create_ensemble_strategies(self.files)
         super().__init__(setting)
+#
+#    def load_portfolio(self, date, length=10):
+#        return strategy.load_portfolio(self.setting.portfolio, date, self.setting.assets / 500, length)
 
     def common(self, setting):
         return self.default_common()

@@ -11,6 +11,8 @@ from dateutil.relativedelta import relativedelta
 from strategy import CombinationCreator
 from loader import Loader
 
+from portfolio import high_update
+
 class CombinationStrategy(CombinationCreator):
     def __init__(self, setting):
         setting.position_adjust = False
@@ -23,15 +25,7 @@ class CombinationStrategy(CombinationCreator):
         return self.selected_condition_index
 
     def load_portfolio(self, date):
-        d = utils.to_format(datetime(date.year, date.month, 1))
-        try:
-            data = pandas.read_csv("portfolio/high_update/%s.csv" % d, header=None)
-            data.columns = ["code", "price", "count", "date"]
-            data = data[data["price"] <= (self.setting.assets / 250)]
-            data = data.iloc[:10]
-        except:
-            data = None
-        return data
+        return high_update.load_portfolio(date, self.setting.assets / 250, 10)
 
     def subject(self, date):
         data = self.load_portfolio(utils.to_datetime(date))
@@ -80,13 +74,6 @@ class CombinationStrategy(CombinationCreator):
         default.closing = [
             lambda d: self.break_precondition(d)
         ]
-
-        for i in range(1, len(setting[1:])):
-            default.new         = default.new           + [lambda d: self.apply(utils.combination(setting[i-1].new, self.new_conditions))]
-            default.taking      = default.taking        + [lambda d: self.apply(utils.combination(setting[i-1].taking, self.taking_conditions))]
-            default.stop_loss   = default.stop_loss     + [lambda d: self.apply(utils.combination(setting[i-1].stop_loss, self.stop_loss_conditions))]
-            default.closing     = default.closing       + [lambda d: self.apply(utils.combination(setting[i-1].closing, self.closing_conditions))]
-            self.conditions_by_seed(self.setting.seed[i])
 
         return default
 

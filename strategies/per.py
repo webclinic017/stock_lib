@@ -12,6 +12,8 @@ from dateutil.relativedelta import relativedelta
 from strategy import CombinationCreator
 from loader import Loader
 
+from portfolio import per
+
 class CombinationStrategy(CombinationCreator):
     def __init__(self, setting):
         setting.position_adjust = False
@@ -21,14 +23,7 @@ class CombinationStrategy(CombinationCreator):
         self.conditions_by_seed(setting.seed[0])
 
     def load_portfolio(self, date, length=10):
-        d = utils.to_format(date)
-        try:
-            data = pandas.read_csv("portfolio/per/%s.csv" % d, header=None)
-            data.columns = ["code", "per", "close"]
-            data = data.iloc[:length]
-        except:
-            data = None
-        return data
+        return per.load_portfolio(date)
 
     def select_dates(self, start_date, end_date, instant):
         dates = super().select_dates(start_date, end_date, instant)
