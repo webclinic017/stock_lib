@@ -71,9 +71,27 @@ def add_stages_stats(data):
     data["resistance"] = data["high"].rolling(15).max()
     data["support"] = data["low"].rolling(15).min()
 
+    data["resistance_1m"] = data["high"].rolling(20).max()
+    data["support_1m"] = data["low"].rolling(20).min()
+
+    data["resistance_3m"] = data["high"].rolling(60).max()
+    data["support_3m"] = data["low"].rolling(60).min()
+
+    data["resistance_6m"] = data["high"].rolling(120).max()
+    data["support_6m"] = data["low"].rolling(120).min()
+
+    data["resistance_1y"] = data["high"].rolling(240).max()
+    data["support_1y"] = data["low"].rolling(240).min()
+
+    data["stages_1m"]                   = stages(data, "resistance_1m", "support_1m", with_eq=True)
+    data["stages_3m"]                   = stages(data, "resistance_3m", "support_3m", with_eq=True)
+    data["stages_6m"]                   = stages(data, "resistance_6m", "support_6m", with_eq=True)
+    data["stages_1y"]                   = stages(data, "resistance_1y", "support_1y", with_eq=True)
+
     data["stages"]                      = stages(data)
-    stages_average                      = ta.SMA(data["stages"].astype(float).values, timeperiod=10)
-    data["stages_average"]              = stages_average
+    data["stages_average"]              = ta.SMA(data["stages"].astype(float).values, timeperiod=10)
+    data["stages_sum"]                  = data["stages_1m"] + data["stages_3m"] + data["stages_6m"] + data["stages_1y"]
+    data["stages_sum_average"]          = ta.SMA(data["stages_sum"].astype(float).values, timeperiod=5)
     data["macd_stages"]                 = (data["macd"] > 0) * 1
     data["macdhist_stages"]             = (data["macdhist"] > 0) * 1
     return data
@@ -352,12 +370,12 @@ def cross(base, target):
     return gc + dc
 
 # ローソク足の位置
-#   -2: 支持線とクロス
+#   -2: 支持線切り下げ
 #   -1: 移動平均と支持線の間
 #    0: 移動平均とクロス
 #    1: 移動平均と抵抗線の間
-#    2: 抵抗線とクロス
-def stages(data):
+#    2: 抵抗線切り上げ
+def stages(data, resistance="resistance", support="support", with_eq=False):
     cross = lambda data, line: (data["low"] < data[line]) & (data[line] < data["high"])
 
     default = cross(data, "daily_average")
@@ -366,10 +384,17 @@ def stages(data):
 
     stage_p1 = (~(default) & (p1)) * 1
     stage_m1 = (~(default) & ~(p1) & (m1) ) * -1
-    stage_p2 = ((cross(data, "resistance")) | (data["resistance"] < data["high"])) * 2
-    stage_m2 = ((cross(data, "support")) | (data["low"] < data["support"])) * -2
 
-    stage = stage_p1 + stage_m1 + stage_p2 + stage_m2
+    if with_eq:
+        stage_p2 = ((cross(data, resistance)) | (data[resistance] <= data["high"])) * 2
+        stage_m2 = ((cross(data, support)) | (data["low"] <= data[support])) * -2
+
+        stage = numpy.maximum(stage_p1, stage_p2) + numpy.minimum(stage_m1, stage_m2)
+    else:
+        stage_p2 = ((cross(data, resistance)) | (data[resistance] < data["high"])) * 2
+        stage_m2 = ((cross(data, support)) | (data["low"] < data[support])) * -2
+
+        stage = stage_p1 + stage_p2 + stage_m1 + stage_m2
 
     return stage
 

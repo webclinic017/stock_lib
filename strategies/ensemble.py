@@ -9,22 +9,45 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from strategy import CombinationCreator
 from loader import Loader
-from simulator import Appliable
 
-# どの戦略をベースにアンサンブルするかはここのimportで指定する
-from strategies.combination import CombinationStrategy
-
-class CombinationStrategy(CombinationStrategy):
+class CombinationStrategy(CombinationCreator):
     def __init__(self, setting):
         self.files = setting.ensemble
         self.strategies = strategy.create_ensemble_strategies(self.files)
+        setting.position_adjust = False
+        setting.strict = True
         super().__init__(setting)
-#
-#    def load_portfolio(self, date, length=10):
-#        return strategy.load_portfolio(self.setting.portfolio, date, self.setting.assets / 500, length)
+        self.weights = setting.weights
+        self.conditions_by_seed(setting.seed[0])
+
+    def load_portfolio(self, date, length=10):
+        portfolio = "high_update" if self.setting.portfolio is None else self.setting.portfolio
+        return strategy.load_portfolio(portfolio, date, self.setting.assets / 500, length)
+
+    def select_dates(self, start_date, end_date, instant):
+        dates = super().select_dates(start_date, end_date, instant)
+        if instant:
+            return [utils.to_datetime(start_date)]
+        else:
+            return list(set(map(lambda x: datetime(x.year, x.month, 1), dates)))
+
+    def subject(self, date):
+        before = self.load_portfolio(utils.to_datetime(date) - utils.relativeterm(1))
+
+        # 前月のポートフォリオの状況次第で変える
+        length = 10
+        length = int(length/2) if before is None else length
+
+        data = self.load_portfolio(utils.to_datetime(date), length=length)
+        if data is None:
+            codes = []
+        else:
+            codes = data["code"].values.tolist()
+        return codes
 
     def common(self, setting):
-        return self.default_common()
+        default = self.default_common()
+        return default
 
     def get_size(self, size):
         return size if size < self.setting.condition_size else self.setting.condition_size
@@ -65,3 +88,23 @@ class CombinationStrategy(CombinationStrategy):
             "new":new, "taking": taking, "stop_loss": stop_loss, "closing": closing, "x2": x2, "x4": x4, "x8": x8
         }
 
+    def new(self):
+        return self.new_conditions
+
+    def taking(self):
+        return self.taking_conditions
+
+    def stop_loss(self):
+        return self.stop_loss_conditions
+
+    def closing(self):
+        return self.closing_conditions
+
+    def x2(self):
+        return self.x2_conditions
+
+    def x4(self):
+        return self.x4_conditions
+
+    def x8(self):
+        return self.x8_conditions

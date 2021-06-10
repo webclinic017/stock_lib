@@ -108,11 +108,11 @@ class StrategySimulator:
         gain = list(map(lambda x: x[0] + x[1], gain))
 
         drawdown = utils.drawdown(gain)
-        max_gain = self.stats.max_unrealized_gain()
+        max_gain = self.stats.current_max_unrealized_gain()
         taking = self.simulator_setting.assets * self.simulator_setting.taking_rate
         stop_loss = self.simulator_setting.assets * self.simulator_setting.stop_loss_rate
 
-        updated, data = list(groupby(drawdown, key=lambda x: x == 0))[-1]
+        updated, data = list(groupby(drawdown, key=lambda x: x == 0))[-1] # todo data機能してない
 
         conditions = [
             drawdown[-1] >= 0.25, # 目標価格を超えた上で一定以上のドローダウンがあったら手仕舞い
@@ -127,7 +127,6 @@ class StrategySimulator:
                 simulators[code].closing()
                 stats["closing"] = True
         return stats, simulators
-
 
     def get_stock_split(self, start_date, end_date, code):
         stock_split = self.stock_split[
@@ -276,7 +275,7 @@ class StrategySimulator:
         if self.verbose:
             print(start_date, end_date, "assets:", self.simulator_setting.assets, "gain:", gain, sum(gain))
             for code, s in sorted(stats.items(), key=lambda x: sum(x[1].gain())):
-                print("[%s] return: %s, commission: %s, drawdown: %s, trade: %s, win: %s, term: %s" % (code, sum(s.gain()), sum(s.commission()), s.max_drawdown(), s.trade_num(), s.win_trade_num(), s.max_term()))
+                print("[%s] return: %s, unrealized:%s, drawdown: %s, trade: %s, win: %s, term: %s" % (code, sum(s.gain()), s.max_unrealized_gain(), s.max_drawdown(), s.trade_num(), s.win_trade_num(), s.max_term()))
 
         s = stats.values()
         results = {

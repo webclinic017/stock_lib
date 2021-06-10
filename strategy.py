@@ -834,7 +834,7 @@ class CombinationSetting:
     position_adjust = True
     strict = True
     assets = 0
-    max_position_size = 8
+    max_position_size = 4
     max_leverage = None
     passive_leverage = False
     condition_size = 5

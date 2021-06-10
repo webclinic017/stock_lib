@@ -444,9 +444,13 @@ class SimulatorStats:
         history = self.unrealized_gain()
         return [] if len(history) == 0 else history[-1]
 
-    def max_unrealized_gain(self):
+    def current_max_unrealized_gain(self):
         unrealized_gain = self.last_unrealized_gain()
-        return 0 if len(unrealized_gain) == 0 else max(unrealized_gain) # TODO 手仕舞いされてたらそれ以降のものを取得する
+        return 0 if len(unrealized_gain) == 0 else max(unrealized_gain)
+
+    def max_unrealized_gain(self):
+        max_unrealized_gain = list(map(lambda x: max(x) if len(x) > 0 else 0, self.unrealized_gain()))
+        return 0 if len(max_unrealized_gain) == 0 else max(max_unrealized_gain)
 
     def gain_rate(self):
         return list(filter(lambda x: x is not None, map(lambda x: x["gain_rate"], self.trade_history)))
@@ -888,12 +892,17 @@ class Simulator:
             return
 
         if position.get_num() > 0:
-            allowable_loss = (self.setting.assets * self.setting.auto_stop_loss) / (position.get_num() * position.min_unit)
+            max_gain = self.stats.current_max_unrealized_gain()
+
+            allowable_loss = (max_gain * self.setting.auto_stop_loss) / (position.get_num() * position.min_unit)
 
             tick_price = self.tick_price(price)
             price_range = tick_price * int(allowable_loss / tick_price)
 
             hold = tick_price * int(position.get_value() / tick_price)
+
+            if price_range == 0:
+                return
 
             if position.is_short():
                 limit = hold + price_range
@@ -971,8 +980,10 @@ class Simulator:
         today = today.iloc[-1]
 
         price = today["open"].item() # 約定価格
+        num = self.position.get_num()
         volume = None if self.setting.ignore_volume else math.ceil(today["volume"].item() * 10)
-        self.log("date: %s, price: %s, volume: %s, ave: %s, hold: %s, capacity: %d, binding: %d" % (date, price, volume, self.position.get_value(), self.position.get_num(), self.capacity, self.total_binding()))
+        self.log("date: %s, price: %s, volume: %s, ave: %.2f, hold: %s, capacity: %d, binding: %d, gain : %.2f"
+            % (date, price, volume, self.position.get_value(), num, self.capacity, self.total_binding(), self.position.gain(price, num)))
 
         self.trade(self.setting.strategy, price, volume, term_data, term_index)
 
