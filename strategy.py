@@ -38,6 +38,7 @@ def add_options(parser):
     parser.add_argument("--passive_leverage", action="store_true", default=False, dest="passive_leverage", help="passive_leverage")
     parser.add_argument("--condition_size", type=int, action="store", default=None, dest="condition_size", help="条件数")
     parser.add_argument("--portfolio", type=str, action="store", default=None, dest="portfolio", help="ポートフォリオ")
+    parser.add_argument("--conditions", type=str, action="store", default=None, dest="conditions", help="条件")
 
     # strategy
     parser.add_argument("--ensemble_dir", action="store", default=None, dest="ensemble_dir", help="アンサンブルディレクトリ")
@@ -301,6 +302,7 @@ def create_combination_setting(args, use_json=True):
     combination_setting.condition_size = combination_setting.condition_size if args.condition_size is None else int(args.condition_size)
     combination_setting.ensemble = combination_setting.ensemble if args.ensemble_dir is None else ensemble_files(args.ensemble_dir)
     combination_setting.portfolio = combination_setting.portfolio if args.portfolio is None else args.portfolio
+    combination_setting.conditions = combination_setting.conditions if args.conditions is None else args.conditions.split(",")
     return combination_setting
 
 def create_combination_setting_by_json(args):
@@ -325,6 +327,7 @@ def apply_combination_setting_by_dict(combination_setting, setting_dict):
     combination_setting.condition_size = setting_dict["condition_size"] if "condition_size" in setting_dict.keys() else combination_setting.condition_size
     combination_setting.ensemble = ensemble_files(setting_dict["ensemble_dir"]) if "ensemble_dir" in setting_dict.keys() else combination_setting.ensemble
     combination_setting.portfolio = setting_dict["portfolio"] if "portfolio" in setting_dict.keys() else combination_setting.portfolio
+    combination_setting.conditions = setting_dict["conditions"] if "conditions" in setting_dict.keys() else combination_setting.conditions
     return combination_setting
 
 def create_simulator_setting(args, use_json=True):
@@ -838,6 +841,7 @@ class CombinationSetting:
     weights = {}
     montecarlo = False
     portfolio = None
+    conditions = []
 
 class Combination(StrategyCreator, StrategyUtil):
     def __init__(self, conditions, common, setting=None):
