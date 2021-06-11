@@ -10,6 +10,8 @@ import itertools
 import time as t
 import glob
 import pandas
+import random
+import conditions
 from loader import Loader
 from loader import Bitcoin
 from collections import namedtuple
@@ -740,9 +742,24 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
         weights = base / sum(base)
         return weights
 
+    def conditions_by_seed(self, seed, targets=["daily", "nikkei", "dow"], names=["all"]):
+        random.seed(seed)
+        numpy.random.seed(seed)
 
-    def conditions_by_seed(self, seed):
-        raise Exception("Need override conditions_by_seed.")
+        self.conditions_all         = conditions.by_names(targets=targets, names=names)
+
+        new, self.new_conditions               = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("new"))
+        taking, self.taking_conditions         = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("taking"))
+        stop_loss, self.stop_loss_conditions   = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("stop_loss"))
+        closing, self.closing_conditions       = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("closing"))
+        x2, self.x2_conditions                 = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("x2"))
+        x4, self.x4_conditions                 = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("x4"))
+        x8, self.x8_conditions                 = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("x8"))
+
+        # 選択された条件のインデックスを覚えておく
+        self.selected_condition_index = {
+            "new":new, "taking": taking, "stop_loss": stop_loss, "x2": x2, "x4": x4, "x8": x8
+        }
 
 
     def default_common(self):
@@ -755,28 +772,28 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
 
     # 継承したクラスから条件のリストから組み合わせを生成する
     def new(self):
-        return [lambda d: False]
+        return self.new_conditions
 
     def taking(self):
-        return [lambda d: False]
+        return self.taking_conditions
 
     def stop_loss(self):
-        return [lambda d: False]
+        return self.stop_loss_conditions
 
     def closing(self):
-        return [lambda d: False]
+        return self.closing_conditions
 
     def x2(self):
-        return [lambda d: False]
+        return self.x2_conditions
 
     def x4(self):
-        return [lambda d: False]
+        return self.x4_conditions
 
     def x8(self):
-        return [lambda d: False]
+        return self.x8_conditions
 
     def x0_5(self):
-        return [lambda d: False]
+        return [lambda d: False] # defaultでは使わない
 
 # ensemble用
 class StrategyCreateSetting:
@@ -795,28 +812,6 @@ class StrategyCreateSetting:
         return strategy_types.COMBINATION
 
 ## 指定可能な戦略====================================================================================================================
-
-def selectable_data():
-    data = {
-        "daily": lambda d: d.data.daily,
-        "nikkei": lambda d: d.index.data["nikkei"].daily,
-        "dow": lambda d: d.index.data["dow"].daily,
-        "new_score": lambda d: d.index.data["new_score"].daily,
-        "industry_score": lambda d: d.index.data["industry_score"].daily
-#        "usdjpy": data.index.data["usdjpy"].daily,
-#        "xbtusd": data.index.data["xbtusd"].daily
-    }
-
-    return data
-
-def select(data, target="daily"):
-
-    d = selectable_data()
-
-    if target in d.keys():
-        return d[target](data)
-
-    raise Exception("unselectable: %s" % target)
 
 class CombinationSetting:
     on_close = {

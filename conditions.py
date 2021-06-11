@@ -1,6 +1,26 @@
 # -*- coding: utf-8 -*-
 
-from strategy import select
+def selectable_data():
+    data = {
+        "daily": lambda d: d.data.daily,
+        "nikkei": lambda d: d.index.data["nikkei"].daily,
+        "dow": lambda d: d.index.data["dow"].daily,
+        "new_score": lambda d: d.index.data["new_score"].daily,
+        "industry_score": lambda d: d.index.data["industry_score"].daily
+#        "usdjpy": data.index.data["usdjpy"].daily,
+#        "xbtusd": data.index.data["xbtusd"].daily
+    }
+
+    return data
+
+def select(data, target="daily"):
+
+    d = selectable_data()
+
+    if target in d.keys():
+        return d[target](data)
+
+    raise Exception("unselectable: %s" % target)
 
 def average_conditions(legs=["daily"]):
     columns = ["daily_average", "weekly_average"]
@@ -91,6 +111,28 @@ def stages_conditions(legs=["daily"]):
             lambda d, leg=leg: select(d, leg)["stages_average"][-3:].min() < 0,
             lambda d, leg=leg: select(d, leg)["stages_average"][-3:].max() > 0,
             lambda d, leg=leg: select(d, leg)["stages_average"][-3:].max() < 0,
+        ]
+    return conditions
+
+def stages_sum_conditions(legs=["daily"]):
+    conditions = []
+    for leg in legs:
+        conditions = conditions + [
+            lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] <= -6,
+            lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] <= -4,
+            lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] <= -2,
+            lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] <= -1,
+            lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] == 0,
+            lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] >= 1,
+            lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] >= 2,
+            lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] >= 4,
+            lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] >= 6,
+            lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] < select(d, leg)["stages_sum_average"].iloc[-1],
+            lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] > select(d, leg)["stages_sum_average"].iloc[-1],
+            lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] > 0,
+            lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] < 0,
+            lambda d, leg=leg: select(d, leg)["stages_sum_average"].iloc[-1] > 0,
+            lambda d, leg=leg: select(d, leg)["stages_sum_average"].iloc[-1] < 0,
         ]
     return conditions
 
@@ -233,3 +275,15 @@ def all_with_index(targets=["daily", "nikkei", "dow", "usdjpy", "xbtusd"]):
 
     return sum(conditions, [])
 
+def by_names(targets=["daily", "nikkei", "dow", "usdjpy", "xbtusd"], names=["all"]):
+    conditions = []
+    conditions_map = {
+        "all": all_with_index(targets),
+        "industry_score": industry_score_conditions(),
+        "stages_sum": stages_sum_conditions()
+    }
+
+    for name in conditions_map.keys():
+        conditions = (conditions + conditions_map[name]) if name in names else conditions
+
+    return conditions

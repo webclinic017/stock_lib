@@ -88,23 +88,3 @@ class CombinationStrategy(CombinationCreator):
             "new":new, "taking": taking, "stop_loss": stop_loss, "closing": closing, "x2": x2, "x4": x4, "x8": x8
         }
 
-    def new(self):
-        return self.new_conditions
-
-    def taking(self):
-        return self.taking_conditions
-
-    def stop_loss(self):
-        return self.stop_loss_conditions
-
-    def closing(self):
-        return self.closing_conditions
-
-    def x2(self):
-        return self.x2_conditions
-
-    def x4(self):
-        return self.x4_conditions
-
-    def x8(self):
-        return self.x8_conditions
