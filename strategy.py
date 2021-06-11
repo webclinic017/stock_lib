@@ -749,7 +749,7 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
         random.seed(seed)
         numpy.random.seed(seed)
 
-        self.conditions_all         = conditions.by_names(targets=targets, names=names)
+        self.conditions_all         = conditions.by_names(targets=targets, names=names+self.setting.conditions)
 
         new, self.new_conditions               = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("new"))
         taking, self.taking_conditions         = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("taking"))
