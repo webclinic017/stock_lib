@@ -12,7 +12,7 @@ from dateutil.relativedelta import relativedelta
 from strategy import CombinationCreator
 from loader import Loader
 
-from portfolio import high_update
+from portfolio import filtered_high_update
 
 class CombinationStrategy(CombinationCreator):
     def __init__(self, setting):
@@ -23,7 +23,7 @@ class CombinationStrategy(CombinationCreator):
         self.conditions_by_seed(setting.seed[0])
 
     def load_portfolio(self, date, length=10):
-        return high_update.load_portfolio(date, self.setting.assets / 500, length)
+        return filtered_high_update.load_portfolio(date, self.setting.assets / 500, length)
 
     def select_dates(self, start_date, end_date, instant):
         dates = super().select_dates(start_date, end_date, instant)
@@ -48,7 +48,7 @@ class CombinationStrategy(CombinationCreator):
 
     def conditions_by_seed(self, seed):
         targets = ["daily", "nikkei", "dow"]
-        names = ["all", "industry_score"]
+        names = ["industry_score"]
         super().conditions_by_seed(seed, targets, names)
 
     def break_precondition(self, d):

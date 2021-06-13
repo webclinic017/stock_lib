@@ -112,18 +112,17 @@ class StrategySimulator:
         taking = self.simulator_setting.assets * self.simulator_setting.taking_rate
         stop_loss = self.simulator_setting.assets * self.simulator_setting.stop_loss_rate
 
-        updated, data = list(groupby(drawdown, key=lambda x: x == 0))[-1] # todo data機能してない
+        # 一定期間以降保有したら厳しく
+        hold_term = max(list(map(lambda x: x.position.get_term(), simulators.values())))
+        adjusted_taking = taking / 2 if hold_term >= 5 else taking
 
         conditions = [
-            drawdown[-1] >= 0.25, # 目標価格を超えた上で一定以上のドローダウンがあったら手仕舞い
-            updated and len(list(data)) >= 2,
-            not updated and len(list(data)) >= 1
+            max_gain > adjusted_taking,
+            drawdown[-1] >= 0.1, # 目標価格を超えた上で一定以上のドローダウンがあったら手仕舞い
         ]
 
-        for code in simulators.keys():
-            # 一定期間以降保有したら厳しく
-            taking = taking / 2 if simulators[code].position.get_term() >= 5 else taking
-            if max_gain > taking and any(conditions):
+        if all(conditions):
+            for code in simulators.keys():
                 simulators[code].closing()
                 stats["closing"] = True
         return stats, simulators
@@ -211,7 +210,7 @@ class StrategySimulator:
             self.stats.append(stats)
 
             stats, simulators = self.closing(stats, simulators)
-            self.log("gain: %s" % stats["unrealized_gain"])
+            self.log("gain: %s, %s" % (stats["unrealized_gain"], stats["gain"]))
 
         # 手仕舞い
         if with_closing:
@@ -270,7 +269,7 @@ class StrategySimulator:
         drawdown = list(map(lambda x: x.drawdown(), stats.values()))
         drawdown = numpy.array(drawdown).T
         max_unrealized_gain = list(map(lambda x: max(x) if len(x) > 0 else 0, self.stats.unrealized_gain()))
-        crash = list(map(lambda x: sum(x.crash()), stats.values()))
+        crash = sum(list(map(lambda x: x.crash(), stats.values())), [])
 
         if self.verbose:
             print(start_date, end_date, "assets:", self.simulator_setting.assets, "gain:", gain, sum(gain))
@@ -302,7 +301,7 @@ class StrategySimulator:
             "sum_contract_price": sum(sum_contract_price) if len(s) > 0 else 0,
             "auto_stop_loss": sum(auto_stop_loss) if len(s) > 0 else 0,
             "max_unrealized_gain": max(max_unrealized_gain) if len(max_unrealized_gain) > 0 else 0,
-            "crash": sum(crash) if len(s) > 0 else 0
+            "crash": min(crash) if len(crash) > 0 else 0
         }
 
         return results

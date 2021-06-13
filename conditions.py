@@ -118,6 +118,9 @@ def stages_sum_conditions(legs=["daily"]):
     conditions = []
     for leg in legs:
         conditions = conditions + [
+            lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] <= -12,
+            lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] <= -10,
+            lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] <= -8,
             lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] <= -6,
             lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] <= -4,
             lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] <= -2,
@@ -127,19 +130,26 @@ def stages_sum_conditions(legs=["daily"]):
             lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] >= 2,
             lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] >= 4,
             lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] >= 6,
+            lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] >= 8,
+            lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] >= 10,
+            lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] >= 12,
             lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] < select(d, leg)["stages_sum_average"].iloc[-1],
             lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] > select(d, leg)["stages_sum_average"].iloc[-1],
+            lambda d, leg=leg: select(d, leg)["stages_sum_average"].iloc[-1] < select(d, leg)["stages_sum_average_long"].iloc[-1],
+            lambda d, leg=leg: select(d, leg)["stages_sum_average"].iloc[-1] > select(d, leg)["stages_sum_average_long"].iloc[-1],
             lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] > 0,
             lambda d, leg=leg: select(d, leg)["stages_sum"].iloc[-1] < 0,
             lambda d, leg=leg: select(d, leg)["stages_sum_average"].iloc[-1] > 0,
             lambda d, leg=leg: select(d, leg)["stages_sum_average"].iloc[-1] < 0,
+            lambda d, leg=leg: select(d, leg)["stages_sum_average_long"].iloc[-1] > 0,
+            lambda d, leg=leg: select(d, leg)["stages_sum_average_long"].iloc[-1] < 0,
         ]
     return conditions
 
-def cross_conditions(legs=["daily"]):
+def cross_conditions(legs=["daily"], additional_columns=[]):
     columns = [
         "average_cross", "macd_cross", "rci_cross", "env12_cross", "env11_cross", "env09_cross", "env08_cross", "rising_safety_cross", "fall_safety_cross"
-    ]
+    ] + additional_columns
 
     conditions = []
     for leg in legs:
@@ -158,11 +168,11 @@ def cross_conditions(legs=["daily"]):
 
     return conditions
 
-def trend_conditions(legs=["daily"]):
+def trend_conditions(legs=["daily"], additional_columns=[]):
     columns = [
         "daily_average_trend", "weekly_average_trend", "volume_average_trend", "macd_trend", "macdhist_trend",
         "rci_trend", "rci_long_trend", "stages_trend", "stages_average_trend", "rising_safety_trend", "fall_safety_trend"
-    ]
+    ] + additional_columns
 
     conditions = []
     for leg in legs:
@@ -181,13 +191,13 @@ def trend_conditions(legs=["daily"]):
 
     return conditions
 
-def cs_conditions(legs=["daily"]):
+def cs_conditions(legs=["daily"], additional_columns=[]):
     columns = [
         "yang_tsutsumi", "yang_harami", "lower_kenuki", "ake_mojo", "yin_sanku", "yin_sanpei",
         "yin_tsutsumi", "yin_harami", "upper_kenuki", "yoi_mojo", "yang_sanku", "yang_sanpei",
         "long_upper_shadow", "long_lower_shadow", "yang", "yin", "long_yang", "long_yin", "low_roundup",
         "high_roundup", "low_rounddown", "high_rounddown", "yang_gap", "yin_gap", "gap", "harami", "tsutsumi"
-    ]
+    ] + additional_columns
 
     conditions = []
     for leg in legs:
@@ -278,12 +288,16 @@ def all_with_index(targets=["daily", "nikkei", "dow", "usdjpy", "xbtusd"]):
 def by_names(targets=["daily", "nikkei", "dow", "usdjpy", "xbtusd"], names=["all"]):
     conditions = []
     conditions_map = {
-        "all": all_with_index(targets),
-        "industry_score": industry_score_conditions(),
-        "stages_sum": stages_sum_conditions()
+        "all": lambda: all_with_index(targets),
+        "industry_score": lambda: all_with_index(targets) + industry_score_conditions(),
+        "stages_sum": lambda: all_with_index(targets) + industry_score_conditions() + stages_sum_conditions(),
+        "2021-06-12": lambda: average_conditions(targets) + tec_conditions(targets) + cross_conditions(targets)
+            + trend_conditions(targets, additional_columns=["stages_sum_trend", "stages_sum_average_trend", "stages_sum_average_long_trend"])
+            + band_conditions(targets) + stages_conditions(targets) + cs_conditions(targets) + industry_score_conditions() + stages_sum_conditions(targets) + new_score_conditions()
+
     }
 
     for name in conditions_map.keys():
-        conditions = (conditions + conditions_map[name]) if name in names else conditions
+        conditions = (conditions + conditions_map[name]()) if name in names else conditions
 
     return conditions

@@ -71,6 +71,15 @@ def add_stages_stats(data):
     data["resistance"] = data["high"].rolling(15).max()
     data["support"] = data["low"].rolling(15).min()
 
+    data["resistance_3d"] = data["high"].rolling(3).max()
+    data["support_3d"] = data["low"].rolling(3).min()
+
+    data["resistance_5d"] = data["high"].rolling(5).max()
+    data["support_5d"] = data["low"].rolling(5).min()
+
+    data["resistance_10d"] = data["high"].rolling(10).max()
+    data["support_10d"] = data["low"].rolling(10).min()
+
     data["resistance_1m"] = data["high"].rolling(20).max()
     data["support_1m"] = data["low"].rolling(20).min()
 
@@ -83,6 +92,9 @@ def add_stages_stats(data):
     data["resistance_1y"] = data["high"].rolling(240).max()
     data["support_1y"] = data["low"].rolling(240).min()
 
+    data["stages_3d"]                   = stages(data, "resistance_3d", "support_3d", with_eq=True)
+    data["stages_5d"]                   = stages(data, "resistance_5d", "support_5d", with_eq=True)
+    data["stages_10d"]                  = stages(data, "resistance_10d", "support_10d", with_eq=True)
     data["stages_1m"]                   = stages(data, "resistance_1m", "support_1m", with_eq=True)
     data["stages_3m"]                   = stages(data, "resistance_3m", "support_3m", with_eq=True)
     data["stages_6m"]                   = stages(data, "resistance_6m", "support_6m", with_eq=True)
@@ -90,8 +102,9 @@ def add_stages_stats(data):
 
     data["stages"]                      = stages(data)
     data["stages_average"]              = ta.SMA(data["stages"].astype(float).values, timeperiod=10)
-    data["stages_sum"]                  = data["stages_1m"] + data["stages_3m"] + data["stages_6m"] + data["stages_1y"]
+    data["stages_sum"]                  = data["stages_3d"] + data["stages_5d"] + data["stages_10d"] + data["stages_1m"] + data["stages_3m"] + data["stages_6m"] + data["stages_1y"]
     data["stages_sum_average"]          = ta.SMA(data["stages_sum"].astype(float).values, timeperiod=5)
+    data["stages_sum_average_long"]     = ta.SMA(data["stages_sum"].astype(float).values, timeperiod=20)
     data["macd_stages"]                 = (data["macd"] > 0) * 1
     data["macdhist_stages"]             = (data["macdhist"] > 0) * 1
     return data
@@ -119,24 +132,30 @@ def add_trend_stats(data):
     data["volume_gradient"]             = diff(data["volume_average"])
     data["weekly_gradient"]             = diff(data["weekly_average"])
     data["daily_gradient"]              = diff(data["daily_average"])
-    data["stages_average_gradient"]     = diff(data["stages_average"])
     data["stages_gradient"]             = diff(data["stages"])
+    data["stages_average_gradient"]     = diff(data["stages_average"])
+    data["stages_sum_gradient"]         = diff(data["stages_sum"])
+    data["stages_sum_average_gradient"] = diff(data["stages_sum_average"])
+    data["stages_sum_average_long_gradient"] = diff(data["stages_sum_average_long"])
     data["fall_safety_gradient"]        = diff(data["fall_safety"])
     data["rising_safety_gradient"]      = diff(data["rising_safety"])
     data["macd_gradient"]               = diff(data["macd"])
     data["macdhist_gradient"]           = diff(data["macdhist"])
 
-    data["daily_average_trend"] = data["daily_gradient"].rolling(5).apply(trend, raw=True)
-    data["weekly_average_trend"] = data["weekly_gradient"].rolling(5).apply(trend, raw=True)
-    data["volume_average_trend"] = data["volume_gradient"].rolling(5).apply(trend, raw=True)
-    data["macd_trend"] = data["macd_gradient"].rolling(5).apply(trend, raw=True)
-    data["macdhist_trend"] = data["macdhist_gradient"].rolling(1).apply(trend, raw=True)
-    data["rci_trend"]       = data["rci_gradient"].rolling(5).apply(trend, raw=True)
-    data["rci_long_trend"]  = data["rci_long_gradient"].rolling(5).apply(trend, raw=True)
-    data["stages_trend"] = data["stages_gradient"].rolling(5).apply(trend, raw=True)
-    data["stages_average_trend"] = data["stages_average_gradient"].rolling(5).apply(trend, raw=True)
-    data["rising_safety_trend"] = data["rising_safety_gradient"].rolling(5).apply(trend, raw=True)
-    data["fall_safety_trend"] = data["fall_safety_gradient"].rolling(5).apply(trend, raw=True)
+    data["daily_average_trend"]         = data["daily_gradient"].rolling(5).apply(trend, raw=True)
+    data["weekly_average_trend"]        = data["weekly_gradient"].rolling(5).apply(trend, raw=True)
+    data["volume_average_trend"]        = data["volume_gradient"].rolling(5).apply(trend, raw=True)
+    data["macd_trend"]                  = data["macd_gradient"].rolling(5).apply(trend, raw=True)
+    data["macdhist_trend"]              = data["macdhist_gradient"].rolling(1).apply(trend, raw=True)
+    data["rci_trend"]                   = data["rci_gradient"].rolling(5).apply(trend, raw=True)
+    data["rci_long_trend"]              = data["rci_long_gradient"].rolling(5).apply(trend, raw=True)
+    data["stages_trend"]                = data["stages_gradient"].rolling(5).apply(trend, raw=True)
+    data["stages_average_trend"]        = data["stages_average_gradient"].rolling(5).apply(trend, raw=True)
+    data["stages_sum_trend"]            = data["stages_sum_gradient"].rolling(5).apply(trend, raw=True)
+    data["stages_sum_average_trend"]    = data["stages_sum_average_gradient"].rolling(5).apply(trend, raw=True)
+    data["stages_sum_average_long_trend"]    = data["stages_sum_average_long_gradient"].rolling(5).apply(trend, raw=True)
+    data["rising_safety_trend"]         = data["rising_safety_gradient"].rolling(5).apply(trend, raw=True)
+    data["fall_safety_trend"]           = data["fall_safety_gradient"].rolling(5).apply(trend, raw=True)
 
     return data
 

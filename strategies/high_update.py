@@ -11,7 +11,7 @@ from dateutil.relativedelta import relativedelta
 from strategy import CombinationCreator
 from loader import Loader
 
-from portfolio import high_update
+from portfolio import filtered_high_update
 
 class CombinationStrategy(CombinationCreator):
     def __init__(self, setting):
@@ -22,7 +22,7 @@ class CombinationStrategy(CombinationCreator):
         self.conditions_by_seed(setting.seed[0])
 
     def load_portfolio(self, date):
-        return high_update.load_portfolio(date, self.setting.assets / 250, 10)
+        return filtered_high_update.load_portfolio(date, self.setting.assets / 500, length)
 
     def subject(self, date):
         data = self.load_portfolio(utils.to_datetime(date))

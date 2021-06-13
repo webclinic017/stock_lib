@@ -28,7 +28,8 @@ def add_options(parser):
     parser.add_argument("--max_position_size", action="store", default=None, dest="max_position_size", help="最大ポジションサイズ")
     parser.add_argument("--production", action="store_true", default=False, dest="production", help="本番向け") # 実行環境の選択
     parser.add_argument("--short", action="store_true", default=False, dest="short", help="空売り戦略")
-    parser.add_argument("--auto_stop_loss", type=float, action="store", default=None, dest="auto_stop_loss", help="自動損切")
+    parser.add_argument("--soft_limit", type=float, action="store", default=None, dest="soft_limit", help="自動損切")
+    parser.add_argument("--hard_limit", type=float, action="store", default=None, dest="hard_limit", help="自動損切")
     parser.add_argument("--stop_loss_rate", action="store", default=None, dest="stop_loss_rate", help="損切レート")
     parser.add_argument("--taking_rate", action="store", default=None, dest="taking_rate", help="利食いレート")
     parser.add_argument("--min_unit", action="store", default=None, dest="min_unit", help="最低単元")
@@ -128,7 +129,10 @@ def get_strategy_name(args):
 
 def load_portfolio(strategy_type, date, price, length=10):
     strategy_types = StrategyType()
-    if strategy_types.HIGH_UPDATE == strategy_type:
+    if "filtered_high_update" == strategy_type:
+        from portfolio import filtered_high_update
+        return filtered_high_update.load_portfolio(date, price, length)
+    elif strategy_types.HIGH_UPDATE == strategy_type:
         from portfolio import high_update
         return high_update.load_portfolio(date, price, length)
     elif strategy_types.LOW_UPDATE == strategy_type:
@@ -236,7 +240,7 @@ def load_strategy_by_option(args, is_short):
 
 def load_simulator_data(code, start_date, end_date, args):
     rule = "D"
-    start = utils.to_format(utils.to_datetime(start_date) - utils.relativeterm(6))
+    start = utils.to_format(utils.to_datetime(start_date) - utils.relativeterm(12))
     data = Loader.load_by_code(code, start, end_date)
 
     if data is None:
@@ -336,7 +340,8 @@ def create_simulator_setting(args, use_json=True):
     simulator_setting.taking_rate = simulator_setting.taking_rate if args.taking_rate is None else float(args.taking_rate)
     simulator_setting.min_unit = simulator_setting.min_unit if args.min_unit is None else int(args.min_unit)
     simulator_setting.short_trade = args.short
-    simulator_setting.auto_stop_loss = simulator_setting.auto_stop_loss if args.auto_stop_loss is None else args.auto_stop_loss
+    simulator_setting.soft_limit = simulator_setting.soft_limit if args.soft_limit is None else args.soft_limit
+    simulator_setting.hard_limit = simulator_setting.hard_limit if args.hard_limit is None else args.hard_limit
     simulator_setting.ignore_volume = args.futures
     simulator_setting = apply_assets(args, simulator_setting)
     return simulator_setting
@@ -350,7 +355,8 @@ def create_simulator_setting_by_json(args):
     simulator_setting.taking_rate = setting_dict["taking_rate"] if "taking_rate" in setting_dict.keys() else simulator_setting.taking_rate
     simulator_setting.min_unit = setting_dict["min_unit"] if "min_unit" in setting_dict.keys() else simulator_setting.min_unit
     simulator_setting.short_trade = args.short
-    simulator_setting.auto_stop_loss = setting_dict["auto_stop_loss"] if "auto_stop_loss" in setting_dict.keys() else simulator_setting.auto_stop_loss
+    simulator_setting.soft_limit = setting_dict["soft_limit"] if "soft_limit" in setting_dict.keys() else simulator_setting.soft_limit
+    simulator_setting.hard_limit = setting_dict["hard_limit"] if "hard_limit" in setting_dict.keys() else simulator_setting.hard_limit
     simulator_setting.ignore_volume = args.futures
     simulator_setting = apply_assets(args, simulator_setting)
     return simulator_setting
@@ -749,7 +755,11 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
         random.seed(seed)
         numpy.random.seed(seed)
 
-        self.conditions_all         = conditions.by_names(targets=targets, names=names+self.setting.conditions)
+        # override でnames指定/argsでconditions指定のどちらかを適用 なにもしなければallを選択
+        selected_names = names if len(self.setting.conditions) == 0 else self.setting.conditions
+        selected_names = ["all"] if len(selected_names) == 0 else selected_names
+
+        self.conditions_all         = conditions.by_names(targets=targets, names=selected_names)
 
         new, self.new_conditions               = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("new"))
         taking, self.taking_conditions         = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("taking"))

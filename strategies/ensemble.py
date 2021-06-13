@@ -21,7 +21,7 @@ class CombinationStrategy(CombinationCreator):
         self.conditions_by_seed(setting.seed[0])
 
     def load_portfolio(self, date, length=10):
-        portfolio = "high_update" if self.setting.portfolio is None else self.setting.portfolio
+        portfolio = "filtered_high_update" if self.setting.portfolio is None else self.setting.portfolio
         return strategy.load_portfolio(portfolio, date, self.setting.assets / 500, length)
 
     def select_dates(self, start_date, end_date, instant):

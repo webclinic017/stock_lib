@@ -9,7 +9,11 @@ def load_portfolio(date, price, length=10):
         data = pandas.read_csv("portfolio/high_update/%s.csv" % d, header=None)
         data.columns = ["code", "price", "count", "date"]
         data = data[data["price"] <= price]
-        data = data.iloc[:length]
+
+        if len(data) < 50 or len(data) > 550:
+            data = None
+        else:
+            data = data.iloc[:length]
     except:
         data = None
     return data
