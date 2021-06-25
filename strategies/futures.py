@@ -24,24 +24,8 @@ class CombinationStrategy(CombinationCreator):
     def subject(self, date):
         return futures.load_portfolio(date, self.setting.assets)["code"].values.tolist()
 
-    def break_precondition(self, d):
-        conditions = [
-            d.data.daily["high_update"][-2:].max() == 0 and (d.position.gain(self.price(d), d.position.get_num()) <= 0 or sum(d.stats.gain()) <= 0) and d.position.get_num() >= 0,
-            d.data.daily["high_update"][-10:].sum() <= 5
-        ]
-
-        return any(conditions)
-
-    def common(self, setting):
+    def common(self, settings):
         default = self.default_common()
-        default.new = [
-            lambda d: d.index.data["new_score"].daily["score"].iloc[-1] > -400,
-            lambda d: d.data.daily["stop_low"].iloc[-1] == 0
-        ]
-
-        default.closing = [
-            lambda d: self.break_precondition(d),
-        ]
-
+        default = futures.common(default)
         return default
 

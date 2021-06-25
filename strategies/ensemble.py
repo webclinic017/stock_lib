@@ -73,15 +73,15 @@ class CombinationStrategy(CombinationCreator):
         random.seed(seed)
         numpy.random.seed(seed)
 
-        size = self.get_size(len(self.strategies))
+        size_map = self.condition_size_map()
 
-        new, self.new_conditions                = self.choice(new_rules, size*2, self.apply_weights("new", len(new_rules)))
-        taking, self.taking_conditions          = self.choice(taking_rules, size, self.apply_weights("taking", len(taking_rules)))
-        stop_loss, self.stop_loss_conditions    = self.choice(stop_loss_rules, size, self.apply_weights("stop_loss", len(stop_loss_rules)))
-        closing, self.closing_conditions        = self.choice(closing_rules, size, self.apply_weights("closing", len(closing_rules)))
-        x2, self.x2_conditions                  = self.choice(x2_rules, size, self.apply_weights("x2", len(x2_rules)))
-        x4, self.x4_conditions                  = self.choice(x4_rules, size, self.apply_weights("x4", len(x4_rules)))
-        x8, self.x8_conditions                  = self.choice(x8_rules, size, self.apply_weights("x8", len(x8_rules)))
+        new, self.new_conditions                = self.choice(new_rules, size_map["new"]*2, self.apply_weights("new", len(new_rules)))
+        taking, self.taking_conditions          = self.choice(taking_rules, size_map["taking"], self.apply_weights("taking", len(taking_rules)))
+        stop_loss, self.stop_loss_conditions    = self.choice(stop_loss_rules, size_map["stop_loss"], self.apply_weights("stop_loss", len(stop_loss_rules)))
+        closing, self.closing_conditions        = self.choice(closing_rules, size_map["closing"], self.apply_weights("closing", len(closing_rules)))
+        x2, self.x2_conditions                  = self.choice(x2_rules, size_map["x2"], self.apply_weights("x2", len(x2_rules)))
+        x4, self.x4_conditions                  = self.choice(x4_rules, size_map["x4"], self.apply_weights("x4", len(x4_rules)))
+        x8, self.x8_conditions                  = self.choice(x8_rules, size_map["x8"], self.apply_weights("x8", len(x8_rules)))
 
         # 選択された条件のインデックスを覚えておく
         self.selected_condition_index = {

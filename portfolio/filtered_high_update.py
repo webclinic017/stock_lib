@@ -2,6 +2,7 @@
 import utils
 import pandas
 from datetime import datetime
+from portfolio import high_update
 
 def load_portfolio(date, price, length=10):
     d = utils.to_format(datetime(date.year, date.month, 1))
@@ -17,4 +18,7 @@ def load_portfolio(date, price, length=10):
     except:
         data = None
     return data
+
+def common(default):
+    return high_update.common(default)
 

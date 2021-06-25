@@ -72,33 +72,28 @@ def add_stages_stats(data):
     data["support"] = data["low"].rolling(15).min()
 
     data["resistance_3d"] = data["high"].rolling(3).max()
-    data["support_3d"] = data["low"].rolling(3).min()
-
     data["resistance_5d"] = data["high"].rolling(5).max()
-    data["support_5d"] = data["low"].rolling(5).min()
-
     data["resistance_10d"] = data["high"].rolling(10).max()
-    data["support_10d"] = data["low"].rolling(10).min()
-
     data["resistance_1m"] = data["high"].rolling(20).max()
-    data["support_1m"] = data["low"].rolling(20).min()
-
     data["resistance_3m"] = data["high"].rolling(60).max()
-    data["support_3m"] = data["low"].rolling(60).min()
-
     data["resistance_6m"] = data["high"].rolling(120).max()
-    data["support_6m"] = data["low"].rolling(120).min()
-
     data["resistance_1y"] = data["high"].rolling(240).max()
+
+    data["support_3d"] = data["low"].rolling(3).min()
+    data["support_5d"] = data["low"].rolling(5).min()
+    data["support_10d"] = data["low"].rolling(10).min()
+    data["support_1m"] = data["low"].rolling(20).min()
+    data["support_3m"] = data["low"].rolling(60).min()
+    data["support_6m"] = data["low"].rolling(120).min()
     data["support_1y"] = data["low"].rolling(240).min()
 
-    data["stages_3d"]                   = stages(data, "resistance_3d", "support_3d", with_eq=True)
-    data["stages_5d"]                   = stages(data, "resistance_5d", "support_5d", with_eq=True)
-    data["stages_10d"]                  = stages(data, "resistance_10d", "support_10d", with_eq=True)
-    data["stages_1m"]                   = stages(data, "resistance_1m", "support_1m", with_eq=True)
-    data["stages_3m"]                   = stages(data, "resistance_3m", "support_3m", with_eq=True)
-    data["stages_6m"]                   = stages(data, "resistance_6m", "support_6m", with_eq=True)
-    data["stages_1y"]                   = stages(data, "resistance_1y", "support_1y", with_eq=True)
+    data["stages_3d"]                   = stages(data, "resistance_3d", "support_3d", "daily_average", with_eq=True)
+    data["stages_5d"]                   = stages(data, "resistance_5d", "support_5d", "daily_average", with_eq=True)
+    data["stages_10d"]                  = stages(data, "resistance_10d", "support_10d", "daily_average", with_eq=True)
+    data["stages_1m"]                   = stages(data, "resistance_1m", "support_1m", "weekly_average", with_eq=True)
+    data["stages_3m"]                   = stages(data, "resistance_3m", "support_3m", "weekly_average", with_eq=True)
+    data["stages_6m"]                   = stages(data, "resistance_6m", "support_6m", "weekly_average", with_eq=True)
+    data["stages_1y"]                   = stages(data, "resistance_1y", "support_1y", "weekly_average", with_eq=True)
 
     data["stages"]                      = stages(data)
     data["stages_average"]              = ta.SMA(data["stages"].astype(float).values, timeperiod=10)
@@ -394,15 +389,15 @@ def cross(base, target):
 #    0: 移動平均とクロス
 #    1: 移動平均と抵抗線の間
 #    2: 抵抗線切り上げ
-def stages(data, resistance="resistance", support="support", with_eq=False):
+def stages(data, resistance="resistance", support="support", average="daily_average", with_eq=False):
     cross = lambda data, line: (data["low"] < data[line]) & (data[line] < data["high"])
 
-    default = cross(data, "daily_average")
-    p1 = data["daily_average"] < data["low"]
-    m1 = data["high"] < data["daily_average"]
+    default = cross(data, average)
+    p1 = data[average] < data["low"] # ローソク足が平均線より上
+    m1 = data["high"] < data[average] # ローソク足が平均線より下
 
     stage_p1 = (~(default) & (p1)) * 1
-    stage_m1 = (~(default) & ~(p1) & (m1) ) * -1
+    stage_m1 = (~(default) & (m1) ) * -1
 
     if with_eq:
         stage_p2 = ((cross(data, resistance)) | (data[resistance] <= data["high"])) * 2

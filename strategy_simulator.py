@@ -127,7 +127,12 @@ class StrategySimulator:
                 stats["closing"] = True
         return stats, simulators
 
+    def is_futures(self, code):
+        return "_" in str(code)
+
     def get_stock_split(self, start_date, end_date, code):
+        if self.is_futures(code):
+            return []
         stock_split = self.stock_split[
             (self.stock_split["date"] >= start_date) &
             (self.stock_split["date"] <= end_date) &
@@ -137,6 +142,8 @@ class StrategySimulator:
         return stock_split
 
     def get_reverse_stock_split(self, start_date, end_date, code):
+        if self.is_futures(code):
+            return []
         reverse_stock_split = self.reverse_stock_split[
             (self.reverse_stock_split["date"] >= start_date) &
             (self.reverse_stock_split["date"] <= end_date) &

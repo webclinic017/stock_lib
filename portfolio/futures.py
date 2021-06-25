@@ -15,3 +15,6 @@ def load_portfolio(date, price, length=10):
     code = "nikkei225mini_%s%02d_daytime" % (year, month)
     return pandas.DataFrame([code], columns=["code"])
 
+def common(default):
+    return default
+

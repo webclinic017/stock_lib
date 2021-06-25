@@ -11,6 +11,8 @@ from dateutil.relativedelta import relativedelta
 from strategy import CombinationCreator
 from loader import Loader
 
+from portfolio import high_update as portfolio
+
 class CombinationStrategy(CombinationCreator):
     def __init__(self, setting):
         setting.position_adjust = False
@@ -22,16 +24,8 @@ class CombinationStrategy(CombinationCreator):
     def conditions_index(self):
         return self.selected_condition_index
 
-    def load_portfolio(self, date):
-        d = utils.to_format(date)
-        try:
-            data = pandas.read_csv("portfolio/high_update/%s.csv" % d, header=None)
-            data.columns = ["code", "price", "count", "date"]
-            data = data[data["price"] <= (self.setting.assets / 250)]
-            data = data.iloc[:5]
-        except:
-            data = None
-        return data
+    def load_portfolio(self, date, length=10):
+        return portfolio.load_portfolio(date, self.setting.assets / 250, 5)
 
     def subject(self, date):
         data = self.load_portfolio(utils.to_datetime(date))
@@ -67,14 +61,3 @@ class CombinationStrategy(CombinationCreator):
 
         return default
 
-    def new(self):
-        return self.new_conditions
-
-    def x2(self):
-        return self.x2_conditions
-
-    def x4(self):
-        return self.x4_conditions
-
-    def x8(self):
-        return self.x8_conditions

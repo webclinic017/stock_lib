@@ -379,6 +379,9 @@ class SimulatorStats:
     def append(self, trade_data):
         self.trade_history.append(trade_data)
 
+    def last(self):
+        return self.create_trade_data() if len(self.trade_history) == 0 else self.trade_history[-1]
+
     def apply(self, trade_data):
         self.trade_history = self.trade_history[:-1] + [trade_data]
 
@@ -460,21 +463,22 @@ class SimulatorStats:
     def gain(self):
         return list(filter(lambda x: x is not None, map(lambda x: x["gain"], self.trade_history)))
 
-    def unrealized_gain(self):
-        histories = utils.split_list(self.trade_history, lambda x: x["closing"]==True)
+    def unrealized_gain(self, split_condition=None):
+        default_condition = lambda x: x["closing"] == True
+        histories = utils.split_list(self.trade_history, default_condition if split_condition is None else split_condition)
         choice = lambda history: list(filter(lambda x: x is not None, list(map(lambda x: x["unrealized_gain"], history))))
         return list(map(choice, histories))
 
-    def last_unrealized_gain(self):
-        history = self.unrealized_gain()
+    def last_unrealized_gain(self, split_condition = None):
+        history = self.unrealized_gain(split_condition)
         return [] if len(history) == 0 else history[-1]
 
-    def current_max_unrealized_gain(self):
-        unrealized_gain = self.last_unrealized_gain()
+    def current_max_unrealized_gain(self, split_condition = None):
+        unrealized_gain = self.last_unrealized_gain(split_condition)
         return 0 if len(unrealized_gain) == 0 else max(unrealized_gain)
 
-    def max_unrealized_gain(self):
-        max_unrealized_gain = list(map(lambda x: max(x) if len(x) > 0 else 0, self.unrealized_gain()))
+    def max_unrealized_gain(self, split_condition = None):
+        max_unrealized_gain = list(map(lambda x: max(x) if len(x) > 0 else 0, self.unrealized_gain(split_condition)))
         return 0 if len(max_unrealized_gain) == 0 else max(max_unrealized_gain)
 
     def gain_rate(self):
@@ -944,12 +948,12 @@ class Simulator:
             hold = self.adjust_tick(position.get_value())
             position_size = position.get_num() * position.min_unit
 
-            max_gain = self.stats.current_max_unrealized_gain()
+            max_gain = self.stats.current_max_unrealized_gain(split_condition=lambda x: x["repay"] is not None)
             max_gain_range = max_gain / position_size
 
             # ストップまでの価格差
             soft_auto_stop_loss = 0 if self.setting.soft_limit is None else self.setting.soft_limit
-            hard_auto_stop_loss = 1.0 if self.setting.hard_limit is None else self.setting.hard_limit
+            hard_auto_stop_loss = 0 if self.setting.hard_limit is None else self.setting.hard_limit
 
             allowable_loss = position.get_value() * soft_auto_stop_loss
             soft_allowable_loss = (hold - max_gain_range if position.is_short() else hold + max_gain_range) * soft_auto_stop_loss
@@ -963,13 +967,16 @@ class Simulator:
             if position.is_short():
                 max_price = hold - max_price_range
                 soft_limit = max_price + soft_price_range
-                hard_limit = max_price + hard_price_range
-                limit = soft_limit if soft_limit < hard_limit and not soft_price_range == 0 else hard_limit
+                hard_limit = hold + hard_price_range
             else:
                 max_price = hold + max_price_range
                 soft_limit = max_price - soft_price_range
-                hard_limit = max_price - hard_price_range
-                limit = soft_limit if soft_limit > hard_limit and not soft_price_range == 0 else hard_limit
+                hard_limit = hold - hard_price_range
+
+            if soft_price_range == 0 or max_price_range < hard_price_range:
+                limit = hard_limit
+            else:
+                limit = soft_limit
 
             self.log("limit: %s %s(s) %s(h), price: %s(hld) %s(cur) %s(max), loss: %4d %4d(s) %4d(h), gain:%d" 
                 % (limit, soft_limit, hard_limit, hold, price, hold+max_price_range, allowable_loss, soft_price_range, hard_price_range, max_gain))

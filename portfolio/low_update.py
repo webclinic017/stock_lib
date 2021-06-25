@@ -14,3 +14,6 @@ def load_portfolio(date, price, length=10):
         data = None
     return data
 
+def common(default):
+    return default
+
