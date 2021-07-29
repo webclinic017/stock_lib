@@ -271,6 +271,7 @@ def load_index(args, start_date, end_date):
 
     index["new_score"] = SimulatorData("new_score", Loader.new_score(), "D")
     index["industry_score"] = SimulatorData("industry_score", Loader.industry_trend(), "D")
+    index["high_update_score"] = SimulatorData("high_update_score", Loader.high_update_score(), "D")
 
     return SimulatorIndexData(index)
 
@@ -849,16 +850,21 @@ class StrategyCreateSetting:
 
 ## 指定可能な戦略====================================================================================================================
 
+class SignalSetting:
+    def __init__(self, new=False, taking=False, stop_loss=False, closing=False):
+        self.new = new
+        self.taking = taking
+        self.stop_loss = stop_loss
+        self.closing = closing
+
 class CombinationSetting:
     on_close = {
         "new": False,
         "repay": False
     }
-    simple = {
-        "new": False,
-        "taking": False,
-        "stop_loss": False,
-        "closing": False,
+    enabled = {
+        "signal": SignalSetting(new=True, taking=True, stop_loss=True, closing=False), # 全体のシグナル
+        "simple": SignalSetting() # commonのみ
     }
     use_limit = False
     position_sizing = False
@@ -953,6 +959,8 @@ class Combination(StrategyCreator, StrategyUtil):
 
     # 買い
     def create_new_orders(self, data):
+        if not self.setting.enabled["signal"].new:
+            return None
 
         if self.setting.position_adjust:
             max_position = self.position_adjust(data)
@@ -981,7 +989,7 @@ class Combination(StrategyCreator, StrategyUtil):
 
         additional = additional + [self.apply(data, self.conditions.new)]
 
-        if not self.setting.simple["new"]:
+        if not self.setting.enabled["simple"].new:
             if self.setting.montecarlo:
                 seed = int(time.time())
                 numpy.random.seed(seed)
@@ -999,6 +1007,9 @@ class Combination(StrategyCreator, StrategyUtil):
 
     # 利食い
     def create_taking_orders(self, data):
+        if not self.setting.enabled["signal"].taking:
+            return None
+
         order = data.position.get_num()
         gain = data.position.gain(self.price(data), order)
 
@@ -1010,7 +1021,7 @@ class Combination(StrategyCreator, StrategyUtil):
         if self.apply(data, self.conditions.x0_5): # x0.5なら半分にする
             order = math.ceil(order / 2)
 
-        if self.setting.simple["taking"] or self.apply(data, self.conditions.taking):
+        if self.setting.enabled["simple"].taking or self.apply(data, self.conditions.taking):
             if self.setting.use_limit:
                 return simulator.LimitOrder(order, self.price(data), is_repay=True, is_short=data.setting.short_trade)
             else:
@@ -1019,6 +1030,9 @@ class Combination(StrategyCreator, StrategyUtil):
 
     # 損切
     def create_stop_loss_orders(self, data):
+        if not self.setting.enabled["signal"].stop_loss:
+            return None
+
         order = data.position.get_num()
         gain = data.position.gain(self.price(data), order)
         stop_loss = self.stop_loss(data, self.setting.max_position_size)
@@ -1029,7 +1043,7 @@ class Combination(StrategyCreator, StrategyUtil):
         conditions = [
             gain < -stop_loss
         ]
-        if self.setting.simple["stop_loss"]:
+        if self.setting.enabled["simple"].stop_loss:
             conditions = conditions + [self.apply_common(data, self.common.stop_loss)]
         else:
             conditions = conditions + [
@@ -1046,12 +1060,19 @@ class Combination(StrategyCreator, StrategyUtil):
 
     # 手仕舞い
     def create_closing_orders(self, data):
-        if not self.apply_common(data, self.common.closing):
+        if not self.setting.enabled["signal"].closing:
             return None
 
-        if self.setting.simple["closing"] or self.apply(data, self.conditions.closing):
+        conditions = [
+            self.apply_common(data, self.common.closing)
+        ]
+
+        if not self.setting.enabled["simple"].closing:
+            conditions = conditions + [self.apply(data, self.conditions.closing)]
+
+        if any(conditions):
             order = data.position.get_num()
-            return simulator.MarketOrder(order, on_close=True, is_short=data.setting.short_trade)
+            return simulator.MarketOrder(order, on_close=self.setting.on_close["repay"], is_short=data.setting.short_trade)
 
         return None
 
@@ -1095,6 +1116,7 @@ class CombinationChecker:
     def get_strategy_sources(self, combination_strategy, setting):
         new, taking, stop_loss, closing, x2, x4, x8, x0_5 = [], [], [], [], [], [], [], []
         s = setting["setting"][0]
+
         new         = new       + [utils.combination(s["new"], combination_strategy.new_conditions)] if "new" in s.keys() else []
         taking      = taking    + [utils.combination(s["taking"], combination_strategy.taking_conditions)] if "taking" in s.keys() else []
         stop_loss   = stop_loss + [utils.combination(s["stop_loss"], combination_strategy.stop_loss_conditions)] if "stop_loss" in s.keys() else []

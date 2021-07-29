@@ -687,6 +687,16 @@ class Loader:
             return None
 
     @staticmethod
+    def high_update_score():
+        try:
+            data = pandas.read_csv("%s/settings/high_update_score.csv" % (Loader.base_dir))
+            data['date'] = pandas.to_datetime(data['date'], format='%Y-%m-%d')
+            return data.sort_values(by=["date"])
+        except:
+            return None
+
+
+    @staticmethod
     def stock_split():
         try:
             data = pandas.read_csv("settings/stock_split.csv", header=None)

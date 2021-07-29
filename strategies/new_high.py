@@ -21,11 +21,12 @@ class CombinationStrategy(CombinationCreator):
         self.weights = setting.weights
         self.conditions_by_seed(setting.seed[0])
 
-    def load_portfolio(self, date):
-        return new_high.load_portfolio(date, self.setting.assets / 250)
+    def load_portfolio(self, date, length=10):
+        return new_high.load_portfolio(date, self.setting.assets / 250, length)
 
     def subject(self, date):
-        data = self.load_portfolio(utils.to_datetime(date))
+        length = 10 if self.setting.portfolio_size is None else self.setting.portfolio_size
+        data = self.load_portfolio(utils.to_datetime(date), length=length)
         if data is None:
             codes = []
         else:

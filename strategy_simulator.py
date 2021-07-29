@@ -32,8 +32,10 @@ class StrategySimulator:
         self.stock_split = Loader.stock_split()
         self.reverse_stock_split = Loader.reverse_stock_split()
 
-        self.stock_split["date"] = list(map(lambda x: self.select_weekday(x, 3), self.stock_split["date"].astype(str).values.tolist()))
-        self.reverse_stock_split["date"] = list(map(lambda x: self.select_weekday(x, 3), self.reverse_stock_split["date"].astype(str).values.tolist()))
+        # 株式分割・統合が予定されていれば変化率を適用する(2日前から株価データは変わっている)
+        before = 2
+        self.stock_split["date"] = list(map(lambda x: self.select_weekday(x, before), self.stock_split["date"].astype(str).values.tolist()))
+        self.reverse_stock_split["date"] = list(map(lambda x: self.select_weekday(x, before), self.reverse_stock_split["date"].astype(str).values.tolist()))
 
     def strategy_creator(self, args):
         return strategy.load_strategy_creator(args, self.combination_setting)
@@ -104,26 +106,15 @@ class StrategySimulator:
         return simulators
 
     def closing(self, stats, simulators):
-        gain = zip(self.stats.last_unrealized_gain(), self.stats.get("gain", 0))
-        gain = list(map(lambda x: x[0] + x[1], gain))
-
-        drawdown = utils.drawdown(gain)
-        max_gain = self.stats.current_max_unrealized_gain()
-        taking = self.simulator_setting.assets * self.simulator_setting.taking_rate
-        stop_loss = self.simulator_setting.assets * self.simulator_setting.stop_loss_rate
-
-        # 一定期間以降保有したら厳しく
-        hold_term = max(list(map(lambda x: x.position.get_term(), simulators.values())))
-        adjusted_taking = taking / 2 if hold_term >= 5 else taking
+        auto_stop_loss = sum(list(map(lambda x: len(x.stats.lose_auto_stop_loss()) - len(x.stats.win_auto_stop_loss()), simulators.values())))
 
         conditions = [
-            max_gain > adjusted_taking,
-            drawdown[-1] >= 0.1, # 目標価格を超えた上で一定以上のドローダウンがあったら手仕舞い
+            auto_stop_loss >= 3
         ]
 
         if all(conditions):
             for code in simulators.keys():
-                simulators[code].closing()
+                simulators[code].closing(force_stop=True)
                 stats["closing"] = True
         return stats, simulators
 
@@ -234,7 +225,9 @@ class StrategySimulator:
         for code in simulators.keys():
             stats[code] = simulators[code].stats
 
-        return self.create_stats(stats, start_date, end_date)
+        results = self.create_stats(stats, start_date, end_date)
+        results["per_day"] = self.create_stats_per_day(stats, simulators)
+        return results
 
 
     def agg(self, stats, target, proc=None):
@@ -250,6 +243,23 @@ class StrategySimulator:
                 else:
                     results[date] = d
         return results
+
+    def create_stats_per_day(self, stats, simulators):
+        per_day = []
+        dates = list(set(sum(list(map(lambda x: x.dates(), stats.values())),[])))
+        gains = self.agg(stats, "gain", proc=lambda x: 0 if x is None else x)
+        unrealized_gains = self.agg(stats, "unrealized_gain", proc=lambda x: 0 if x is None else x)
+        for date in dates:
+            trade = list(map(lambda x: x.find_by_date(date), stats.values()))
+            trade = sum(list(filter(lambda x: len(x) > 0 and x[0]["gain"] is not None, trade)), [])
+            per_day = per_day + [{
+                "date": str(date),
+                "gain": int(gains[date]),
+                "unrealized_gain": int(unrealized_gains[date]),
+                "trade": len(trade)
+            }]
+
+        return per_day
 
     def create_stats(self, stats, start_date, end_date):
         # 統計 =======================================
@@ -272,7 +282,9 @@ class StrategySimulator:
         import rakuten
         oneday_commission = list(map(lambda x: rakuten.oneday_commission(x), agg_contract_price))
         interest = list(map(lambda x: int(x * 0.028 / 365), unavailable_assets))
-        auto_stop_loss = list(map(lambda x: len(x[1].auto_stop_loss()), stats.items()))
+        auto_stop_loss = list(map(lambda x: len(x.auto_stop_loss()), stats.values()))
+        win_auto_stop_loss = list(map(lambda x: len(x.win_auto_stop_loss()), stats.values()))
+        lose_auto_stop_loss = list(map(lambda x: len(x.lose_auto_stop_loss()), stats.values()))
         drawdown = list(map(lambda x: x.drawdown(), stats.values()))
         drawdown = numpy.array(drawdown).T
         max_unrealized_gain = list(map(lambda x: max(x) if len(x) > 0 else 0, self.stats.unrealized_gain()))
@@ -307,8 +319,10 @@ class StrategySimulator:
             "max_unavailable_assets": max(unavailable_assets) if len(s) > 0 and len(unavailable_assets) > 0 else 0,
             "sum_contract_price": sum(sum_contract_price) if len(s) > 0 else 0,
             "auto_stop_loss": sum(auto_stop_loss) if len(s) > 0 else 0,
+            "win_auto_stop_loss": sum(win_auto_stop_loss) if len(s) > 0 else 0,
+            "lose_auto_stop_loss": sum(lose_auto_stop_loss) if len(s) > 0 else 0,
             "max_unrealized_gain": max(max_unrealized_gain) if len(max_unrealized_gain) > 0 else 0,
-            "crash": min(crash) if len(crash) > 0 else 0
+            "crash": min(crash) if len(crash) > 0 else 0,
         }
 
         return results

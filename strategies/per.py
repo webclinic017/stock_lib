@@ -23,7 +23,7 @@ class CombinationStrategy(CombinationCreator):
         self.conditions_by_seed(setting.seed[0])
 
     def load_portfolio(self, date, length=10):
-        return per.load_portfolio(date)
+        return per.load_portfolio(date, length)
 
     def select_dates(self, start_date, end_date, instant):
         dates = super().select_dates(start_date, end_date, instant)
@@ -33,7 +33,8 @@ class CombinationStrategy(CombinationCreator):
             return list(set(map(lambda x: datetime(x.year, x.month, 1), dates)))
 
     def subject(self, date):
-        data = self.load_portfolio(utils.to_datetime(date), length=10)
+        length = 10 if self.setting.portfolio_size is None else self.setting.portfolio_size
+        data = self.load_portfolio(utils.to_datetime(date), length=length)
         if data is None:
             codes = []
         else:

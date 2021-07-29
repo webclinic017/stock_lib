@@ -35,7 +35,7 @@ class CombinationStrategy(CombinationCreator):
         before = self.load_portfolio(utils.to_datetime(date) - utils.relativeterm(1))
 
         # 前月のポートフォリオの状況次第で変える
-        length = 10
+        length = 10 if self.setting.portfolio_size is None else self.setting.portfolio_size
         length = int(length/2) if before is None else length
 
         data = self.load_portfolio(utils.to_datetime(date), length=length)
@@ -47,6 +47,9 @@ class CombinationStrategy(CombinationCreator):
 
     def common(self, setting):
         default = self.default_common()
+        default.new = [
+            lambda d: d.data.daily["rci"].iloc[-1] > d.data.daily["rci_long"].iloc[-1]
+        ]
         return default
 
     def get_size(self, size):
