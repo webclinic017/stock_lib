@@ -752,3 +752,11 @@ class Loader:
             return data
         except:
             return None
+
+    @staticmethod
+    def financials():
+        try:
+            data = pandas.read_csv("%s/financial/financials.csv" % Loader.base_dir)
+            return data
+        except:
+            return None

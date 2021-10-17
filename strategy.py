@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import os
 import time
 import re
 import json
@@ -53,6 +54,8 @@ def add_options(parser):
     parser.add_argument("--high_update", action="store_true", default=False, dest="high_update", help="高値更新")
     parser.add_argument("--low_update", action="store_true", default=False, dest="low_update", help="安値更新")
     parser.add_argument("--per", action="store_true", default=False, dest="per", help="PER")
+    parser.add_argument("--financials", action="store_true", default=False, dest="financials", help="決算情報ベース")
+    parser.add_argument("--signals", action="store_true", default=False, dest="signals", help="シグナル")
     parser.add_argument("--simple", action="store_true", default=False, dest="simple", help="シンプル")
     return parser
 
@@ -93,6 +96,8 @@ class StrategyType:
     HIGH_UPDATE="high_update"
     LOW_UPDATE="low_update"
     PER="per"
+    FINANCIALS="financials"
+    SIGNALS="signals"
 
     def list(self):
         return [
@@ -104,7 +109,9 @@ class StrategyType:
             self.SIMPLE,
             self.HIGH_UPDATE,
             self.LOW_UPDATE,
-            self.PER
+            self.PER,
+            self.FINANCIALS,
+            self.SIGNALS
         ]
 
 def get_strategy_name(args):
@@ -125,41 +132,54 @@ def get_strategy_name(args):
         return strategy_types.LOW_UPDATE
     elif args.per:
         return strategy_types.PER
+    elif args.financials:
+        return strategy_types.FINANCIALS
+    elif args.signals:
+        return strategy_types.SIGNALS
     else:
         return strategy_types.COMBINATION
 
 # load ================================================
 
-def select_portfolio(strategy_type):
+def select_portfolio(portfolio_name):
     strategy_types = StrategyType()
-    if "filtered_high_update" == strategy_type:
+    if "filtered_high_update" == portfolio_name:
         from portfolio import filtered_high_update
         return filtered_high_update
-    elif strategy_types.HIGH_UPDATE == strategy_type:
+    elif strategy_types.HIGH_UPDATE == portfolio_name:
         from portfolio import high_update
         return high_update
-    elif strategy_types.LOW_UPDATE == strategy_type:
+    elif strategy_types.LOW_UPDATE == portfolio_name:
         from portfolio import low_update
         return low_update
-    elif strategy_types.NEW_HIGH == strategy_type:
+    elif strategy_types.NEW_HIGH == portfolio_name:
         from portfolio import new_high
         return new_high
-    elif strategy_types.PER == strategy_type:
+    elif strategy_types.PER == portfolio_name:
         from portfolio import per
         return per
-    elif strategy_types.FUTURES == strategy_type:
+    elif strategy_types.FINANCIALS == portfolio_name:
+        from portfolio import financials
+        return financials
+    elif "%s/" % strategy_types.SIGNALS in portfolio_name:
+        from portfolio import signals
+        return signals
+    elif strategy_types.FUTURES == portfolio_name:
         from portfolio import futures
         return futures
     else:
-        raise Exception("unsupported type: %s" % strategy_type)
+        raise Exception("unsupported type: %s" % portfolio_name)
 
-def load_portfolio(strategy_type, date, price, length=10):
-    return select_portfolio(strategy_type).load_portfolio(date, price, length)
+def load_portfolio(portfolio_name, date, price, length=10):
+    if "%s/" % StrategyType().SIGNALS in portfolio_name: # signals/XXXX
+        return select_portfolio(portfolio_name).load_portfolio(portfolio_name, date, price, length)
+    else:
+        return select_portfolio(portfolio_name).load_portfolio(date, price, length)
 
-def load_strategy_creator_by_type(strategy_type, is_production, combination_setting, ignore_ensemble=False):
+def load_strategy_creator_by_type(strategy_type, is_production, combination_setting):
     strategy_types = StrategyType()
     if is_production:
-        if strategy_types.ENSEMBLE == strategy_type and not ignore_ensemble:
+        if strategy_types.ENSEMBLE == strategy_type:
             from strategies.production.ensemble import CombinationStrategy
             return CombinationStrategy(combination_setting)
         elif strategy_types.NEW_HIGH == strategy_type:
@@ -175,7 +195,7 @@ def load_strategy_creator_by_type(strategy_type, is_production, combination_sett
             from strategies.production.combination import CombinationStrategy
             return CombinationStrategy(combination_setting)
     else:
-        if strategy_types.ENSEMBLE == strategy_type and not ignore_ensemble:
+        if strategy_types.ENSEMBLE == strategy_type:
             from strategies.ensemble import CombinationStrategy
             return CombinationStrategy(combination_setting)
         elif strategy_types.OPEN_CLOSE == strategy_type:
@@ -195,6 +215,12 @@ def load_strategy_creator_by_type(strategy_type, is_production, combination_sett
             return CombinationStrategy(combination_setting)
         elif strategy_types.PER == strategy_type:
             from strategies.per import CombinationStrategy
+            return CombinationStrategy(combination_setting)
+        elif strategy_types.FINANCIALS == strategy_type:
+            from strategies.financials import CombinationStrategy
+            return CombinationStrategy(combination_setting)
+        elif strategy_types.SIGNALS == strategy_type:
+            from strategies.signals import CombinationStrategy
             return CombinationStrategy(combination_setting)
         elif strategy_types.SIMPLE == strategy_type:
             from strategies.simple import SimpleStrategy
@@ -220,12 +246,11 @@ def load_strategy_setting(args):
 
     return setting_dict, strategy_setting
 
-def load_strategy_creator_by_setting(create_setting, ignore_ensemble=False):
+def load_strategy_creator_by_setting(create_setting):
     return load_strategy_creator_by_type(
         create_setting.strategy_type,
         create_setting.is_production,
-        create_setting.combination_setting,
-        ignore_ensemble)
+        create_setting.combination_setting)
 
 def load_strategy_setting_by_filename(filename):
     setting_dict = Loader.simulate_setting(filename)
@@ -295,7 +320,7 @@ def create_strategy_setting(setting_dict):
 
 def create_ensemble_strategies(files):
     settings = list(map(lambda x: StrategyCreateSetting(x), files))
-    ensembles = list(map(lambda x: load_strategy_creator_by_setting(x, ignore_ensemble=True).create(x.strategy_setting), settings))
+    ensembles = list(map(lambda x: load_strategy_creator_by_setting(x).create(x.strategy_setting), settings))
     return ensembles
 
 def ensemble_files(directory):
@@ -834,10 +859,12 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
 
 # ensemble用
 class StrategyCreateSetting:
-    def __init__(self, filename):
+    def __init__(self, filepath):
+        # ディレクトリに判別用の文字列が含まれる場合があるのでファイル名のみにする
+        filename = os.path.basename(filepath)
         self.strategy_type = self.get_strategy_name(filename)
         self.is_production = "production" in filename
-        self.setting_dict = Loader.simulate_setting(filename, "")
+        self.setting_dict = Loader.simulate_setting(filepath, "")
         self.strategy_setting = create_strategy_setting(self.setting_dict)
         self.combination_setting = apply_combination_setting_by_dict(CombinationSetting(), self.setting_dict)
 
