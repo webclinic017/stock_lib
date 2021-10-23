@@ -32,10 +32,17 @@ class StrategySimulator:
         self.stock_split = Loader.stock_split()
         self.reverse_stock_split = Loader.reverse_stock_split()
 
-        # 株式分割・統合が予定されていれば変化率を適用する(2日前から株価データは変わっている)
-        before = 2
-        self.stock_split["date"] = list(map(lambda x: self.select_weekday(x, before), self.stock_split["date"].astype(str).values.tolist()))
-        self.reverse_stock_split["date"] = list(map(lambda x: self.select_weekday(x, before), self.reverse_stock_split["date"].astype(str).values.tolist()))
+        # 株式分割・統合が予定されていれば変化率を適用する
+        self.stock_split["date"] = list(map(lambda x: self.apply_manda_date(x), self.stock_split["date"].astype(str).values.tolist()))
+        self.reverse_stock_split["date"] = list(map(lambda x: self.apply_manda_date(x), self.reverse_stock_split["date"].astype(str).values.tolist()))
+
+    def apply_manda_date(self, date):
+        if utils.to_datetime(date) < utils.to_datetime("2019-08-01"):
+            # 2019-08-01より前は3日前から株価データは変わっている
+            return self.select_weekday(date, 3)
+        else:
+            # 2019-08-01以降は2日前から株価データは変わっている
+            return self.select_weekday(date, 2)
 
     def strategy_creator(self, args):
         return strategy.load_strategy_creator(args, self.combination_setting)

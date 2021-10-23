@@ -12,6 +12,7 @@ from strategy import CombinationCreator
 from loader import Loader
 
 from portfolio import signals as portfolio
+from portfolio import high_update as high_update
 
 class CombinationStrategy(CombinationCreator):
     def __init__(self, setting):
@@ -24,12 +25,15 @@ class CombinationStrategy(CombinationCreator):
         self.conditions_by_seed(setting.seed[0])
 
     def load_portfolio(self, date, length=10):
-        return portfolio.load_portfolio(self.setting.portfolio, date, self.setting.assets / 250, length)
+#        limit = min([self.setting.assets / 250, 15000])
+        limit = self.setting.assets / 250
+        return portfolio.load_portfolio(self.setting.portfolio, date, limit, length)
 
     def subject(self, date):
         length = 10 if self.setting.portfolio_size is None else self.setting.portfolio_size
         data = self.load_portfolio(utils.to_datetime(date), length=length)
-        if data is None:
+        market = high_update.load_portfolio(utils.to_datetime(date), self.setting.assets, 1000)
+        if data is None:# or market is None or len(market) < 15 or len(market) > 550:
             codes = []
         else:
             codes = data["code"].values.tolist()

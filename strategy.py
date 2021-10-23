@@ -14,6 +14,7 @@ import glob
 import pandas
 import random
 import conditions
+from datetime import datetime
 from loader import Loader
 from loader import Bitcoin
 from collections import namedtuple
@@ -703,8 +704,16 @@ class StrategyCreator:
     def add_data(self, data, index):
         return data
 
+    # 取引対象とするポートフォリオの日付リスト
+#    def select_dates(self, start_date, end_date, instant):
+#        return list(utils.daterange(utils.to_datetime(start_date), utils.to_datetime(end_date)))
+
     def select_dates(self, start_date, end_date, instant):
-        return list(utils.daterange(utils.to_datetime(start_date), utils.to_datetime(end_date)))
+        dates = list(utils.daterange(utils.to_datetime(start_date), utils.to_datetime(end_date)))
+        if instant:
+            return [utils.to_datetime(start_date)]
+        else:
+            return list(set(map(lambda x: datetime(x.year, x.month, 1), dates)))
 
     def create(self, settings):
         new = [lambda x: self.create_new_orders(x)]

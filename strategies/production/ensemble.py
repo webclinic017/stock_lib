@@ -24,13 +24,6 @@ class CombinationStrategy(CombinationCreator):
         portfolio = "filtered_high_update" if self.setting.portfolio is None else self.setting.portfolio
         return strategy.load_portfolio(portfolio, date, self.setting.assets / 500, length)
 
-    def select_dates(self, start_date, end_date, instant):
-        dates = super().select_dates(start_date, end_date, instant)
-        if instant:
-            return [utils.to_datetime(start_date)]
-        else:
-            return list(set(map(lambda x: datetime(x.year, x.month, 1), dates)))
-
     def subject(self, date):
         before = self.load_portfolio(utils.to_datetime(date) - utils.relativeterm(1))
 

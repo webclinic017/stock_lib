@@ -597,7 +597,7 @@ def price_limit_with_index(price):
     import rakuten
     return rakuten.price_limit(price)
 
-# =======================================
+# date util =======================================
 def timestamp():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -653,7 +653,7 @@ def daterange_by_month(start_date, end_date):
     for n in range(months):
         yield start_date + relativedelta(months=n)
 
-# =======================================
+# combination util =======================================
 # 全組み合わせを取得
 def combinations(conditions):
     num = combinations_size(conditions)
@@ -695,7 +695,7 @@ def combination(index, conditions):
     else:
         return cond
 
-# =======================================
+# list util =======================================
 def split_list(data, condition):
 #    if len(data) <= 1:
 #        return data
@@ -704,6 +704,10 @@ def split_list(data, condition):
             return [data[:i+1]] + split_list(data[i+1:], condition)
     return [data]
 
+def chunked(iterable, n):
+    return [iterable[x:x + n] for x in range(0, len(iterable), n)]
+
+# process =======================================
 def proc_call(params, retry=3):
     print(params)
     for _ in range(retry):

@@ -62,6 +62,4 @@ def recall(y_true, y_pred):
   recall = true_positives / (possible_positives + K.epsilon())
   return recall
 
-def chunked(iterable, n):
-    return [iterable[x:x + n] for x in range(0, len(iterable), n)]
 
