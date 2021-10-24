@@ -314,6 +314,7 @@ class StrategySimulator:
             "oneday_commission": sum(oneday_commission),
             "interest": sum(interest),
             "return": round(sum(gain) / self.simulator_setting.assets, 2),
+            "init_assets": self.simulator_setting.assets,
             "min_assets": min(min_assets) if len(min_assets) > 0 else 0,
             "drawdown": round(max(list(map(lambda x: max(x), drawdown))) if len(drawdown) > 0 else 0, 2),
             "max_drawdown": round(max(list(map(lambda x: sum(x), drawdown))) if len(drawdown) > 0 else 0, 2),
