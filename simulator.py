@@ -963,16 +963,16 @@ class Simulator:
             position_size = position.get_num() * position.min_unit
 
             max_gain = self.stats.current_max_unrealized_gain(split_condition=lambda x: x["repay"] is not None)
-            max_gain_range = max_gain / position_size
+            max_gain_range = (0 if max_gain < 0 else max_gain) / position_size
 
             # ストップまでの価格差
             soft_auto_stop_loss = 0 if self.setting.soft_limit is None else self.setting.soft_limit
             hard_auto_stop_loss = 0 if self.setting.hard_limit is None else self.setting.hard_limit
 
             allowable_loss = position.get_value() * soft_auto_stop_loss
-            soft_allowable_loss = (hold - max_gain_range if position.is_short() else hold + max_gain_range) * soft_auto_stop_loss
+            soft_allowable_loss = (hold - max_gain_range if position.is_short() else hold + max_gain_range) * soft_auto_stop_loss # 過去最高値からの割合
 #            hard_allowable_loss = (self.setting.assets * hard_auto_stop_loss) / position_size
-            hard_allowable_loss = hold * hard_auto_stop_loss
+            hard_allowable_loss = hold * hard_auto_stop_loss # 保有価格からの割合
 
             max_price_range = self.adjust_tick(max_gain_range)
             soft_price_range = self.adjust_tick(soft_allowable_loss)
