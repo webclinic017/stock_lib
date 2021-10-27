@@ -707,6 +707,12 @@ def split_list(data, condition):
 def chunked(iterable, n):
     return [iterable[x:x + n] for x in range(0, len(iterable), n)]
 
+# dict util =======================================
+def to_jsonizable(dic):
+    to_numpy = lambda x: (x[0], numpy.array([x[1]]).tolist()[0]) if "numpy" in str(type(x[1])) else x
+    jsonizable = lambda x: (x[0], to_jsonizable(x[1])) if type(x[1]) is dict else x
+    return dict(list(map(lambda x: jsonizable(to_numpy(x)), list(dic.items()))))
+
 # process =======================================
 def proc_call(params, retry=3):
     print(params)
