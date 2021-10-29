@@ -19,10 +19,10 @@ def nan_to_num(data, default=0):
 
 def add_average_stats(data):
     close = numpy.array(data["close"].values, dtype="f8")
-    data["daily_average"]     = ta.SMA(close, timeperiod=5)
-    data["weekly_average"]    = ta.SMA(close, timeperiod=25)
+    data["average"]     = ta.SMA(close, timeperiod=5)
+    data["long_average"]    = ta.SMA(close, timeperiod=25)
     data["volume_average"]    = ta.SMA(data["volume"].astype(float).values, timeperiod=5)
-    data["ma_divergence"]     = (data["close"] - data["weekly_average"]) / data["weekly_average"]
+    data["ma_divergence"]     = (data["close"] - data["long_average"]) / data["long_average"]
     return data
 
 def add_tec_stats(data):
@@ -87,13 +87,13 @@ def add_stages_stats(data):
     data["support_6m"] = data["low"].rolling(120).min()
     data["support_1y"] = data["low"].rolling(240).min()
 
-    data["stages_3d"]                   = stages(data, "resistance_3d", "support_3d", "daily_average", with_eq=True)
-    data["stages_5d"]                   = stages(data, "resistance_5d", "support_5d", "daily_average", with_eq=True)
-    data["stages_10d"]                  = stages(data, "resistance_10d", "support_10d", "daily_average", with_eq=True)
-    data["stages_1m"]                   = stages(data, "resistance_1m", "support_1m", "weekly_average", with_eq=True)
-    data["stages_3m"]                   = stages(data, "resistance_3m", "support_3m", "weekly_average", with_eq=True)
-    data["stages_6m"]                   = stages(data, "resistance_6m", "support_6m", "weekly_average", with_eq=True)
-    data["stages_1y"]                   = stages(data, "resistance_1y", "support_1y", "weekly_average", with_eq=True)
+    data["stages_3d"]                   = stages(data, "resistance_3d", "support_3d", "average", with_eq=True)
+    data["stages_5d"]                   = stages(data, "resistance_5d", "support_5d", "average", with_eq=True)
+    data["stages_10d"]                  = stages(data, "resistance_10d", "support_10d", "average", with_eq=True)
+    data["stages_1m"]                   = stages(data, "resistance_1m", "support_1m", "long_average", with_eq=True)
+    data["stages_3m"]                   = stages(data, "resistance_3m", "support_3m", "long_average", with_eq=True)
+    data["stages_6m"]                   = stages(data, "resistance_6m", "support_6m", "long_average", with_eq=True)
+    data["stages_1y"]                   = stages(data, "resistance_1y", "support_1y", "long_average", with_eq=True)
 
     data["stages"]                      = stages(data)
     data["stages_average"]              = ta.SMA(data["stages"].astype(float).values, timeperiod=10)
@@ -106,7 +106,7 @@ def add_stages_stats(data):
 
 def add_cross_stats(data):
     # クロス系
-    data["average_cross"] = cross(data["daily_average"], data["weekly_average"])
+    data["average_cross"] = cross(data["average"], data["long_average"])
     data["macd_cross"] = cross(data["macd"], data["macdsignal"])
     data["rci_cross"] = cross(data["rci"], data["rci_long"])
 
@@ -125,8 +125,8 @@ def add_trend_stats(data):
     data["rci_long_gradient"]           = diff(data["rci_long"])
     data["rci_gradient"]                = diff(data["rci"])
     data["volume_gradient"]             = diff(data["volume_average"])
-    data["weekly_gradient"]             = diff(data["weekly_average"])
-    data["daily_gradient"]              = diff(data["daily_average"])
+    data["weekly_gradient"]             = diff(data["long_average"])
+    data["daily_gradient"]              = diff(data["average"])
     data["stages_gradient"]             = diff(data["stages"])
     data["stages_average_gradient"]     = diff(data["stages_average"])
     data["stages_sum_gradient"]         = diff(data["stages_sum"])
@@ -137,8 +137,8 @@ def add_trend_stats(data):
     data["macd_gradient"]               = diff(data["macd"])
     data["macdhist_gradient"]           = diff(data["macdhist"])
 
-    data["daily_average_trend"]         = data["daily_gradient"].rolling(5).apply(trend, raw=True)
-    data["weekly_average_trend"]        = data["weekly_gradient"].rolling(5).apply(trend, raw=True)
+    data["average_trend"]         = data["daily_gradient"].rolling(5).apply(trend, raw=True)
+    data["long_average_trend"]        = data["weekly_gradient"].rolling(5).apply(trend, raw=True)
     data["volume_average_trend"]        = data["volume_gradient"].rolling(5).apply(trend, raw=True)
     data["macd_trend"]                  = data["macd_gradient"].rolling(5).apply(trend, raw=True)
     data["macdhist_trend"]              = data["macdhist_gradient"].rolling(1).apply(trend, raw=True)
@@ -389,7 +389,7 @@ def cross(base, target):
 #    0: 移動平均とクロス
 #    1: 移動平均と抵抗線の間
 #    2: 抵抗線切り上げ
-def stages(data, resistance="resistance", support="support", average="daily_average", with_eq=False):
+def stages(data, resistance="resistance", support="support", average="average", with_eq=False):
     cross = lambda data, line: (data["low"] < data[line]) & (data[line] < data["high"])
 
     default = cross(data, average)

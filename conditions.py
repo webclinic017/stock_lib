@@ -23,7 +23,7 @@ def select(data, target="daily"):
     raise Exception("unselectable: %s" % target)
 
 def average_conditions(legs=["daily"]):
-    columns = ["daily_average", "weekly_average"]
+    columns = ["average", "long_average"]
     targets = ["open", "high", "low", "close"]
 
     conditions = []
@@ -170,7 +170,7 @@ def cross_conditions(legs=["daily"], additional_columns=[]):
 
 def trend_conditions(legs=["daily"], additional_columns=[]):
     columns = [
-        "daily_average_trend", "weekly_average_trend", "volume_average_trend", "macd_trend", "macdhist_trend",
+        "average_trend", "long_average_trend", "volume_average_trend", "macd_trend", "macdhist_trend",
         "rci_trend", "rci_long_trend", "stages_trend", "stages_average_trend", "rising_safety_trend", "fall_safety_trend"
     ] + additional_columns
 
