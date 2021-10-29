@@ -358,27 +358,9 @@ class Loader:
         return data
 
     @staticmethod
-    def monitor_stocks():
-        try:
-            data = pandas.read_csv('settings/monitor_stocks.csv', header=None)
-            data.columns = ['code']
-        except:
-            data = None
-        return data
-
-    @staticmethod
-    def high_performance_stocks():
+    def small_stocks():
         try:
             data = pandas.read_csv('settings/high_performance_stocks.csv', header=None)
-            data.columns = ['code']
-        except:
-            data = None
-        return data
-
-    @staticmethod
-    def low_performance_stocks():
-        try:
-            data = pandas.read_csv('settings/low_performance_stocks.csv', header=None)
             data.columns = ['code']
         except:
             data = None
@@ -441,42 +423,6 @@ class Loader:
         return data
 
     @staticmethod
-    def attention_stocks():
-        try:
-            data = pandas.read_csv('settings/attention_stocks.csv', header=None)
-            data.columns = ['code']
-        except:
-            data = None
-        return data
-
-    @staticmethod
-    def high_attention_stocks():
-        try:
-            data = pandas.read_csv('settings/high_attention_stocks.csv', header=None)
-            data.columns = ['code']
-        except:
-            data = None
-        return data
-
-    @staticmethod
-    def fall_attention_stocks():
-        try:
-            data = pandas.read_csv('settings/fall_attention_stocks.csv', header=None)
-            data.columns = ['code']
-        except:
-            data = None
-        return data
-
-    @staticmethod
-    def fall_high_performance_attention_stocks():
-        try:
-            data = pandas.read_csv('settings/fall_high_performance_attention_stocks.csv', header=None)
-            data.columns = ['code']
-        except:
-            data = None
-        return data
-
-    @staticmethod
     def simulate_setting(filename=None, path="simulate_settings/"):
         filename = "simulate_setting.json" if filename is None else filename
         try:
@@ -527,24 +473,6 @@ class Loader:
         try:
             data = pandas.read_csv("%s/new_score.csv" % Loader.settings_dir, header=None)
             data.columns = ['date', 'score']
-        except:
-            data = None
-        return data
-
-    @staticmethod
-    def new_high_all_stocks():
-        try:
-            data = pandas.read_csv('settings/new_high_all.txt', header=None)
-            data.columns = ['code', 'high']
-        except:
-            data = None
-        return data
-
-    @staticmethod
-    def attention_new_high_stocks():
-        try:
-            data = pandas.read_csv('settings/attention_new_high_stocks.csv', header=None)
-            data.columns = ['code']
         except:
             data = None
         return data
