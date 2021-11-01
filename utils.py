@@ -52,6 +52,7 @@ def add_band_stats(data):
 
     data["env_entity"]     =  each(lambda i, x: x["env12"] - x["env08"], data)
     data["env_entity_average"] = ta.SMA(numpy.array(data["env_entity"].values, dtype="f8"), timeperiod=5)
+
     return data
 
 def add_safety_stats(data):
@@ -67,9 +68,8 @@ def add_safety_stats(data):
 
     return data
 
-def add_stages_stats(data):
+def add_resistance_stats(data):
     data["resistance"] = data["high"].rolling(15).max()
-    data["support"] = data["low"].rolling(15).min()
 
     data["resistance_3d"] = data["high"].rolling(3).max()
     data["resistance_5d"] = data["high"].rolling(5).max()
@@ -79,6 +79,14 @@ def add_stages_stats(data):
     data["resistance_6m"] = data["high"].rolling(120).max()
     data["resistance_1y"] = data["high"].rolling(240).max()
 
+    data["resistance_entity"] = (data["resistance_10d"] - data["resistance_3d"]) * (~((data["resistance_3d"] == data["resistance_5d"]) | (data["resistance_5d"] == data["resistance_10d"]) | (data["resistance_3d"] == data["resistance_10d"])) * 1)
+
+
+    return data
+
+def add_support_stats(data):
+    data["support"] = data["low"].rolling(15).min()
+
     data["support_3d"] = data["low"].rolling(3).min()
     data["support_5d"] = data["low"].rolling(5).min()
     data["support_10d"] = data["low"].rolling(10).min()
@@ -87,6 +95,12 @@ def add_stages_stats(data):
     data["support_6m"] = data["low"].rolling(120).min()
     data["support_1y"] = data["low"].rolling(240).min()
 
+    data["support_entity"] = (data["support_3d"] - data["support_10d"]) * (~((data["support_3d"] == data["support_5d"]) | (data["support_5d"] == data["support_10d"]) | (data["support_3d"] == data["support_10d"])) * 1)
+
+    return data
+
+
+def add_stages_stats(data):
     data["stages_3d"]                   = stages(data, "resistance_3d", "support_3d", "average", with_eq=True)
     data["stages_5d"]                   = stages(data, "resistance_5d", "support_5d", "average", with_eq=True)
     data["stages_10d"]                  = stages(data, "resistance_10d", "support_10d", "average", with_eq=True)
@@ -102,6 +116,7 @@ def add_stages_stats(data):
     data["stages_sum_average_long"]     = ta.SMA(data["stages_sum"].astype(float).values, timeperiod=20)
     data["macd_stages"]                 = (data["macd"] > 0) * 1
     data["macdhist_stages"]             = (data["macdhist"] > 0) * 1
+
     return data
 
 def add_cross_stats(data):
@@ -122,11 +137,13 @@ def add_cross_stats(data):
 
 def add_trend_stats(data):
     # 気配を出力する
-    data["rci_long_gradient"]           = diff(data["rci_long"])
-    data["rci_gradient"]                = diff(data["rci"])
+    data["average_gradient"]            = diff(data["average"])
+    data["long_average_gradient"]       = diff(data["long_average"])
     data["volume_gradient"]             = diff(data["volume_average"])
-    data["weekly_gradient"]             = diff(data["long_average"])
-    data["daily_gradient"]              = diff(data["average"])
+    data["macd_gradient"]               = diff(data["macd"])
+    data["macdhist_gradient"]           = diff(data["macdhist"])
+    data["rci_gradient"]                = diff(data["rci"])
+    data["rci_long_gradient"]           = diff(data["rci_long"])
     data["stages_gradient"]             = diff(data["stages"])
     data["stages_average_gradient"]     = diff(data["stages_average"])
     data["stages_sum_gradient"]         = diff(data["stages_sum"])
@@ -134,11 +151,9 @@ def add_trend_stats(data):
     data["stages_sum_average_long_gradient"] = diff(data["stages_sum_average_long"])
     data["fall_safety_gradient"]        = diff(data["fall_safety"])
     data["rising_safety_gradient"]      = diff(data["rising_safety"])
-    data["macd_gradient"]               = diff(data["macd"])
-    data["macdhist_gradient"]           = diff(data["macdhist"])
 
-    data["average_trend"]         = data["daily_gradient"].rolling(5).apply(trend, raw=True)
-    data["long_average_trend"]        = data["weekly_gradient"].rolling(5).apply(trend, raw=True)
+    data["average_trend"]               = data["average_gradient"].rolling(5).apply(trend, raw=True)
+    data["long_average_trend"]          = data["long_average_gradient"].rolling(5).apply(trend, raw=True)
     data["volume_average_trend"]        = data["volume_gradient"].rolling(5).apply(trend, raw=True)
     data["macd_trend"]                  = data["macd_gradient"].rolling(5).apply(trend, raw=True)
     data["macdhist_trend"]              = data["macdhist_gradient"].rolling(1).apply(trend, raw=True)
@@ -181,18 +196,18 @@ def add_stats(data, default=0, names=[]):
 
     stats = {
         "average": add_average_stats,
+        "resistance": add_resistance_stats,
+        "support": add_support_stats,
         "tec": add_tec_stats,
         "band": add_band_stats,
         "safety": add_safety_stats,
-        "stages": add_stages_stats,
-        "cross": add_cross_stats,
-        "trend": add_trend_stats,
         "manda": add_manda_stats,
+        "stages": add_stages_stats, # resistance / support
+        "cross": add_cross_stats, # average / tec / band / safety
+        "trend": add_trend_stats, # average / tec / band / safety / stages
     }
 
-    keys = ["average", "tec", "band", "safety", "stages", "cross", "trend", "manda"]
-
-    for name in keys:
+    for name in stats.keys():
         try:
             data = stats[name](data) if is_t(name) else data
         except Exception as e:
