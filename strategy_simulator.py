@@ -125,11 +125,11 @@ class StrategySimulator:
                 stats["closing"] = True
         return stats, simulators
 
-    def is_futures(self, code):
-        return "_" in str(code)
+    def is_stock(self, code):
+        return str(code).isdigit()
 
     def get_stock_split(self, start_date, end_date, code):
-        if self.is_futures(code):
+        if not self.is_stock(code):
             return []
         stock_split = self.stock_split[
             (self.stock_split["date"] >= start_date) &
@@ -140,7 +140,7 @@ class StrategySimulator:
         return stock_split
 
     def get_reverse_stock_split(self, start_date, end_date, code):
-        if self.is_futures(code):
+        if not self.is_stock(code):
             return []
         reverse_stock_split = self.reverse_stock_split[
             (self.reverse_stock_split["date"] >= start_date) &
@@ -185,7 +185,7 @@ class StrategySimulator:
         self.log("targets: %s" % list(simulators.keys()))
         capacity = None
 
-        for date in dates:
+        for step, date in enumerate(dates):
             # 休日はスキップ
             if not utils.is_weekday(utils.to_datetime(date)):
                 self.log("%s is not weekday" % date)

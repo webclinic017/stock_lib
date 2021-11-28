@@ -26,6 +26,7 @@ from argparse import ArgumentParser
 def add_options(parser):
     parser.add_argument("-v", action="store_true", default=False, dest="verbose", help="debug log")
     parser.add_argument("--code", type=str, action="store", default=None, dest="code", help="code")
+    parser.add_argument("--setting_dir", type=str, action="store", default=None, dest="setting_dir", help="")
     parser.add_argument("--use_limit", action="store_true", default=False, dest="use_limit", help="指値を使う")
     parser.add_argument("--position_sizing", action="store_true", default=False, dest="position_sizing", help="ポジションサイジング")
     parser.add_argument("--max_position_size", action="store", default=None, dest="max_position_size", help="最大ポジションサイズ")
@@ -238,12 +239,7 @@ def load_strategy_creator(args, combination_setting=None):
 def load_strategy_setting(args):
     filename = get_filename(args)
 
-    setting_dict, strategy_setting = load_strategy_setting_by_filename(filename)
-
-    # 個別銘柄の設定がなければ共通の設定を読む
-    if args.code is not None and setting_dict is None:
-        filename = get_filename(args)
-        setting_dict = Loader.simulate_setting(filename)
+    setting_dict, strategy_setting = load_strategy_setting_by_filename(filename, args.setting_dir)
 
     return setting_dict, strategy_setting
 
@@ -253,8 +249,11 @@ def load_strategy_creator_by_setting(create_setting):
         create_setting.is_production,
         create_setting.combination_setting)
 
-def load_strategy_setting_by_filename(filename):
-    setting_dict = Loader.simulate_setting(filename)
+def load_strategy_setting_by_filename(filename, path):
+    if path is None:
+        setting_dict = Loader.simulate_setting(filename)
+    else:
+        setting_dict = Loader.simulate_setting(filename, path)
 
     strategy_setting = create_strategy_setting(setting_dict)
 
@@ -266,7 +265,7 @@ def load_strategy(args, combination_setting=None):
 
 def load_strategy_by_option(args, is_short):
     filename = create_filename(create_prefix(args, is_production=args.production, is_short=is_short))
-    setting_dict, settings = load_strategy_setting_by_filename(filename)
+    setting_dict, settings = load_strategy_setting_by_filename(filename, args.setting_dir)
     combination_setting = create_combination_setting_by_dict(args, setting_dict)
     return load_strategy_creator(args, combination_setting).create(settings)
 
@@ -873,7 +872,7 @@ class StrategyCreateSetting:
         filename = os.path.basename(filepath)
         self.strategy_type = self.get_strategy_name(filename)
         self.is_production = "production" in filename
-        self.setting_dict = Loader.simulate_setting(filepath, "")
+        self.setting_dict = Loader.simulate_setting(filepath, "") # フルパスの想定
         self.strategy_setting = create_strategy_setting(self.setting_dict)
         self.combination_setting = apply_combination_setting_by_dict(CombinationSetting(), self.setting_dict)
 

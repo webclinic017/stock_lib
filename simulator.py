@@ -341,7 +341,6 @@ class SimulatorSetting:
         self.stop_loss_rate = 0.02
         self.taking_rate = 1.0
         self.min_unit = 100
-        self.trade_step = 1
         self.soft_limit = None
         self.hard_limit = None
         self.ignore_volume = False # 指値時の出来高チェックをスキップ

@@ -80,7 +80,7 @@ def add_resistance_stats(data):
     data["resistance_1y"] = data["high"].rolling(240).max()
 
     data["resistance_entity"] = (data["resistance_10d"] - data["resistance_3d"]) * (~((data["resistance_3d"] == data["resistance_5d"]) | (data["resistance_5d"] == data["resistance_10d"]) | (data["resistance_3d"] == data["resistance_10d"])) * 1)
-
+    data["resistance_entity"] = data["resistance_entity"] / data["close"]
 
     return data
 
@@ -96,6 +96,7 @@ def add_support_stats(data):
     data["support_1y"] = data["low"].rolling(240).min()
 
     data["support_entity"] = (data["support_3d"] - data["support_10d"]) * (~((data["support_3d"] == data["support_5d"]) | (data["support_5d"] == data["support_10d"]) | (data["support_3d"] == data["support_10d"])) * 1)
+    data["support_entity"] = data["support_entity"] / data["close"]
 
     return data
 

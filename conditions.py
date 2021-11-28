@@ -269,6 +269,29 @@ def trade_conditions():
         lambda d: d.stats.lose_streak() >= 3,
     ]
 
+def resistance_support_conditions(legs=["daily"]):
+    conditions = []
+    for leg in legs:
+        conditions = conditions + [
+            lambda d: select(d, leg)["resistance_entity"].iloc[-2] < select(d, leg)["resistance_entity"].iloc[-1],
+            lambda d: select(d, leg)["resistance_entity"].iloc[-2] > select(d, leg)["resistance_entity"].iloc[-1],
+            lambda d: select(d, leg)["resistance_entity"].iloc[-3:].max() > select(d, leg)["resistance_entity"].iloc[-1],
+            lambda d: select(d, leg)["resistance_entity"].iloc[-5:].max() > select(d, leg)["resistance_entity"].iloc[-1],
+            lambda d: select(d, leg)["resistance_entity"].iloc[-3:-1].max() < select(d, leg)["resistance_entity"].iloc[-1],
+            lambda d: select(d, leg)["resistance_entity"].iloc[-5:-1].max() < select(d, leg)["resistance_entity"].iloc[-1],
+            lambda d: select(d, leg)["support_entity"].iloc[-2] < select(d, leg)["support_entity"].iloc[-1],
+            lambda d: select(d, leg)["support_entity"].iloc[-2] > select(d, leg)["support_entity"].iloc[-1],
+            lambda d: select(d, leg)["support_entity"].iloc[-3:].max() > select(d, leg)["support_entity"].iloc[-1],
+            lambda d: select(d, leg)["support_entity"].iloc[-5:].max() > select(d, leg)["support_entity"].iloc[-1],
+            lambda d: select(d, leg)["support_entity"].iloc[-3:-1].max() < select(d, leg)["support_entity"].iloc[-1],
+            lambda d: select(d, leg)["support_entity"].iloc[-5:-1].max() < select(d, leg)["support_entity"].iloc[-1],
+            lambda d: select(d, leg)["support_entity"].iloc[-1] > select(d, leg)["resistance_entity"].iloc[-1],
+            lambda d: select(d, leg)["support_entity"].iloc[-1] < select(d, leg)["resistance_entity"].iloc[-1],
+            lambda d: select(d, leg)["support_entity"].iloc[-1] == 0,
+            lambda d: select(d, leg)["resistance_entity"].iloc[-1] == 0,
+        ]
+    return conditions
+
 def all():
     return average_conditions() + tec_conditions() + cross_conditions() + trend_conditions() + band_conditions() + stages_conditions() + cs_conditions()
 
@@ -287,15 +310,14 @@ def all_with_index(targets=["daily", "nikkei", "dow", "usdjpy", "xbtusd"]):
 
 def by_names(targets=["daily", "nikkei", "dow", "usdjpy", "xbtusd"], names=["all"]):
     conditions = []
-    conditions_map = {
-        "all": lambda: all_with_index(targets),
-        "industry_score": lambda: all_with_index(targets) + industry_score_conditions(),
-        "stages_sum": lambda: all_with_index(targets) + industry_score_conditions() + stages_sum_conditions(),
-        "2021-06-12": lambda: average_conditions(targets) + tec_conditions(targets) + cross_conditions(targets)
+    conditions_map = {}
+    conditions_map["all"] = lambda: all_with_index(targets)
+    conditions_map["industry_score"] = lambda: all_with_index(targets) + industry_score_conditions()
+    conditions_map["stages_sum"] = lambda: all_with_index(targets) + industry_score_conditions() + stages_sum_conditions(),
+    conditions_map["2021-06-12"] = (lambda: average_conditions(targets) + tec_conditions(targets) + cross_conditions(targets)
             + trend_conditions(targets, additional_columns=["stages_sum_trend", "stages_sum_average_trend", "stages_sum_average_long_trend"])
-            + band_conditions(targets) + stages_conditions(targets) + cs_conditions(targets) + industry_score_conditions() + stages_sum_conditions(targets) + new_score_conditions()
-
-    }
+            + band_conditions(targets) + stages_conditions(targets) + cs_conditions(targets) + industry_score_conditions() + stages_sum_conditions(targets) + new_score_conditions())
+    conditions_map["2021-11-13"] = lambda: conditions_map["2021-06-12"]() + resistance_support_conditions()
 
     for name in conditions_map.keys():
         conditions = (conditions + conditions_map[name]()) if name in names else conditions
