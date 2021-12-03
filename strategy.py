@@ -269,7 +269,7 @@ def load_strategy_by_option(args, is_short):
     combination_setting = create_combination_setting_by_dict(args, setting_dict)
     return load_strategy_creator(args, combination_setting).create(settings)
 
-def load_simulator_data(code, start_date, end_date, args, names=[]):
+def load_simulator_data(code, start_date, end_date, args, names=[], technical_setting=None):
     rule = "D"
     start = utils.to_format(utils.to_datetime(start_date) - utils.relativeterm(12))
     data = Loader.load_by_code(code, start, end_date)
@@ -278,7 +278,7 @@ def load_simulator_data(code, start_date, end_date, args, names=[]):
         print("%s: %s is None" % (start_date, code))
         return None
 
-    simulator_data = add_stats(code, data, rule, names)
+    simulator_data = add_stats(code, data, rule, names, technical_setting)
     if args.verbose:
         print("loaded:", utils.timestamp(), code, data["date"].iloc[0], data["date"].iloc[-1])
     else:
@@ -300,9 +300,9 @@ def load_index(args, start_date, end_date):
 
     return SimulatorIndexData(index)
 
-def add_stats(code, data, rule, names=[]):
+def add_stats(code, data, rule, names=[], technical_setting=None):
     try:
-        data = utils.add_stats(data, names=names)
+        data = utils.add_stats(data, names=names, technical_setting=technical_setting)
         data = utils.add_cs_stats(data)
         return SimulatorData(code, data, rule)
     except Exception as e:

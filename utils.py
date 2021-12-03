@@ -14,36 +14,70 @@ import talib as ta
 import slack
 import time
 
+class TechnicalSetting:
+    def __init__(self):
+        self.average = 5
+        self.long_average = 25
+        self.volume_average = 5
+        self.rci = 9
+        self.rci_long = 27
+        self.macd_fast = 12
+        self.macd_slow = 26
+        self.macd_signal = 9
+        self.macd_hist = 100
+        self.atr = 14
+        self.bbands = 25
+        self.env_entity_average = 5
+
+class ShortTechnicalSetting(TechnicalSetting):
+    def __init__(self):
+        super().__init__()
+        self.average = 3
+        self.long_average = 9
+        self.volume_average = 9
+        self.rci = 3
+        self.rci_long = 9
+        self.macd_fast = 4
+        self.macd_slow = 10
+        self.macd_signal =3 
+        self.macd_hist = 30
+        self.atr = 5
+        self.bbands = 9
+        self.env_entity_average = 3
+
 def nan_to_num(data, default=0):
     return data if default is None else numpy.nan_to_num(data)
 
-def add_average_stats(data):
+def add_average_stats(data, technical_setting=None):
+    setting = TechnicalSetting() if technical_setting is None else technical_setting
     close = numpy.array(data["close"].values, dtype="f8")
-    data["average"]     = ta.SMA(close, timeperiod=5)
-    data["long_average"]    = ta.SMA(close, timeperiod=25)
-    data["volume_average"]    = ta.SMA(data["volume"].astype(float).values, timeperiod=5)
+    data["average"]     = ta.SMA(close, timeperiod=setting.average)
+    data["long_average"]    = ta.SMA(close, timeperiod=setting.long_average)
+    data["volume_average"]    = ta.SMA(data["volume"].astype(float).values, timeperiod=setting.volume_average)
     data["ma_divergence"]     = (data["close"] - data["long_average"]) / data["long_average"]
     return data
 
-def add_tec_stats(data):
-    data["rci"]                 = data["close"].rolling(9).apply(rci, raw=True)
-    data["rci_long"]            = data["close"].rolling(27).apply(rci, raw=True)
+def add_tec_stats(data, technical_setting=None):
+    setting = TechnicalSetting() if technical_setting is None else technical_setting
+    data["rci"]                 = data["close"].rolling(setting.rci).apply(rci, raw=True)
+    data["rci_long"]            = data["close"].rolling(setting.rci_long).apply(rci, raw=True)
 
     close = numpy.array(data["close"].values, dtype="f8")
-    macd, macdsignal, macdhist = ta.MACD(close, fastperiod=12, slowperiod=26, signalperiod=9)
+    macd, macdsignal, macdhist = ta.MACD(close, fastperiod=setting.macd_fast, slowperiod=setting.macd_slow, signalperiod=setting.macd_signal)
     data["macd"]           = macd
     data["macdsignal"]     = macdsignal
     data["macdhist"]       = macdhist
-    data["macdhist_convert"] = data["macdhist"].rolling(100).apply(trend_convert, raw=True)
+    data["macdhist_convert"] = data["macdhist"].rolling(setting.macd_hist).apply(trend_convert, raw=True)
 
     # average true range
-    data["atr"] = ta.ATR(data["high"].astype(float).values, data["low"].astype(float).values, data["close"].astype(float).values, timeperiod=14)
+    data["atr"] = ta.ATR(data["high"].astype(float).values, data["low"].astype(float).values, data["close"].astype(float).values, timeperiod=setting.atr)
     return data
 
-def add_band_stats(data):
+def add_band_stats(data, technical_setting=None):
+    setting = TechnicalSetting() if technical_setting is None else technical_setting
     close = numpy.array(data["close"].values, dtype="f8")
-    upper, _, lower = ta.BBANDS(close, timeperiod=25, nbdevup=1, nbdevdn=1, matype=0)
-    upper2, _, lower2 = ta.BBANDS(close, timeperiod=25, matype=0)
+    upper, _, lower = ta.BBANDS(close, timeperiod=setting.bbands, nbdevup=1, nbdevdn=1, matype=0)
+    upper2, _, lower2 = ta.BBANDS(close, timeperiod=setting.bbands, matype=0)
 
     data["env12"]          = nan_to_num(upper2)
     data["env11"]          = nan_to_num(upper)
@@ -51,11 +85,11 @@ def add_band_stats(data):
     data["env08"]          = nan_to_num(lower2)
 
     data["env_entity"]     =  each(lambda i, x: x["env12"] - x["env08"], data)
-    data["env_entity_average"] = ta.SMA(numpy.array(data["env_entity"].values, dtype="f8"), timeperiod=5)
+    data["env_entity_average"] = ta.SMA(numpy.array(data["env_entity"].values, dtype="f8"), timeperiod=setting.env_entity_average)
 
     return data
 
-def add_safety_stats(data):
+def add_safety_stats(data, technical_setting=None):
     data["low_noize"]         = data["low"].rolling(2).apply(lambda x: x[-2] - x[-1] if x[-2] - x[-1] < 0 else 0, raw=True)
     data["rising_safety"]     = data["low_noize"].rolling(10).apply(rising_safety, raw=True)
     data["rising_safety"]     = data["low"] + data["rising_safety"]
@@ -68,7 +102,7 @@ def add_safety_stats(data):
 
     return data
 
-def add_resistance_stats(data):
+def add_resistance_stats(data, technical_setting=None):
     data["resistance"] = data["high"].rolling(15).max()
 
     data["resistance_3d"] = data["high"].rolling(3).max()
@@ -84,7 +118,7 @@ def add_resistance_stats(data):
 
     return data
 
-def add_support_stats(data):
+def add_support_stats(data, technical_setting=None):
     data["support"] = data["low"].rolling(15).min()
 
     data["support_3d"] = data["low"].rolling(3).min()
@@ -101,7 +135,7 @@ def add_support_stats(data):
     return data
 
 
-def add_stages_stats(data):
+def add_stages_stats(data, technical_setting=None):
     data["stages_3d"]                   = stages(data, "resistance_3d", "support_3d", "average", with_eq=True)
     data["stages_5d"]                   = stages(data, "resistance_5d", "support_5d", "average", with_eq=True)
     data["stages_10d"]                  = stages(data, "resistance_10d", "support_10d", "average", with_eq=True)
@@ -120,7 +154,7 @@ def add_stages_stats(data):
 
     return data
 
-def add_cross_stats(data):
+def add_cross_stats(data, technical_setting=None):
     # クロス系
     data["average_cross"] = cross(data["average"], data["long_average"])
     data["macd_cross"] = cross(data["macd"], data["macdsignal"])
@@ -136,7 +170,7 @@ def add_cross_stats(data):
 
     return data
 
-def add_trend_stats(data):
+def add_trend_stats(data, technical_setting=None):
     # 気配を出力する
     data["average_gradient"]            = diff(data["average"])
     data["long_average_gradient"]       = diff(data["long_average"])
@@ -170,7 +204,7 @@ def add_trend_stats(data):
 
     return data
 
-def add_manda_stats(data):
+def add_manda_stats(data, technical_setting=None):
     data["pct_change"] = data["close"].pct_change()
     data["stock_split"]             = (data["pct_change"] < -0.45) * 1
     data["reverse_stock_split"]     = (data["pct_change"] > 2.0) * 1
@@ -192,9 +226,9 @@ def stop_low(data):
     gradient = current - before
     return -limit == gradient
 
-def add_stats(data, default=0, names=[]):
+def add_stats(data, default=0, names=[], technical_setting=None):
     is_t = lambda name : len(names) == 0 or name in names
-
+    setting = TechnicalSetting() if technical_setting is None else technical_setting
     stats = {
         "average": add_average_stats,
         "resistance": add_resistance_stats,
@@ -210,7 +244,7 @@ def add_stats(data, default=0, names=[]):
 
     for name in stats.keys():
         try:
-            data = stats[name](data) if is_t(name) else data
+            data = stats[name](data, setting) if is_t(name) else data
         except Exception as e:
             import traceback
             traceback.print_exc()
