@@ -109,9 +109,9 @@ class StrategySimulator:
             self.log("=== [closing] ===")
             for code in simulators.keys():
                 split_data = stocks[code].split(dates[0], dates[-1])
-                if len(split_data.daily) == 0:
+                if len(split_data.middle) == 0:
                     continue
-                self.log("[%s] closing: %s" % (code, split_data.daily["date"].iloc[-1]))
+                self.log("[%s] closing: %s" % (code, split_data.middle["date"].iloc[-1]))
                 simulators[code].force_closing(dates[-1], split_data)
         return simulators
 

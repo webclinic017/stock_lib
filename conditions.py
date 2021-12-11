@@ -2,18 +2,18 @@
 
 def selectable_data():
     data = {
-        "daily": lambda d: d.data.daily,
-        "nikkei": lambda d: d.index.data["nikkei"].daily,
-        "dow": lambda d: d.index.data["dow"].daily,
-        "new_score": lambda d: d.index.data["new_score"].daily,
-        "industry_score": lambda d: d.index.data["industry_score"].daily
-#        "usdjpy": data.index.data["usdjpy"].daily,
-#        "xbtusd": data.index.data["xbtusd"].daily
+        "middle": lambda d: d.data.middle,
+        "nikkei": lambda d: d.index.data["nikkei"].middle,
+        "dow": lambda d: d.index.data["dow"].middle,
+        "new_score": lambda d: d.index.data["new_score"].middle,
+        "industry_score": lambda d: d.index.data["industry_score"].middle
+#        "usdjpy": data.index.data["usdjpy"].middle,
+#        "xbtusd": data.index.data["xbtusd"].middle
     }
 
     return data
 
-def select(data, target="daily"):
+def select(data, target="middle"):
 
     d = selectable_data()
 
@@ -22,7 +22,7 @@ def select(data, target="daily"):
 
     raise Exception("unselectable: %s" % target)
 
-def average_conditions(legs=["daily"]):
+def average_conditions(legs=["middle"]):
     columns = ["average", "long_average"]
     targets = ["open", "high", "low", "close"]
 
@@ -42,7 +42,7 @@ def average_conditions(legs=["daily"]):
 
     return conditions
 
-def tec_conditions(legs=["daily"]):
+def tec_conditions(legs=["middle"]):
     columns = ["rci", "macd"]
     conditions = []
     for leg in legs:
@@ -75,7 +75,7 @@ def tec_conditions(legs=["daily"]):
         conditions = (conditions + macd) if "macd" in columns else conditions
     return conditions
 
-def band_conditions(legs=["daily"]):
+def band_conditions(legs=["middle"]):
     conditions = []
     for leg in legs:
         conditions = conditions + [
@@ -84,11 +84,11 @@ def band_conditions(legs=["daily"]):
         ]
     return conditions
 
-def safety_conditions(legs=["daily"]):
+def safety_conditions(legs=["middle"]):
     return [
     ]
 
-def stages_conditions(legs=["daily"]):
+def stages_conditions(legs=["middle"]):
     conditions = []
     for leg in legs:
         conditions = conditions + [
@@ -114,7 +114,7 @@ def stages_conditions(legs=["daily"]):
         ]
     return conditions
 
-def stages_sum_conditions(legs=["daily"]):
+def stages_sum_conditions(legs=["middle"]):
     conditions = []
     for leg in legs:
         conditions = conditions + [
@@ -146,7 +146,7 @@ def stages_sum_conditions(legs=["daily"]):
         ]
     return conditions
 
-def cross_conditions(legs=["daily"], additional_columns=[]):
+def cross_conditions(legs=["middle"], additional_columns=[]):
     columns = [
         "average_cross", "macd_cross", "rci_cross", "env12_cross", "env11_cross", "env09_cross", "env08_cross", "rising_safety_cross", "fall_safety_cross"
     ] + additional_columns
@@ -168,7 +168,7 @@ def cross_conditions(legs=["daily"], additional_columns=[]):
 
     return conditions
 
-def trend_conditions(legs=["daily"], additional_columns=[]):
+def trend_conditions(legs=["middle"], additional_columns=[]):
     columns = [
         "average_trend", "long_average_trend", "volume_average_trend", "macd_trend", "macdhist_trend",
         "rci_trend", "rci_long_trend", "stages_trend", "stages_average_trend", "rising_safety_trend", "fall_safety_trend"
@@ -191,7 +191,7 @@ def trend_conditions(legs=["daily"], additional_columns=[]):
 
     return conditions
 
-def cs_conditions(legs=["daily"], additional_columns=[]):
+def cs_conditions(legs=["middle"], additional_columns=[]):
     columns = [
         "yang_tsutsumi", "yang_harami", "lower_kenuki", "ake_mojo", "yin_sanku", "yin_sanpei",
         "yin_tsutsumi", "yin_harami", "upper_kenuki", "yoi_mojo", "yang_sanku", "yang_sanpei",
@@ -269,7 +269,7 @@ def trade_conditions():
         lambda d: d.stats.lose_streak() >= 3,
     ]
 
-def resistance_support_conditions(legs=["daily"]):
+def resistance_support_conditions(legs=["middle"]):
     conditions = []
     for leg in legs:
         conditions = conditions + [
@@ -295,7 +295,7 @@ def resistance_support_conditions(legs=["daily"]):
 def all():
     return average_conditions() + tec_conditions() + cross_conditions() + trend_conditions() + band_conditions() + stages_conditions() + cs_conditions()
 
-def all_with_index(targets=["daily", "nikkei", "dow", "usdjpy", "xbtusd"]):
+def all_with_index(targets=["middle", "nikkei", "dow", "usdjpy", "xbtusd"]):
     conditions = [
         average_conditions(targets),
         tec_conditions(targets),
@@ -308,7 +308,7 @@ def all_with_index(targets=["daily", "nikkei", "dow", "usdjpy", "xbtusd"]):
 
     return sum(conditions, [])
 
-def by_names(targets=["daily", "nikkei", "dow", "usdjpy", "xbtusd"], names=["all"]):
+def by_names(targets=["middle", "nikkei", "dow", "usdjpy", "xbtusd"], names=["all"]):
     conditions = []
     conditions_map = {}
     conditions_map["all"] = lambda: all_with_index(targets)

@@ -254,9 +254,9 @@ class AppliableData(Appliable):
 
 
 class SimulatorData:
-    def __init__(self, code, daily, rule):
+    def __init__(self, code, middle, rule):
         self.code = code
-        self.daily = daily
+        self.middle = middle
         self.rule = rule
 
     def split(self, start_date, end_date):
@@ -264,42 +264,42 @@ class SimulatorData:
         return data
 
     def split_from(self, start_date):
-        d = self.daily[self.daily["date"] >= start_date]
+        d = self.middle[self.middle["date"] >= start_date]
         return SimulatorData(self.code, d, self.rule)
 
     def split_to(self, end_date):
-        d = self.daily[self.daily["date"] <= end_date]
+        d = self.middle[self.middle["date"] <= end_date]
         return SimulatorData(self.code, d, self.rule)
 
     def split_until(self, end_date):
-        d = self.daily[self.daily["date"] < end_date]
+        d = self.middle[self.middle["date"] < end_date]
         return SimulatorData(self.code, d, self.rule)
 
     def dates(self, start_date, end_date):
-        d = self.daily[self.daily["date"] >= start_date]
+        d = self.middle[self.middle["date"] >= start_date]
         d = d[d["date"] <= end_date]
         dates = d["date"].copy().astype(str).values.tolist()
         return dates
 
     def at(self, date):
-        return SimulatorData(self.code, self.daily[self.daily["date"] == date], self.rule)
+        return SimulatorData(self.code, self.middle[self.middle["date"] == date], self.rule)
 
     def index(self, begin, end):
-        d = self.daily.iloc[begin:end]
+        d = self.middle.iloc[begin:end]
         return SimulatorData(self.code, d, self.rule)
 
     def create_empty(self, date):
-        data = pandas.DataFrame([[0] * len(self.daily.columns)], columns=self.daily.columns)
+        data = pandas.DataFrame([[0] * len(self.middle.columns)], columns=self.middle.columns)
         data["date"].iloc[0] = date
         data['date'] = pandas.to_datetime(data['date'], format='%Y-%m-%d')
-        return SimulatorData(self.code, pandas.DataFrame([[0] * len(self.daily.columns)], columns=self.daily.columns), self.rule)
+        return SimulatorData(self.code, pandas.DataFrame([[0] * len(self.middle.columns)], columns=self.middle.columns), self.rule)
 
 class SimulatorIndexData:
     def __init__(self, data):
         self.data = data
 
     def complement(self, data, date):
-        return data if len(data.daily) > 0 else data.create_empty(date)
+        return data if len(data.middle) > 0 else data.create_empty(date)
 
     def dates(self, start_date, end_date):
         dates = []
@@ -665,7 +665,7 @@ class SecuritiesComponySimulator(SecuritiesCompony):
         return results
 
     def create_appliable_data(self, data, index):
-        return AppliableData(data, index, self.position, self.total_assets(data.daily["close"].iloc[-1].item()), self.setting, self.stats)
+        return AppliableData(data, index, self.position, self.total_assets(data.middle["close"].iloc[-1].item()), self.setting, self.stats)
 
     # 総資産
     def total_assets(self, value):
@@ -741,7 +741,7 @@ class SecuritiesComponySimulator(SecuritiesCompony):
 
     # 強制手仕舞い(以降トレードしない)
     def force_closing(self, date, data):
-        low, high, value = data.daily["low"].iloc[-1], data.daily["high"].iloc[-1], data.daily["close"].iloc[-1]
+        low, high, value = data.middle["low"].iloc[-1], data.middle["high"].iloc[-1], data.middle["close"].iloc[-1]
         trade_data = self.stats.last()
         num = self.position.get_num()
         gain = self.position.gain(value, num)
@@ -917,7 +917,7 @@ class SecuritiesComponySimulator(SecuritiesCompony):
         return
 
     def open_trade(self, volume, data, trade_data):
-        price = data.daily["open"].iloc[-1].item()
+        price = data.middle["open"].iloc[-1].item()
         # 仮想トレードなら注文をキューから取得
 
         new_orders = []
@@ -930,7 +930,7 @@ class SecuritiesComponySimulator(SecuritiesCompony):
         return self.virtual_trade(data, new_orders, repay_orders, trade_data)
 
     def close_trade(self, volume, data, trade_data):
-        price = data.daily["close"].iloc[-1].item()
+        price = data.middle["close"].iloc[-1].item()
         # 仮想トレードなら注文をキューから取得
 
         new_orders = []
@@ -944,10 +944,10 @@ class SecuritiesComponySimulator(SecuritiesCompony):
         return self.virtual_trade(data, new_orders, repay_orders, trade_data)
 
     def intraday_trade(self, volume, data, trade_data):
-        price = data.daily["open"].iloc[-1].item()
+        price = data.middle["open"].iloc[-1].item()
         # 仮想トレードなら注文をキューから取得
-        low = data.daily["low"].iloc[-1]
-        high = data.daily["high"].iloc[-1]
+        low = data.middle["low"].iloc[-1]
+        high = data.middle["high"].iloc[-1]
 
         new_orders = []
         new_orders += self.limit_new_order(price, low, high, volume)
@@ -975,7 +975,7 @@ class SecuritiesComponySimulator(SecuritiesCompony):
                 trade_data["new"] = agreed_price
                 trade_data["order_type"] = order.order_type
                 trade_data["assets"]              = self.total_assets(agreed_price)
-                trade_data["min_assets"]          = self.total_assets(data.daily["high"].iloc[-1] if self.position.is_short() else data.daily["low"].iloc[-1])
+                trade_data["min_assets"]          = self.total_assets(data.middle["high"].iloc[-1] if self.position.is_short() else data.middle["low"].iloc[-1])
                 trade_data["unavailable_assets"]  = trade_data["assets"] - self.assets
                 trade_data["commission"]          = self.commission(agreed_price, order.num)
 
@@ -1046,11 +1046,11 @@ class SecuritiesComponySimulator(SecuritiesCompony):
 
         term_index = index.split_to(date)
 
-        today = term_data.at(date).daily
+        today = term_data.at(date).middle
 
         if len(today) == 0:
             self.log("less data: %s" % (date))
-            trade_data = self.create_trade_data(date, term_data.daily["low"].iloc[-1], term_data.daily["high"].iloc[-1], term_data.daily["close"].iloc[-1])
+            trade_data = self.create_trade_data(date, term_data.middle["low"].iloc[-1], term_data.middle["high"].iloc[-1], term_data.middle["close"].iloc[-1])
             self.stats.append(trade_data)
             return
 
@@ -1068,17 +1068,17 @@ class SecuritiesComponySimulator(SecuritiesCompony):
     def trade(self, strategy, price, volume, data, index):
         assert type(data) is SimulatorData, "data is not SimulatorData."
 
-        date = data.daily["date"].astype(str).iloc[-1]
+        date = data.middle["date"].astype(str).iloc[-1]
 
         # トレード履歴に直前のシグナルを反映
         self.apply_signal()
 
         # stats
-        trade_data = self.create_trade_data(date, data.daily["low"].iloc[-1], data.daily["high"].iloc[-1], price)
+        trade_data = self.create_trade_data(date, data.middle["low"].iloc[-1], data.middle["high"].iloc[-1], price)
 
         # 判断に必要なデータ数がない
-        if price == 0 or len(data.daily) < self.setting.min_data_length:
-            self.log("less data. skip trade. [%s - %s]. price: %s == 0 or length: %s < %s" % (data.daily["date"].iloc[0], date, price, len(data.daily), self.setting.min_data_length))
+        if price == 0 or len(data.middle) < self.setting.min_data_length:
+            self.log("less data. skip trade. [%s - %s]. price: %s == 0 or length: %s < %s" % (data.middle["date"].iloc[0], date, price, len(data.middle), self.setting.min_data_length))
             self.stats.append(trade_data)
             return
 
@@ -1088,7 +1088,7 @@ class SecuritiesComponySimulator(SecuritiesCompony):
         trade_data["term"] = self.position.get_term()
 
         # 損切の逆指値
-        self.auto_stop_loss(data.daily["close"].iloc[-2], self.position)
+        self.auto_stop_loss(data.middle["close"].iloc[-2], self.position)
 
         # 寄り付き====================================================================
         if self.setting.virtual_trade: # 注文の約定チェック
@@ -1101,13 +1101,13 @@ class SecuritiesComponySimulator(SecuritiesCompony):
         # トレード履歴に追加
         trade_data["contract_price"] = list(filter(lambda x: x is not None, [trade_data["new"], trade_data["repay"]]))
         trade_data["contract_price"] = None if len(trade_data["contract_price"]) == 0 else trade_data["contract_price"][0] * trade_data["size"] * self.setting.min_unit
-        trade_data["max_unrealized_gain"] = self.position.current_gain(data.daily["low"].iloc[-1] if self.position.is_short() else data.daily["high"].iloc[-1])
-        trade_data["unrealized_gain"] = self.position.current_gain(data.daily["close"].iloc[-1])
+        trade_data["max_unrealized_gain"] = self.position.current_gain(data.middle["low"].iloc[-1] if self.position.is_short() else data.middle["high"].iloc[-1])
+        trade_data["unrealized_gain"] = self.position.current_gain(data.middle["close"].iloc[-1])
         self.stats.append(trade_data)
 
         # 手仕舞い後はもう何もしない
         if self.force_stop:
-            self.log("force stopped. [%s - %s]" % (data.daily["date"].iloc[0], date))
+            self.log("force stopped. [%s - %s]" % (data.middle["date"].iloc[0], date))
             return
 
         # 注文を出す
@@ -1137,7 +1137,7 @@ class Simulator(SecuritiesComponySimulator):
     def new_signals(self, strategy, data, index):
         signal = None
         for order in self.new_signal(strategy, data, index):
-            price = data.daily["close"].iloc[-1] if order.price is None else order.price
+            price = data.middle["close"].iloc[-1] if order.price is None else order.price
             # 成り行き注文なら値幅の上限を基準にcostを計算する
             price = price + self.price_limit(price)[1] if order.is_market() else price
             cost = self.position.eval(price, order.num)

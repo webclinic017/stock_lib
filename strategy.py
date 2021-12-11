@@ -429,13 +429,13 @@ class StrategyUtil:
         return all(common)
 
     def price(self, data):
-        return data.data.daily["close"].iloc[-1]
+        return data.data.middle["close"].iloc[-1]
 
     def max_gain(self, data):
         if data.setting.short_trade:
-            max_gain = data.position.gain(data.data.daily["low"].iloc[-data.position.get_term():].min(), data.position.get_num())
+            max_gain = data.position.gain(data.data.middle["low"].iloc[-data.position.get_term():].min(), data.position.get_num())
         else:
-            max_gain = data.position.gain(data.data.daily["high"].iloc[-data.position.get_term():].max(), data.position.get_num())
+            max_gain = data.position.gain(data.data.middle["high"].iloc[-data.position.get_term():].max(), data.position.get_num())
         return max_gain
 
     # 最大許容損失
@@ -446,12 +446,12 @@ class StrategyUtil:
     def goal(self, data):
         order = data.position.get_num() # 現在の保有数
         if data.setting.short_trade:
-            price = data.data.daily["low"].iloc[-1]
-            line = data.data.daily["support"].iloc[-1]
+            price = data.data.middle["low"].iloc[-1]
+            line = data.data.middle["support"].iloc[-1]
             goal = (price - line)
         else:
-            price = data.data.daily["high"].iloc[-1]
-            line = data.data.daily["resistance"].iloc[-1]
+            price = data.data.middle["high"].iloc[-1]
+            line = data.data.middle["resistance"].iloc[-1]
             goal = (line - price)
 
         goal = 0 if goal < 0 else goal * (order + 1)
@@ -477,13 +477,13 @@ class StrategyUtil:
 
     # 上限
     def upper(self, data, term=1):
-        upper = data.data.daily["resistance"].iloc[-term]
+        upper = data.data.middle["resistance"].iloc[-term]
 
         return upper
 
     # 下限
     def lower(self, data, term=1):
-        lower= data.data.daily["support"].iloc[-term]
+        lower= data.data.middle["support"].iloc[-term]
 
         return lower
 
@@ -517,9 +517,9 @@ class StrategyUtil:
 
     def safety(self, data, term):
         if data.setting.short_trade:
-            return data.data.daily["fall_safety"].iloc[-term]
+            return data.data.middle["fall_safety"].iloc[-term]
         else:
-            return data.data.daily["rising_safety"].iloc[-term]
+            return data.data.middle["rising_safety"].iloc[-term]
 
     def term(self, data):
         return 1 if data.position.get_term()  == 0 else data.position.get_term()
@@ -808,7 +808,7 @@ class CombinationCreator(StrategyCreator, StrategyUtil):
                 size_map[key] = CombinationSetting().condition_size # default
         return size_map
 
-    def conditions_by_seed(self, seed, targets=["daily", "nikkei", "dow"], names=["all"]):
+    def conditions_by_seed(self, seed, targets=["middle", "nikkei", "dow"], names=["all"]):
         random.seed(seed)
         numpy.random.seed(seed)
 

@@ -45,7 +45,7 @@ class CombinationStrategy(CombinationCreator):
         random.seed(seed)
         numpy.random.seed(seed)
 
-        targets = ["daily", "nikkei", "dow"]
+        targets = ["middle", "nikkei", "dow"]
         self.conditions_all         = conditions.all_with_index(targets)
 
         new, self.new_conditions               = self.choice(self.conditions_all, self.setting.condition_size, self.apply_weights("new"))
@@ -63,8 +63,8 @@ class CombinationStrategy(CombinationCreator):
 
     def break_precondition(self, d):
         conditions = [
-            d.data.daily["high_update"][-2:].max() == 0 and (d.position.gain(self.price(d), d.position.get_num()) <= 0 or sum(d.stats.gain()) <= 0) and d.position.get_num() >= 0,
-            d.data.daily["high_update"][-10:].sum() <= 5
+            d.data.middle["high_update"][-2:].max() == 0 and (d.position.gain(self.price(d), d.position.get_num()) <= 0 or sum(d.stats.gain()) <= 0) and d.position.get_num() >= 0,
+            d.data.middle["high_update"][-10:].sum() <= 5
         ]
 
         return any(conditions)
@@ -72,8 +72,8 @@ class CombinationStrategy(CombinationCreator):
     def common(self, setting):
         default = self.default_common()
         default.new = [
-            lambda d: d.index.data["new_score"].daily["score"].iloc[-1] > -400,
-            lambda d: d.data.daily["stop_low"].iloc[-1] == 0,
+            lambda d: d.index.data["new_score"].middle["score"].iloc[-1] > -400,
+            lambda d: d.data.middle["stop_low"].iloc[-1] == 0,
             lambda d: not self.break_precondition(d)
         ]
 

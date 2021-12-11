@@ -168,13 +168,13 @@ class Loader:
 
     @staticmethod
     def load_stock_tick_ohlc(code, start_date, end_date, rule="5T", time=None):
-        daily = Loader.load(code, start_date, end_date)
+        data = Loader.load(code, start_date, end_date)
         columns = ["code", "date", "time", "price", "volume"]
         columns_dict = {}
         for column in columns:
             columns_dict[column] = []
 
-        for i, row in daily.iterrows():
+        for i, row in data.iterrows():
             for column, d in zip(columns, ["%s0" % code, utils.format(str(row["date"]), input_format="%Y-%m-%d %H:%M:%S", output_format="%Y%m%d"), 90000000000, row["open"], 0]):
                 columns_dict[column].append(d)
             for column, d in zip(columns, ["%s0" % code, utils.format(str(row["date"]), input_format="%Y-%m-%d %H:%M:%S", output_format="%Y%m%d"), 150000000000, row["close"], None]):

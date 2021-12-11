@@ -41,7 +41,7 @@ class CombinationStrategy(CombinationCreator):
         return codes
 
     def conditions_by_seed(self, seed):
-        targets = ["daily", "nikkei", "dow"]
+        targets = ["middle", "nikkei", "dow"]
         names = ["industry_score"]
         super().conditions_by_seed(seed, targets, names)
 

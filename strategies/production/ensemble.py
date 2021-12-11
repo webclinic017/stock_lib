@@ -41,7 +41,7 @@ class CombinationStrategy(CombinationCreator):
     def common(self, setting):
         default = self.default_common()
         default.new = [
-            lambda d: d.data.daily["rci"].iloc[-1] > d.data.daily["rci_long"].iloc[-1]
+            lambda d: d.data.middle["rci"].iloc[-1] > d.data.middle["rci_long"].iloc[-1]
         ]
         return default
 
