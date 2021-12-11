@@ -10,7 +10,10 @@ import cache
 import utils
 import strategy
 from loader import Loader
-from simulator import Simulator, SimulatorStats
+from simulator import SimulatorStats
+
+from rakuten import RakutenSimulator as Simulator
+from rakuten import Rakuten as SecuritiesCompony
 
 class StrategySimulator:
     def __init__(self, simulator_setting, combination_setting, strategy_settings, verbose=False):
@@ -286,8 +289,7 @@ class StrategySimulator:
         min_assets = list(map(lambda x: self.simulator_setting.assets + x, min_assets))
         sum_contract_price = list(map(lambda x: x[1].sum_contract_price(), stats.items()))
         agg_contract_price = self.agg(stats, "contract_price", proc=lambda x: 0 if x is None else x).values()
-        import rakuten
-        oneday_commission = list(map(lambda x: rakuten.oneday_commission(x), agg_contract_price))
+        oneday_commission = list(map(lambda x: SecuritiesCompony().oneday_commission(x), agg_contract_price))
         interest = list(map(lambda x: int(x * 0.028 / 365), unavailable_assets))
         auto_stop_loss = list(map(lambda x: len(x.auto_stop_loss()), stats.values()))
         win_auto_stop_loss = list(map(lambda x: len(x.win_auto_stop_loss()), stats.values()))

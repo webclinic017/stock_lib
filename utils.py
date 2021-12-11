@@ -644,8 +644,8 @@ def price_limit(price):
     return price_range
 
 def price_limit_with_index(price):
-    import rakuten
-    return rakuten.price_limit(price)
+    from rakuten import Rakuten
+    return Rakuten().price_limit(price)
 
 # date util =======================================
 def timestamp():

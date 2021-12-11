@@ -307,6 +307,8 @@ def add_stats(code, data, rule, names=[], technical_setting=None):
         return SimulatorData(code, data, rule)
     except Exception as e:
         print(code, "load_error: %s" % e)
+        import traceback
+        traceback.print_exc()
         return None
 
 # create ================================================
