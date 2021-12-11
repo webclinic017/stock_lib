@@ -270,7 +270,6 @@ def load_strategy_by_option(args, is_short):
     return load_strategy_creator(args, combination_setting).create(settings)
 
 def load_simulator_data(code, start_date, end_date, args, names=[], technical_setting=None):
-    rule = "D"
     start = utils.to_format(utils.to_datetime(start_date) - utils.relativeterm(12))
     data = Loader.load_by_code(code, start, end_date)
 
@@ -278,7 +277,7 @@ def load_simulator_data(code, start_date, end_date, args, names=[], technical_se
         print("%s: %s is None" % (start_date, code))
         return None
 
-    simulator_data = add_stats(code, data, rule, names, technical_setting)
+    simulator_data = add_stats(code, data, names, technical_setting)
     if args.verbose:
         print("loaded:", utils.timestamp(), code, data["date"].iloc[0], data["date"].iloc[-1])
     else:
@@ -291,20 +290,20 @@ def load_index(args, start_date, end_date):
 
     for k in ["nikkei", "dow"]:
         d = Loader.load_index(k, start, end_date, with_filter=True, strict=False)
-        d = add_stats(k, d, "D")
+        d = add_stats(k, d)
         index[k] = d
 
-    index["new_score"] = SimulatorData("new_score", Loader.new_score(), "D")
-    index["industry_score"] = SimulatorData("industry_score", Loader.industry_trend(), "D")
-    index["high_update_score"] = SimulatorData("high_update_score", Loader.high_update_score(), "D")
+    index["new_score"] = SimulatorData("new_score", Loader.new_score())
+    index["industry_score"] = SimulatorData("industry_score", Loader.industry_trend())
+    index["high_update_score"] = SimulatorData("high_update_score", Loader.high_update_score())
 
     return SimulatorIndexData(index)
 
-def add_stats(code, data, rule, names=[], technical_setting=None):
+def add_stats(code, data, names=[], technical_setting=None):
     try:
         data = utils.add_stats(data, names=names, technical_setting=technical_setting)
         data = utils.add_cs_stats(data)
-        return SimulatorData(code, data, rule)
+        return SimulatorData(code, data)
     except Exception as e:
         print(code, "load_error: %s" % e)
         import traceback

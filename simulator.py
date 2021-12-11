@@ -254,10 +254,9 @@ class AppliableData(Appliable):
 
 
 class SimulatorData:
-    def __init__(self, code, middle, rule):
+    def __init__(self, code, middle):
         self.code = code
         self.middle = middle
-        self.rule = rule
 
     def split(self, start_date, end_date):
         data = self.split_from(start_date).split_to(end_date)
@@ -265,15 +264,15 @@ class SimulatorData:
 
     def split_from(self, start_date):
         d = self.middle[self.middle["date"] >= start_date]
-        return SimulatorData(self.code, d, self.rule)
+        return SimulatorData(self.code, d)
 
     def split_to(self, end_date):
         d = self.middle[self.middle["date"] <= end_date]
-        return SimulatorData(self.code, d, self.rule)
+        return SimulatorData(self.code, d)
 
     def split_until(self, end_date):
         d = self.middle[self.middle["date"] < end_date]
-        return SimulatorData(self.code, d, self.rule)
+        return SimulatorData(self.code, d)
 
     def dates(self, start_date, end_date):
         d = self.middle[self.middle["date"] >= start_date]
@@ -282,17 +281,17 @@ class SimulatorData:
         return dates
 
     def at(self, date):
-        return SimulatorData(self.code, self.middle[self.middle["date"] == date], self.rule)
+        return SimulatorData(self.code, self.middle[self.middle["date"] == date])
 
     def index(self, begin, end):
         d = self.middle.iloc[begin:end]
-        return SimulatorData(self.code, d, self.rule)
+        return SimulatorData(self.code, d)
 
     def create_empty(self, date):
         data = pandas.DataFrame([[0] * len(self.middle.columns)], columns=self.middle.columns)
         data["date"].iloc[0] = date
         data['date'] = pandas.to_datetime(data['date'], format='%Y-%m-%d')
-        return SimulatorData(self.code, pandas.DataFrame([[0] * len(self.middle.columns)], columns=self.middle.columns), self.rule)
+        return SimulatorData(self.code, pandas.DataFrame([[0] * len(self.middle.columns)], columns=self.middle.columns))
 
 class SimulatorIndexData:
     def __init__(self, data):
