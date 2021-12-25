@@ -3,6 +3,7 @@
 def selectable_data():
     data = {
         "middle": lambda d: d.data.middle,
+        "short": lambda d: d.data.short,
         "nikkei": lambda d: d.index.data["nikkei"].middle,
         "dow": lambda d: d.index.data["dow"].middle,
         "new_score": lambda d: d.index.data["new_score"].middle,
@@ -311,15 +312,16 @@ def all_with_index(targets=["middle", "nikkei", "dow", "usdjpy", "xbtusd"]):
 def by_names(targets=["middle", "nikkei", "dow", "usdjpy", "xbtusd"], names=["all"]):
     conditions = []
     conditions_map = {}
-    conditions_map["all"] = lambda: all_with_index(targets)
-    conditions_map["industry_score"] = lambda: all_with_index(targets) + industry_score_conditions()
-    conditions_map["stages_sum"] = lambda: all_with_index(targets) + industry_score_conditions() + stages_sum_conditions(),
-    conditions_map["2021-06-12"] = (lambda: average_conditions(targets) + tec_conditions(targets) + cross_conditions(targets)
-            + trend_conditions(targets, additional_columns=["stages_sum_trend", "stages_sum_average_trend", "stages_sum_average_long_trend"])
-            + band_conditions(targets) + stages_conditions(targets) + cs_conditions(targets) + industry_score_conditions() + stages_sum_conditions(targets) + new_score_conditions())
-    conditions_map["2021-11-13"] = lambda: conditions_map["2021-06-12"]() + resistance_support_conditions()
+    conditions_map["all"] = lambda t: all_with_index(t)
+    conditions_map["industry_score"] = lambda t: all_with_index(t) + industry_score_conditions()
+    conditions_map["stages_sum"] = lambda t: all_with_index(t) + industry_score_conditions() + stages_sum_conditions(),
+    conditions_map["2021-06-12"] = (lambda t: average_conditions(t) + tec_conditions(t) + cross_conditions(t)
+            + trend_conditions(t, additional_columns=["stages_sum_trend", "stages_sum_average_trend", "stages_sum_average_long_trend"])
+            + band_conditions(t) + stages_conditions(t) + cs_conditions(t) + industry_score_conditions() + stages_sum_conditions(t) + new_score_conditions())
+    conditions_map["2021-11-13"] = lambda t: conditions_map["2021-06-12"](t) + resistance_support_conditions()
+    conditions_map["2021-12-12"] = lambda t: conditions_map["2021-11-13"](t+["short"])
 
     for name in conditions_map.keys():
-        conditions = (conditions + conditions_map[name]()) if name in names else conditions
+        conditions = (conditions + conditions_map[name](targets)) if name in names else conditions
 
     return conditions

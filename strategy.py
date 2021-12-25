@@ -27,6 +27,7 @@ def add_options(parser):
     parser.add_argument("-v", action="store_true", default=False, dest="verbose", help="debug log")
     parser.add_argument("--code", type=str, action="store", default=None, dest="code", help="code")
     parser.add_argument("--setting_dir", type=str, action="store", default=None, dest="setting_dir", help="")
+    parser.add_argument("--use_setting", type=str, action="store", default=None, dest="use_setting", help="")
     parser.add_argument("--use_limit", action="store_true", default=False, dest="use_limit", help="指値を使う")
     parser.add_argument("--position_sizing", action="store_true", default=False, dest="position_sizing", help="ポジションサイジング")
     parser.add_argument("--max_position_size", action="store", default=None, dest="max_position_size", help="最大ポジションサイズ")
@@ -82,11 +83,11 @@ def create_prefix(args, is_production, is_short):
 
 def get_filename(args):
     prefix = get_prefix(args)
-    filename = create_filename(prefix)
+    if args.use_setting is None:
+        filename = "%ssimulate_setting.json" % prefix
+    else:
+        filename = args.use_setting
     return filename
-
-def create_filename(prefix):
-    return "%ssimulate_setting.json" % prefix
 
 class StrategyType:
     ENSEMBLE="ensemble"
@@ -263,13 +264,7 @@ def load_strategy(args, combination_setting=None):
     _, settings = load_strategy_setting(args)
     return load_strategy_creator(args, combination_setting).create(settings)
 
-def load_strategy_by_option(args, is_short):
-    filename = create_filename(create_prefix(args, is_production=args.production, is_short=is_short))
-    setting_dict, settings = load_strategy_setting_by_filename(filename, args.setting_dir)
-    combination_setting = create_combination_setting_by_dict(args, setting_dict)
-    return load_strategy_creator(args, combination_setting).create(settings)
-
-def load_simulator_data(code, start_date, end_date, args, names=[], technical_setting=None):
+def load_simulator_data(code, start_date, end_date, args, names=[]):
     start = utils.to_format(utils.to_datetime(start_date) - utils.relativeterm(12))
     data = Loader.load_by_code(code, start, end_date)
 
@@ -277,7 +272,7 @@ def load_simulator_data(code, start_date, end_date, args, names=[], technical_se
         print("%s: %s is None" % (start_date, code))
         return None
 
-    simulator_data = add_stats(code, data, names, technical_setting)
+    simulator_data = add_stats(code, data, names)
     if args.verbose:
         print("loaded:", utils.timestamp(), code, data["date"].iloc[0], data["date"].iloc[-1])
     else:
@@ -299,11 +294,13 @@ def load_index(args, start_date, end_date):
 
     return SimulatorIndexData(index)
 
-def add_stats(code, data, names=[], technical_setting=None):
+def add_stats(code, data, names=[]):
     try:
-        data = utils.add_stats(data, names=names, technical_setting=technical_setting)
-        data = utils.add_cs_stats(data)
-        return SimulatorData(code, data)
+        middle = utils.add_stats(data.copy(), names=names)
+        middle = utils.add_cs_stats(middle)
+        short = utils.add_stats(data, names=names, technical_setting=utils.ShortTechnicalSetting())
+        short = utils.add_cs_stats(short)
+        return SimulatorData(code, middle, short=short)
     except Exception as e:
         print(code, "load_error: %s" % e)
         import traceback

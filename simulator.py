@@ -12,7 +12,7 @@ from itertools import groupby
 # 売買の状態
 class Position:
     METHOD_LONG = "long"
-    METHOD_short = "short"
+    METHOD_SHORT = "short"
 
     SYSTEM_ACTUAL = "actual"
     SYSTEM_CREDIT = "credit"
@@ -252,46 +252,92 @@ class AppliableData(Appliable):
     def at(self, date):
         return AppliableData(self.data.at(date), self.index.at(date), self.position, self.assets, self.setting, self.stats)
 
-
-class SimulatorData:
-    def __init__(self, code, middle):
-        self.code = code
-        self.middle = middle
+class SimulatorTermData:
+    def __init__(self, data):
+        self.data = pandas.DataFrame([[""]], columns=["date"]) if data is None else data
 
     def split(self, start_date, end_date):
         data = self.split_from(start_date).split_to(end_date)
         return data
 
     def split_from(self, start_date):
-        d = self.middle[self.middle["date"] >= start_date]
-        return SimulatorData(self.code, d)
+        d = self.data[self.data["date"] >= start_date]
+        return SimulatorTermData(d)
 
     def split_to(self, end_date):
-        d = self.middle[self.middle["date"] <= end_date]
-        return SimulatorData(self.code, d)
+        d = self.data[self.data["date"] <= end_date]
+        return SimulatorTermData(d)
 
     def split_until(self, end_date):
-        d = self.middle[self.middle["date"] < end_date]
-        return SimulatorData(self.code, d)
+        d = self.data[self.data["date"] < end_date]
+        return SimulatorTermData(d)
 
     def dates(self, start_date, end_date):
-        d = self.middle[self.middle["date"] >= start_date]
+        d = self.data[self.data["date"] >= start_date]
         d = d[d["date"] <= end_date]
         dates = d["date"].copy().astype(str).values.tolist()
         return dates
 
     def at(self, date):
-        return SimulatorData(self.code, self.middle[self.middle["date"] == date])
+        return SimulatorTermData(self.data[self.data["date"] == date])
 
     def index(self, begin, end):
-        d = self.middle.iloc[begin:end]
-        return SimulatorData(self.code, d)
+        d = self.data.iloc[begin:end]
+        return SimulatorTermData(d)
 
     def create_empty(self, date):
-        data = pandas.DataFrame([[0] * len(self.middle.columns)], columns=self.middle.columns)
+        data = pandas.DataFrame([[0] * len(self.data.columns)], columns=self.data.columns)
         data["date"].iloc[0] = date
         data['date'] = pandas.to_datetime(data['date'], format='%Y-%m-%d')
-        return SimulatorData(self.code, pandas.DataFrame([[0] * len(self.middle.columns)], columns=self.middle.columns))
+        return SimulatorTermData(pandas.DataFrame([[0] * len(self.data.columns)], columns=self.data.columns))
+
+class SimulatorData:
+    def __init__(self, code, middle, short=None):
+        self.code = code
+        self.middle = middle
+        self.short = short
+
+    def split(self, start_date, end_date):
+        return self.split_from(start_date).split_to(end_date)
+
+    def split_from(self, start_date):
+        return SimulatorData(self.code,
+            SimulatorTermData(self.middle).split_from(start_date).data,
+            SimulatorTermData(self.short).split_from(start_date).data
+        )
+
+    def split_to(self, end_date):
+        return SimulatorData(self.code,
+            SimulatorTermData(self.middle).split_to(end_date).data,
+            SimulatorTermData(self.short).split_to(end_date).data
+        )
+
+    def split_until(self, end_date):
+        return SimulatorData(self.code,
+            SimulatorTermData(self.middle).split_until(end_date).data,
+            SimulatorTermData(self.short).split_until(end_date).data
+        )
+
+    def dates(self, start_date, end_date):
+        return SimulatorTermData(self.middle).dates(start_date, end_date)
+
+    def at(self, date):
+        return SimulatorData(self.code,
+            SimulatorTermData(self.middle).at(date).data,
+            SimulatorTermData(self.short).at(date).data
+        )
+
+    def index(self, begin, end):
+        return SimulatorData(self.code,
+            SimulatorTermData(self.middle).index(begin, end).data,
+            SimulatorTermData(self.short).index(begin, end).data
+        )
+
+    def create_empty(self, date):
+        return SimulatorData(self.code,
+            SimulatorTermData(self.middle).create_empty(date).data,
+            SimulatorTermData(self.short).create_empty(date).data
+        )
 
 class SimulatorIndexData:
     def __init__(self, data):
