@@ -329,6 +329,7 @@ def ensemble_files(directory):
 def create_combination_setting(args, use_json=True):
     combination_setting = create_combination_setting_by_json(args) if use_json else apply_assets(args, CombinationSetting())
     combination_setting.use_limit = args.use_limit if args.use_limit else combination_setting.use_limit
+    combination_setting.montecarlo = args.montecarlo if args.montecarlo else combination_setting.montecarlo
     combination_setting.position_sizing = args.position_sizing if args.position_sizing else combination_setting.position_sizing
     combination_setting.max_position_size = combination_setting.max_position_size if args.max_position_size is None else int(args.max_position_size)
     combination_setting.max_leverage = combination_setting.max_leverage if args.max_leverage is None else int(args.max_leverage)
