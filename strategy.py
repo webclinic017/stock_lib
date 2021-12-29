@@ -47,6 +47,7 @@ def add_options(parser):
     parser.add_argument("--appliable_signal", type=str, action="store", default=None, dest="appliable_signal", help="設定を適用可能なシグナルリスト")
     parser.add_argument("--portfolio", type=str, action="store", default=None, dest="portfolio", help="ポートフォリオ")
     parser.add_argument("--portfolio_size", type=int, action="store", default=None, dest="portfolio_size", help="ポートフォリオの銘柄数")
+    parser.add_argument("--montecarlo", action="store_true", default=False, dest="montecarlo", help="ランダム取引")
 
     # strategy
     parser.add_argument("--ensemble_dir", action="store", default=None, dest="ensemble_dir", help="アンサンブルディレクトリ")
