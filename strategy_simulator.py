@@ -297,12 +297,13 @@ class StrategySimulator:
         drawdown = list(map(lambda x: x.drawdown(), stats.values()))
         drawdown = numpy.array(drawdown).T
         max_unrealized_gain = list(map(lambda x: max(x) if len(x) > 0 else 0, self.stats.unrealized_gain()))
+        min_unrealized_gain = list(map(lambda x: min(x) if len(x) > 0 else 0, self.stats.unrealized_gain()))
         crash = sum(list(map(lambda x: x.crash(), stats.values())), [])
 
         if self.verbose:
             print(start_date, end_date, "assets:", self.simulator_setting.assets, "gain:", gain, sum(gain))
             for code, s in sorted(stats.items(), key=lambda x: sum(x[1].gain())):
-                print("[%s] return: %s, unrealized:%s, drawdown: %s, trade: %s, win: %s, term: %s" % (code, sum(s.gain()), s.max_unrealized_gain(), s.max_drawdown(), s.trade_num(), s.win_trade_num(), s.max_term()))
+                print("[%s] return: %s, unrealized:%s, drawdown: %s, trade: %s, win: %s, term: %s" % (code, sum(s.gain()), s.min_unrealized_gain(), s.max_drawdown(), s.trade_num(), s.win_trade_num(), s.max_term()))
 
         s = stats.values()
         results = {
@@ -332,6 +333,7 @@ class StrategySimulator:
             "win_auto_stop_loss": sum(win_auto_stop_loss) if len(s) > 0 else 0,
             "lose_auto_stop_loss": sum(lose_auto_stop_loss) if len(s) > 0 else 0,
             "max_unrealized_gain": max(max_unrealized_gain) if len(max_unrealized_gain) > 0 else 0,
+            "min_unrealized_gain": min(min_unrealized_gain) if len(min_unrealized_gain) > 0 else 0,
             "crash": min(crash) if len(crash) > 0 else 0,
         }
 
