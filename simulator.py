@@ -535,6 +535,10 @@ class SimulatorStats:
         max_unrealized_gain = list(map(lambda x: max(x) if len(x) > 0 else 0, self.unrealized_gain(split_condition)))
         return 0 if len(max_unrealized_gain) == 0 else max(max_unrealized_gain)
 
+    def min_unrealized_gain(self, split_condition = None):
+        min_unrealized_gain = list(map(lambda x: min(x) if len(x) > 0 else 0, self.unrealized_gain(split_condition)))
+        return 0 if len(min_unrealized_gain) == 0 else min(min_unrealized_gain)
+
     def gain_rate(self):
         return list(filter(lambda x: x is not None, map(lambda x: x["gain_rate"], self.trade_history)))
 
