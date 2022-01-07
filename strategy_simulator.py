@@ -218,7 +218,7 @@ class StrategySimulator:
             self.stats.append(stats)
 
             stats, simulators = self.closing(stats, simulators)
-            self.log("gain: %s, %s" % (stats["unrealized_gain"], stats["gain"]))
+            self.log("gain: %s, %s, %s" % (stats["unrealized_gain"], stats["gain"], capacity+binding))
 
         # 手仕舞い
         if with_closing:
@@ -277,7 +277,7 @@ class StrategySimulator:
         lose = list(filter(lambda x: sum(x[1].gain_rate()) < 0, stats.items()))
         win_codes = list(map(lambda x: x[0], wins))
         lose_codes = list(map(lambda x: x[0], lose))
-        codes = win_codes + lose_codes
+        codes = list(stats.keys())
         commission = list(map(lambda x: sum(x[1].commission()), stats.items()))
         gain = list(map(lambda x: sum(x[1].gain()), stats.items()))
         position_size = self.agg(stats, "size").values()
