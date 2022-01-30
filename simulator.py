@@ -688,9 +688,8 @@ class SecuritiesComponySimulator(SecuritiesCompony):
         method = Position.METHOD_SHORT if setting.short_trade else Position.METHOD_LONG
         self.position = position if position is not None else Position(system=system, method=method, min_unit=setting.min_unit)
         self.setting = setting
-        self.leverage = 3.33 # 要調整
         self.assets = setting.assets
-        self.update_deposit(self.assets)
+        self.capacity = setting.assets * 3.33 # 要調整
         self.binding = 0 # 拘束資産（注文中）
         self.unbound = 0 # 解放された資産（約定↓痔）
         self.stats = SimulatorStats()
@@ -717,16 +716,10 @@ class SecuritiesComponySimulator(SecuritiesCompony):
     def create_appliable_data(self, data, index):
         return AppliableData(data, index, self.position, self.total_assets(data.middle["close"].iloc[-1].item()), self.setting, self.stats)
 
-    def update_deposit(self, deposit):
-        self.deposit = deposit
-        self.capacity = self.deposit * self.leverage
-
     # 総資産
     def total_assets(self, value):
-        return self.assets + self.unavailable_assets(value)
-
-    def unavailable_assets(self, value):
-        return self.position.cost(value, self.position.get_num())
+        holdings = self.position.cost(value, self.position.get_num())
+        return self.assets + holdings
 
     def total_capacity(self):
         total = self.capacity - self.total_binding()
@@ -738,7 +731,6 @@ class SecuritiesComponySimulator(SecuritiesCompony):
     def order_binding(self):
         return sum(list(map(lambda x: x.binding, self.new_orders.get())))
 
-    # TODO 利用ないかも
     def get_stats(self): 
         stats = dict()
         stats["assets"] = int(self.assets)
@@ -773,8 +765,7 @@ class SecuritiesComponySimulator(SecuritiesCompony):
         cost = self.position.new(num, value)
         commission = self.commission(value, num)
         self.assets -= cost
-#        self.capacity -= cost
-        self.update_deposit(self.deposit - int(cost / self.leverage))
+        self.capacity -= cost
 
         self.log("[%s] new: %s yen x %s, total %s, ave %s, assets %s, cost %s, commission %s" % (self.position.method, value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost, commission))
 
@@ -792,10 +783,7 @@ class SecuritiesComponySimulator(SecuritiesCompony):
         term = self.position.get_term()
         cost = self.position.repay(num, value)
         self.assets += cost
-#        self.capacity += cost
-        # 実際の損益はレバレッジ関係なく直接assetsに反映
-        # cost / leverageだと実際の損益の1/3が反映されてしまうのでその分を引く
-        self.update_deposit(self.deposit + int(cost / self.leverage) + gain - int(gain / self.leverage))
+        self.capacity += cost
 
         self.log("[%s] repay: %s yen x %s, total %s, ave %s, assets %s, cost %s, commission %s, term %s : gain %s" % (self.position.method, value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost, commission, term, gain))
         return True
@@ -1037,7 +1025,7 @@ class SecuritiesComponySimulator(SecuritiesCompony):
                 trade_data["order_type"] = order.order_type
                 trade_data["assets"]              = self.total_assets(agreed_price)
                 trade_data["min_assets"]          = self.total_assets(data.middle["high"].iloc[-1] if self.position.is_short() else data.middle["low"].iloc[-1])
-                trade_data["unavailable_assets"]  = self.unavailable_assets(agreed_price)
+                trade_data["unavailable_assets"]  = trade_data["assets"] - self.assets
                 trade_data["commission"]          = self.commission(agreed_price, order.num)
 
         # 返済注文実行
@@ -1055,7 +1043,7 @@ class SecuritiesComponySimulator(SecuritiesCompony):
                 trade_data["gain_rate"] = gain_rate
                 trade_data["order_type"] = order.order_type
                 trade_data["assets"]              = self.total_assets(agreed_price)
-                trade_data["unavailable_assets"]  = self.unavailable_assets(agreed_price)
+                trade_data["unavailable_assets"]  = trade_data["assets"] - self.assets
                 trade_data["commission"]          = commission
 
         return trade_data
@@ -1067,7 +1055,7 @@ class SecuritiesComponySimulator(SecuritiesCompony):
         trade_data["date"]                = date
         trade_data["assets"]              = self.total_assets(price)
         trade_data["min_assets"]          = self.total_assets(high if self.position.is_short() else low)
-        trade_data["unavailable_assets"]  = self.unavailable_assets(price)
+        trade_data["unavailable_assets"]  = trade_data["assets"] - self.assets
         return trade_data
 
     def apply_signal(self):
@@ -1085,6 +1073,23 @@ class SecuritiesComponySimulator(SecuritiesCompony):
         self.new_orders.increment_term()
         self.repay_orders.increment_term()
 
+    def simulate(self, dates, data, index={}):
+        assert type(data) is SimulatorData, "data is not SimulatorData."
+
+        print(dates)
+        for date in dates:
+            self.simulate_by_date(date, data, index)
+
+        # 統計取得のために全部手仕舞う
+        self.force_closing(dates[-1], data)
+
+        stats = self.get_stats()
+
+        self.log("result assets: %s" % stats["assets"])
+
+        return stats
+
+    # 高速化
     def simulate_by_date(self, date, data, index={}):
         term_data = data.split_to(date)
 
@@ -1103,8 +1108,8 @@ class SecuritiesComponySimulator(SecuritiesCompony):
         price = today["open"].item() # 約定価格
         num = self.position.get_num()
         volume = None if self.setting.ignore_volume else math.ceil(today["volume"].item() * 10)
-        self.log("date: %s, price: %s, volume: %s, ave: %.2f, hold: %s, deposit: %s, assets: %s, capacity: %d, binding: %d, gain : %.2f"
-            % (date, price, volume, self.position.get_value(), num, self.deposit, self.assets ,self.capacity, self.total_binding(), self.position.gain(price, num)))
+        self.log("date: %s, price: %s, volume: %s, ave: %.2f, hold: %s, capacity: %d, binding: %d, gain : %.2f"
+            % (date, price, volume, self.position.get_value(), num, self.capacity, self.total_binding(), self.position.gain(price, num)))
 
         self.trade(self.setting.strategy, price, volume, term_data, term_index)
 
