@@ -360,7 +360,7 @@ class Loader:
     @staticmethod
     def small_stocks():
         try:
-            data = pandas.read_csv('settings/high_performance_stocks.csv', header=None)
+            data = pandas.read_csv('settings/small_stocks.csv', header=None)
             data.columns = ['code']
         except:
             data = None
@@ -451,15 +451,6 @@ class Loader:
         return data
 
     @staticmethod
-    def new_high_stocks():
-        try:
-            data = pandas.read_csv('settings/new_high.csv', header=None)
-            data.columns = ['code', 'high']
-        except:
-            data = None
-        return data
-
-    @staticmethod
     def new_score_stocks(date, filename):
         try:
             data = pandas.read_csv("%s/new_score/%s/%s.csv" % (Loader.settings_dir, date, filename), header=None)
@@ -519,7 +510,7 @@ class Loader:
             data = pandas.read_csv('settings/assets_history.csv', header=None)
             data.columns = ['date', 'assets', 'deposit', 'itrust']
             data['date'] = pandas.to_datetime(data['date'], format='%Y-%m-%d')
-            data.sort_values("date")
+            data = data.sort_values("date")
         except:
             data = None
         return data
