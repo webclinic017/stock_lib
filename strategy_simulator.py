@@ -186,7 +186,7 @@ class StrategySimulator:
         dates = self.simulate_dates(codes, stocks, start_date, end_date)
 
         self.log("targets: %s" % list(simulators.keys()))
-        capacity = None
+        deposit = None
 
         for step, date in enumerate(dates):
             # 休日はスキップ
@@ -207,10 +207,13 @@ class StrategySimulator:
                 # M&A 適用
                 simulators = self.manda_by_date(date, code, simulators)
 
-                simulators[code].capacity = simulators[code].capacity if capacity is None else capacity
+                if self.simulator_setting.use_deposit:
+                    simulators[code].update_deposit(simulators[code].deposit if deposit is None else deposit)
+                else:
+                    simulators[code].capacity = simulators[code].capacity if deposit is None else deposit
                 simulators[code].binding = binding - simulators[code].order_binding() # 自分の拘束分はsimulator側で加算するので引いておく
                 simulators[code].simulate_by_date(date, stocks[code], index)
-                capacity = simulators[code].capacity
+                deposit = simulators[code].deposit if self.simulator_setting.use_deposit else simulators[code].capacity
                 binding += simulators[code].order_binding() - simulators[code].unbound
 
             stats["unrealized_gain"] = self.sum_stats(simulators, lambda x: x.stats.last_unrealized_gain())
@@ -218,7 +221,7 @@ class StrategySimulator:
             self.stats.append(stats)
 
             stats, simulators = self.closing(stats, simulators)
-            self.log("gain: %s, %s, %s" % (stats["unrealized_gain"], stats["gain"], capacity+binding))
+            self.log("unrealized_gain: %s, gain: %s, total gain: %s, deposit: %s, binding: %s" % (stats["unrealized_gain"], stats["gain"], sum(self.stats.gain()), deposit, binding))
 
         # 手仕舞い
         if with_closing:

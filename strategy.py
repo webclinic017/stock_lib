@@ -29,6 +29,7 @@ def add_options(parser):
     parser.add_argument("--setting_dir", type=str, action="store", default=None, dest="setting_dir", help="")
     parser.add_argument("--use_setting", type=str, action="store", default=None, dest="use_setting", help="")
     parser.add_argument("--use_limit", action="store_true", default=False, dest="use_limit", help="指値を使う")
+    parser.add_argument("--use_deposit", action="store_true", default=False, dest="use_deposit", help="新しいキャパシティの計算を利用する")
     parser.add_argument("--position_sizing", action="store_true", default=False, dest="position_sizing", help="ポジションサイジング")
     parser.add_argument("--max_position_size", action="store", default=None, dest="max_position_size", help="最大ポジションサイズ")
     parser.add_argument("--production", action="store_true", default=False, dest="production", help="本番向け") # 実行環境の選択
@@ -379,6 +380,7 @@ def create_simulator_setting(args, use_json=True):
     simulator_setting.soft_limit = simulator_setting.soft_limit if args.soft_limit is None else args.soft_limit
     simulator_setting.hard_limit = simulator_setting.hard_limit if args.hard_limit is None else args.hard_limit
     simulator_setting.ignore_volume = args.futures
+    simulator_setting.use_deposit = args.use_deposit if args.use_deposit else simulator_setting.use_deposit
     simulator_setting = apply_assets(args, simulator_setting)
     return simulator_setting
 
@@ -394,6 +396,7 @@ def create_simulator_setting_by_json(args):
     simulator_setting.soft_limit = setting_dict["soft_limit"] if "soft_limit" in setting_dict.keys() else simulator_setting.soft_limit
     simulator_setting.hard_limit = setting_dict["hard_limit"] if "hard_limit" in setting_dict.keys() else simulator_setting.hard_limit
     simulator_setting.ignore_volume = args.futures
+    simulator_setting.use_deposit = setting_dict["use_deposit"] if "use_deposit" in setting_dict.keys() else simulator_setting.use_deposit
     simulator_setting = apply_assets(args, simulator_setting)
     return simulator_setting
 
