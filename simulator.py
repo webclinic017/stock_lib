@@ -28,6 +28,7 @@ class Position:
         self.system = system
         self.method = method
         self.min_unit = min_unit
+        self.interest = 0
 
     def add_history(self, num, value):
         for _ in range(int(num)):
@@ -36,6 +37,7 @@ class Position:
         if self.get_num() == 0:
           self.term = 0
           self.value = []
+          self.interest = 0
 
     # 現在の評価額
     def eval(self, value, num):
@@ -118,6 +120,14 @@ class Position:
     # 保有期間を加算
     def increment_term(self):
         self.term += 1
+
+    # 金利を取得
+    def get_interest(self):
+        return self.interest
+
+    # 金利を追加
+    def add_interest(self, interest):
+        self.interest += interest
 
     # 特定口座（現物）
     def is_actual(self):
@@ -421,7 +431,8 @@ class SimulatorStats:
             "closing": False,
             "contract_price": None,
             "order_type": None,
-            "commission": None
+            "commission": None,
+            "interest": None
         }
         return trade_data
 
@@ -545,6 +556,9 @@ class SimulatorStats:
 
     def commission(self):
         return list(filter(lambda x: x is not None, map(lambda x: x["commission"], self.trade_history)))
+
+    def interest(self):
+        return list(filter(lambda x: x is not None, map(lambda x: x["interest"], self.trade_history)))
 
     def profits(self):
         return list(filter(lambda x: x > 0, self.gain()))
@@ -682,6 +696,10 @@ class SecuritiesCompony:
         print("use default price_limit. should override price_limit")
         return (0, 0) # (価格帯, 値幅)
 
+    def interest(self, price, num):
+        print("use default interest. should override interest")
+        return 0
+
 # 証券会社
 class SecuritiesComponySimulator(SecuritiesCompony):
     def __init__(self, setting, position = None):
@@ -772,14 +790,14 @@ class SecuritiesComponySimulator(SecuritiesCompony):
             return False
 
         cost = self.position.new(num, value)
-        commission = self.commission(value, num)
+        self.add_interest()
         self.assets -= cost
         if self.setting.use_deposit:
             self.update_deposit(self.deposit - int(cost / self.leverage))
         else:
             self.capacity -= cost
 
-        self.log("[%s] new: %s yen x %s, total %s, ave %s, assets %s, cost %s, commission %s" % (self.position.method, value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost, commission))
+        self.log("[%s] new: %s yen x %s, total %s, ave %s, assets %s, cost %s" % (self.position.method, value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost))
 
         return True
 
@@ -791,7 +809,6 @@ class SecuritiesComponySimulator(SecuritiesCompony):
 
         gain_rate = self.position.gain_rate(value)
         gain = self.position.gain(value, num)
-        commission = self.commission(value, num)
         term = self.position.get_term()
         cost = self.position.repay(num, value)
         self.assets += cost
@@ -802,7 +819,7 @@ class SecuritiesComponySimulator(SecuritiesCompony):
         else:
             self.capacity += cost
 
-        self.log("[%s] repay: %s yen x %s, total %s, ave %s, assets %s, cost %s, commission %s, term %s : gain %s" % (self.position.method, value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost, commission, term, gain))
+        self.log("[%s] repay: %s yen x %s, total %s, ave %s, assets %s, cost %s, term %s : gain %s" % (self.position.method, value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost, term, gain))
         return True
 
     # 強制手仕舞い(以降トレードしない)
@@ -846,7 +863,11 @@ class SecuritiesComponySimulator(SecuritiesCompony):
                 self.stats.apply(trade_data)
 
     def commission(self, value, num):
-        return self.default_commission(self.position.cost(value, num), is_credit=False)
+        return self.default_commission(self.position.cost(value, num), is_credit=True)
+
+    def add_interest(self):
+        interest = self.interest(self.position.get_value(), self.position.get_num() * self.position.min_unit)
+        self.position.add_interest(interest)
 
     def adjust_tick(self, price):
         tick_price = self.tick_price(price)
@@ -1051,9 +1072,10 @@ class SecuritiesComponySimulator(SecuritiesCompony):
                 self.repay_orders.clear() # ポジションがなくなってたら以降の注文はキャンセル
                 break
             agreed_price = self.repay_agreed_price(data, order)
-            gain        = self.position.gain(agreed_price, order.num)
-            gain_rate   = self.position.gain_rate(agreed_price)
-            commission  = self.commission(agreed_price, order.num)
+            gain         = self.position.gain(agreed_price, order.num)
+            gain_rate    = self.position.gain_rate(agreed_price)
+            commission   = self.commission(agreed_price, order.num)
+            interest     = self.position.get_interest()
             if self.repay(agreed_price, order.num):
                 trade_data["repay"] = agreed_price
                 trade_data["gain"] = gain
@@ -1062,6 +1084,7 @@ class SecuritiesComponySimulator(SecuritiesCompony):
                 trade_data["assets"]              = self.total_assets(agreed_price)
                 trade_data["unavailable_assets"]  = self.unavailable_assets(agreed_price)
                 trade_data["commission"]          = commission
+                trade_data["interest"]            = interest
 
         return trade_data
 
@@ -1085,6 +1108,8 @@ class SecuritiesComponySimulator(SecuritiesCompony):
         # ポジションの保有期間を増やす
         if self.position.get_num() > 0:
             self.position.increment_term()
+            # 金利を手数料に加算する
+            self.add_interest()
 
         # 注文の保持期間を増やす
         self.new_orders.increment_term()

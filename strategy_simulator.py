@@ -293,7 +293,7 @@ class StrategySimulator:
         sum_contract_price = list(map(lambda x: x[1].sum_contract_price(), stats.items()))
         agg_contract_price = self.agg(stats, "contract_price", proc=lambda x: 0 if x is None else x).values()
         oneday_commission = list(map(lambda x: SecuritiesCompony().oneday_commission(x), agg_contract_price))
-        interest = list(map(lambda x: int(x * 0.028 / 365), unavailable_assets))
+        interest = list(map(lambda x: sum(x.interest()), stats.values()))
         auto_stop_loss = list(map(lambda x: len(x.auto_stop_loss()), stats.values()))
         win_auto_stop_loss = list(map(lambda x: len(x.win_auto_stop_loss()), stats.values()))
         lose_auto_stop_loss = list(map(lambda x: len(x.lose_auto_stop_loss()), stats.values()))

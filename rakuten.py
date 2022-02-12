@@ -114,7 +114,13 @@ class Rakuten(SecuritiesCompony):
         if commission is None:
             commission = over
 
-        return int(commission * 1.1)
+        return int(commission * 1.1) # 税込み
+
+    # 1日あたりの金利
+    def interest(self, price, num):
+        sum_contract_price = price * num
+        interest = int(sum_contract_price * 0.028 / 365)
+        return interest
 
 class RakutenSimulator(Rakuten, Simulator):
     pass
