@@ -48,6 +48,7 @@ def add_options(parser):
     parser.add_argument("--appliable_signal", type=str, action="store", default=None, dest="appliable_signal", help="設定を適用可能なシグナルリスト")
     parser.add_argument("--portfolio", type=str, action="store", default=None, dest="portfolio", help="ポートフォリオ")
     parser.add_argument("--portfolio_size", type=int, action="store", default=None, dest="portfolio_size", help="ポートフォリオの銘柄数")
+    parser.add_argument("--with_commission", action="store_true", default=False, dest="with_commission", help="損益に手数料を含める")
     parser.add_argument("--montecarlo", action="store_true", default=False, dest="montecarlo", help="ランダム取引")
 
     # strategy
@@ -327,6 +328,18 @@ def ensemble_files(directory):
     files = sorted(glob.glob("%s/*" % directory))
     return files
 
+def create_combination_setting_by_json(args):
+    setting_dict, _ = load_strategy_setting(args)
+    return create_combination_setting_by_dict(args, setting_dict)
+
+def create_combination_setting_by_dict(args, setting_dict):
+    combination_setting = CombinationSetting()
+    if setting_dict is None:
+        return combination_setting
+    combination_setting = apply_combination_setting_by_dict(combination_setting, setting_dict)
+    combination_setting = apply_assets(args, combination_setting)
+    return combination_setting
+
 # args > json > default の優先度
 def create_combination_setting(args, use_json=True):
     combination_setting = create_combination_setting_by_json(args) if use_json else apply_assets(args, CombinationSetting())
@@ -342,18 +355,6 @@ def create_combination_setting(args, use_json=True):
     combination_setting.portfolio_size = combination_setting.portfolio_size if args.portfolio_size is None else args.portfolio_size
     combination_setting.conditions = combination_setting.conditions if args.conditions is None else args.conditions.split(",")
     combination_setting.appliable_signal = combination_setting.appliable_signal if args.appliable_signal is None else json.loads(args.appliable_signal)
-    return combination_setting
-
-def create_combination_setting_by_json(args):
-    setting_dict, _ = load_strategy_setting(args)
-    return create_combination_setting_by_dict(args, setting_dict)
-
-def create_combination_setting_by_dict(args, setting_dict):
-    combination_setting = CombinationSetting()
-    if setting_dict is None:
-        return combination_setting
-    combination_setting = apply_combination_setting_by_dict(combination_setting, setting_dict)
-    combination_setting = apply_assets(args, combination_setting)
     return combination_setting
 
 def apply_combination_setting_by_dict(combination_setting, setting_dict):

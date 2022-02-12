@@ -232,13 +232,13 @@ class StrategySimulator:
     def sum_stats(self, simulators, callback):
         return sum(list(map(lambda x: 0 if len(callback(x)) == 0 else callback(x)[-1], simulators.values())))
 
-    def get_stats(self, simulators, start_date, end_date):
+    def get_stats(self, simulators, start_date, end_date, with_commission=False):
         # 統計 ====================================
         stats = {}
         for code in simulators.keys():
             stats[code] = simulators[code].stats
 
-        results = self.create_stats(stats, start_date, end_date)
+        results = self.create_stats(stats, start_date, end_date, with_commission)
         results["per_day"] = self.create_stats_per_day(stats, simulators)
         return results
 
@@ -274,7 +274,7 @@ class StrategySimulator:
 
         return per_day
 
-    def create_stats(self, stats, start_date, end_date):
+    def create_stats(self, stats, start_date, end_date, with_commission=False):
         # 統計 =======================================
         wins = list(filter(lambda x: sum(x[1].gain_rate()) > 0, stats.items()))
         lose = list(filter(lambda x: sum(x[1].gain_rate()) < 0, stats.items()))
@@ -282,7 +282,10 @@ class StrategySimulator:
         lose_codes = list(map(lambda x: x[0], lose))
         codes = list(stats.keys())
         commission = list(map(lambda x: sum(x[1].commission()), stats.items()))
-        gain = list(map(lambda x: sum(x[1].gain()), stats.items()))
+        if with_commission:
+            gain = list(map(lambda x: sum(x[1].gain()) - sum(x[1].commission()) - sum(x[1].interest()), stats.items()))
+        else:
+            gain = list(map(lambda x: sum(x[1].gain()), stats.items()))
         position_size = self.agg(stats, "size").values()
         position_size = list(filter(lambda x: x != 0, position_size))
         position_term = list(map(lambda x: x[1].term(), stats.items()))
