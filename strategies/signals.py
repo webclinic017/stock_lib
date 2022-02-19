@@ -26,7 +26,7 @@ class CombinationStrategy(CombinationCreator):
 
     def load_portfolio(self, date, length=10):
 #        limit = min([self.setting.assets / 250, 15000])
-        limit = self.setting.assets / 250
+        limit = (self.setting.assets / 250) if self.setting.portfolio_limit is None else self.setting.portfolio_limit
         return portfolio.load_portfolio(self.setting.portfolio, date, limit, length)
 
     def subject(self, date):

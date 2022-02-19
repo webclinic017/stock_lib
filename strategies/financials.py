@@ -24,7 +24,8 @@ class CombinationStrategy(CombinationCreator):
         self.conditions_by_seed(setting.seed[0])
 
     def load_portfolio(self, date, length=10):
-        return portfolio.load_portfolio(date, self.setting.assets / 500, length)
+        limit = (self.setting.assets / 500) if self.setting.portfolio_limit is None else self.setting.portfolio_limit
+        return portfolio.load_portfolio(date, limit, length)
 
     def subject(self, date):
         before = self.load_portfolio(utils.to_datetime(date) - utils.relativeterm(1))

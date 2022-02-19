@@ -48,6 +48,7 @@ def add_options(parser):
     parser.add_argument("--appliable_signal", type=str, action="store", default=None, dest="appliable_signal", help="設定を適用可能なシグナルリスト")
     parser.add_argument("--portfolio", type=str, action="store", default=None, dest="portfolio", help="ポートフォリオ")
     parser.add_argument("--portfolio_size", type=int, action="store", default=None, dest="portfolio_size", help="ポートフォリオの銘柄数")
+    parser.add_argument("--portfolio_limit", type=int, action="store", default=None, dest="portfolio_limit", help="ポートフォリオの価格制限")
     parser.add_argument("--with_commission", action="store_true", default=False, dest="with_commission", help="損益に手数料を含める")
     parser.add_argument("--montecarlo", action="store_true", default=False, dest="montecarlo", help="ランダム取引")
 
@@ -235,7 +236,7 @@ def load_strategy_creator_by_type(strategy_type, is_production, combination_sett
             from strategies.combination import CombinationStrategy
             return CombinationStrategy(combination_setting)
 
-def load_strategy_creator(args, combination_setting=None):
+def load_strategy_creator(args, combination_setting):
     combination_setting = CombinationSetting() if combination_setting is None else combination_setting
     strategy_type = get_strategy_name(args)
     return load_strategy_creator_by_type(strategy_type, args.production, combination_setting)
@@ -263,7 +264,7 @@ def load_strategy_setting_by_filename(filename, path):
 
     return setting_dict, strategy_setting
 
-def load_strategy(args, combination_setting=None):
+def load_strategy(args, combination_setting):
     _, settings = load_strategy_setting(args)
     return load_strategy_creator(args, combination_setting).create(settings)
 
@@ -353,6 +354,7 @@ def create_combination_setting(args, use_json=True):
     combination_setting.ensemble = combination_setting.ensemble if args.ensemble_dir is None else ensemble_files(args.ensemble_dir)
     combination_setting.portfolio = combination_setting.portfolio if args.portfolio is None else args.portfolio
     combination_setting.portfolio_size = combination_setting.portfolio_size if args.portfolio_size is None else args.portfolio_size
+    combination_setting.portfolio_limit = combination_setting.portfolio_limit if args.portfolio_limit is None else args.portfolio_limit
     combination_setting.conditions = combination_setting.conditions if args.conditions is None else args.conditions.split(",")
     combination_setting.appliable_signal = combination_setting.appliable_signal if args.appliable_signal is None else json.loads(args.appliable_signal)
     return combination_setting
@@ -368,6 +370,7 @@ def apply_combination_setting_by_dict(combination_setting, setting_dict):
     combination_setting.ensemble = ensemble_files(setting_dict["ensemble_dir"]) if "ensemble_dir" in setting_dict.keys() else combination_setting.ensemble
     combination_setting.portfolio = setting_dict["portfolio"] if "portfolio" in setting_dict.keys() else combination_setting.portfolio
     combination_setting.portfolio_size = setting_dict["portfolio_size"] if "portfolio_size" in setting_dict.keys() else combination_setting.portfolio_size
+    combination_setting.portfolio_limit = setting_dict["portfolio_limit"] if "portfolio_limit" in setting_dict.keys() else combination_setting.portfolio_limit
     combination_setting.conditions = setting_dict["conditions"] if "conditions" in setting_dict.keys() else combination_setting.conditions
     combination_setting.appliable_signal = setting_dict["appliable_signal"] if "appliable_signal" in setting_dict.keys() else combination_setting.appliable_signal
     return combination_setting
@@ -923,6 +926,7 @@ class CombinationSetting:
     montecarlo = False
     portfolio = None
     portfolio_size = 10
+    portfolio_limit = None
     conditions = []
 
 class Combination(StrategyCreator, StrategyUtil):
