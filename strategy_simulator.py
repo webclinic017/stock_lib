@@ -340,6 +340,9 @@ class StrategySimulator:
             "lose_auto_stop_loss": sum(lose_auto_stop_loss) if len(s) > 0 else 0,
             "max_unrealized_gain": max(max_unrealized_gain) if len(max_unrealized_gain) > 0 else 0,
             "min_unrealized_gain": min(min_unrealized_gain) if len(min_unrealized_gain) > 0 else 0,
+            "closing_gain": sum(list(map(lambda x: x.closing_gain(), stats.values()))),
+            "closing_trade": sum(list(map(lambda x: x.closing_trade_num(), s))) if len(s) > 0 else 0,
+            "closing_term": sum(list(map(lambda x: x.closing_term(), stats.values()))),
             "crash": min(crash) if len(crash) > 0 else 0,
         }
 

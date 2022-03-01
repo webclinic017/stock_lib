@@ -449,22 +449,28 @@ class SimulatorStats:
         return list(map(lambda x: default if x[key] is None else x[key], self.trade_history))
 
     def find_by_date(self, date):
-        return list(filter(lambda x: x["date"] == date, self.trade_history))
+        return self.find(lambda x: x["date"] == date)
 
-    def size(self):
-        return list(map(lambda x: x["size"], self.trade_history))
+    def find(self, condition):
+        return list(filter(lambda x: condition(x), self.trade_history))
 
     def dates(self):
         return list(filter(lambda x: x is not None, self.get("date")))
 
-    def term(self):
-        return list(map(lambda x: x["term"], self.trade_history))
+    def size(self):
+        return list(map(lambda x: x["size"], self.trade_history))
 
     def max_size(self):
         return max(self.size()) if len(self.size()) > 0 else 0
 
+    def term(self):
+        return list(map(lambda x: x["term"], self.trade_history))
+
     def max_term(self):
         return max(self.term()) if len(self.term()) > 0 else 0
+
+    def closing_term(self):
+        return sum(list(map(lambda x: x["term"], self.closing_trade())))
 
     def trade(self):
         return list(filter(lambda x: x["gain"] is not None, self.trade_history))
@@ -475,6 +481,9 @@ class SimulatorStats:
     def lose_trade(self):
         return list(filter(lambda x: x["gain"] < 0, self.trade()))
 
+    def closing_trade(self):
+        return self.find(lambda x: x["closing"])
+
     def trade_num(self):
         return len(self.trade())
 
@@ -483,6 +492,9 @@ class SimulatorStats:
 
     def lose_trade_num(self):
         return len(self.lose_trade())
+
+    def closing_trade_num(self):
+        return len(self.closing_trade())
 
     # 勝率
     def win_rate(self):
@@ -550,6 +562,9 @@ class SimulatorStats:
     def min_unrealized_gain(self, split_condition = None):
         min_unrealized_gain = list(map(lambda x: min(x) if len(x) > 0 else 0, self.unrealized_gain(split_condition)))
         return 0 if len(min_unrealized_gain) == 0 else min(min_unrealized_gain)
+
+    def closing_gain(self):
+        return sum(list(map(lambda x: x["gain"], self.find(lambda x: x["closing"]))))
 
     def gain_rate(self):
         return list(filter(lambda x: x is not None, map(lambda x: x["gain_rate"], self.trade_history)))
