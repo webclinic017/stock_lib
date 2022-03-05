@@ -693,14 +693,14 @@ def select_weekday(date, to_before=True, target=None):
     return select
 
 # end_dateは含まない
-def daterange(start_date, end_date):
-    for n in range((end_date - start_date).days):
+def daterange(start_date, end_date, step=1):
+    for n in range(0, (end_date - start_date).days, step):
         yield start_date + timedelta(n)
 
-def daterange_by_month(start_date, end_date):
+def daterange_by_month(start_date, end_date, step=1):
     delta = relativedelta(end_date, start_date)
     months = delta.years * 12 + delta.months
-    for n in range(months):
+    for n in range(0, months, step):
         yield start_date + relativedelta(months=n)
 
 # combination util =======================================
