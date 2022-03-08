@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 def selectable_data():
-    data = {
+    return {
         "middle": lambda d: d.data.middle,
         "short": lambda d: d.data.short,
         "nikkei": lambda d: d.index.data["nikkei"].middle,
@@ -11,8 +11,6 @@ def selectable_data():
 #        "usdjpy": data.index.data["usdjpy"].middle,
 #        "xbtusd": data.index.data["xbtusd"].middle
     }
-
-    return data
 
 def select(data, target="middle"):
 

@@ -734,8 +734,9 @@ class SecuritiesComponySimulator(SecuritiesCompony):
         self.closing_orders = StockOrder()
         self.force_stop = False
 
-    def log(self, message):
+    def log(self, message_callback):
         if self.setting.debug:
+            message = message_callback()
             print(message)
             self.logs.append(message)
 
@@ -812,7 +813,7 @@ class SecuritiesComponySimulator(SecuritiesCompony):
         else:
             self.capacity -= cost
 
-        self.log("[%s] new: %s yen x %s, total %s, ave %s, assets %s, cost %s" % (self.position.method, value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost))
+        self.log(lambda: "[%s] new: %s yen x %s, total %s, ave %s, assets %s, cost %s" % (self.position.method, value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost))
 
         return True
 
@@ -834,7 +835,7 @@ class SecuritiesComponySimulator(SecuritiesCompony):
         else:
             self.capacity += cost
 
-        self.log("[%s] repay: %s yen x %s, total %s, ave %s, assets %s, cost %s, term %s : gain %s" % (self.position.method, value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost, term, gain))
+        self.log(lambda: "[%s] repay: %s yen x %s, total %s, ave %s, assets %s, cost %s, term %s : gain %s" % (self.position.method, value, num, self.position.get_num(), self.position.get_value(), self.total_assets(value), cost, term, gain))
         return True
 
     # 強制手仕舞い(以降トレードしない)
@@ -846,7 +847,7 @@ class SecuritiesComponySimulator(SecuritiesCompony):
         gain_rate = self.position.gain_rate(value)
         cost = self.position.cost(num, value)
         if self.repay(value, num):
-            self.log(" - force closing: price %s x %s" % (value, num))
+            self.log(lambda: " - force closing: price %s x %s" % (value, num))
             trade_data["date"] = date
             trade_data["repay"] = value
             trade_data["gain"] = gain
@@ -864,12 +865,12 @@ class SecuritiesComponySimulator(SecuritiesCompony):
         self.force_stop = force_stop
 
         if self.force_stop:
-            self.log("[cancel] new/repay order. force closed")
+            self.log(lambda: "[cancel] new/repay order. force closed")
             self.new_orders.clear()
             self.repay_orders.clear()
 
         if self.position.get_num() > 0:
-            self.log(" - closing_order: num %s, price %s" % (self.position.get_num(), self.position.get_value()))
+            self.log(lambda: " - closing_order: num %s, price %s" % (self.position.get_num(), self.position.get_value()))
             self.repay_orders.set([MarketOrder(self.position.get_num(), is_short=self.position.is_short())])
 
             if len(self.stats.trade_history) > 0:
@@ -896,7 +897,7 @@ class SecuritiesComponySimulator(SecuritiesCompony):
         hit.num = num
         remain.num = remain.num - num
 
-        self.log("[split order] hit: %s, remain: %s" % (hit.num, remain.num))
+        self.log(lambda: "[split order] hit: %s, remain: %s" % (hit.num, remain.num))
 
         return [hit, remain]
 
@@ -1138,7 +1139,7 @@ class SecuritiesComponySimulator(SecuritiesCompony):
         today = term_data.at(date).middle
 
         if len(today) == 0:
-            self.log("less data: %s" % (date))
+            self.log(lambda: "less data: %s" % (date))
             trade_data = self.create_trade_data(date, term_data.middle["low"].iloc[-1], term_data.middle["high"].iloc[-1], term_data.middle["close"].iloc[-1])
             self.stats.append(trade_data)
             return
@@ -1148,7 +1149,7 @@ class SecuritiesComponySimulator(SecuritiesCompony):
         price = today["open"].item() # 約定価格
         num = self.position.get_num()
         volume = None if self.setting.ignore_volume else math.ceil(today["volume"].item() * 10)
-        self.log("date: %s, price: %s, volume: %s, ave: %.2f, hold: %s, deposit: %s, assets: %s, capacity: %d, binding: %d, gain : %.2f"
+        self.log(lambda: "date: %s, price: %s, volume: %s, ave: %.2f, hold: %s, deposit: %s, assets: %s, capacity: %d, binding: %d, gain : %.2f"
             % (date, price, volume, self.position.get_value(), num, self.deposit, self.assets ,self.capacity, self.total_binding(), self.position.gain(price, num)))
 
         self.trade(self.setting.strategy, price, volume, term_data, term_index)
@@ -1167,7 +1168,7 @@ class SecuritiesComponySimulator(SecuritiesCompony):
 
         # 判断に必要なデータ数がない
         if price == 0 or len(data.middle) < self.setting.min_data_length:
-            self.log("less data. skip trade. [%s - %s]. price: %s == 0 or length: %s < %s" % (data.middle["date"].iloc[0], date, price, len(data.middle), self.setting.min_data_length))
+            self.log(lambda: "less data. skip trade. [%s - %s]. price: %s == 0 or length: %s < %s" % (data.middle["date"].iloc[0], date, price, len(data.middle), self.setting.min_data_length))
             self.stats.append(trade_data)
             return
 
@@ -1196,7 +1197,7 @@ class SecuritiesComponySimulator(SecuritiesCompony):
 
         # 手仕舞い後はもう何もしない
         if self.force_stop:
-            self.log("force stopped. [%s - %s]" % (data.middle["date"].iloc[0], date))
+            self.log(lambda: "force stopped. [%s - %s]" % (data.middle["date"].iloc[0], date))
             return
 
         # 注文を出す
@@ -1231,9 +1232,9 @@ class Simulator(SecuritiesComponySimulator):
             price = price + self.price_limit(price)[1] if order.is_market() else price
             cost = self.position.eval(price, order.num)
             if (self.total_capacity() - cost) <= 0:
-                self.log(" - [over capacity] new_order: num %s, price %s, cost %d - %s unbound: %s" % (order.num, order.price, self.total_capacity(), cost, self.unbound))
+                self.log(lambda: " - [over capacity] new_order: num %s, price %s, cost %d - %s unbound: %s" % (order.num, order.price, self.total_capacity(), cost, self.unbound))
                 return signal
-            self.log(" - new_order: num %s, price %s, cost %s - %s" % (order.num, order.price, self.total_capacity(), cost))
+            self.log(lambda: " - new_order: num %s, price %s, cost %s - %s" % (order.num, order.price, self.total_capacity(), cost))
             order.binding = cost
             self.new_orders.set([order])
             signal = order
@@ -1244,13 +1245,13 @@ class Simulator(SecuritiesComponySimulator):
         signal = None
         for order in self.taking_signal(strategy, data, index):
             if order.num > 0:
-                self.log(" - taking_order: num %s, price %s" % (order.num, order.price))
+                self.log(lambda: " - taking_order: num %s, price %s" % (order.num, order.price))
             self.repay_orders.set([order])
             signal = order
 
         for order in self.stop_loss_signal(strategy, data, index):
             if order.num > 0:
-                self.log(" - stop_loss_order: num %s, price %s" % (order.num, order.price))
+                self.log(lambda: " - stop_loss_order: num %s, price %s" % (order.num, order.price))
             self.repay_orders.set([order])
             signal = order
 
@@ -1259,7 +1260,7 @@ class Simulator(SecuritiesComponySimulator):
     def closing_signals(self, strategy, data, index):
         for order in self.closing_signal(strategy, data, index):
             if order.num > 0:
-                self.log(" - closing_order: num %s, price %s" % (order.num, order.price))
+                self.log(lambda: " - closing_order: num %s, price %s" % (order.num, order.price))
             self.closing_orders.set([order])
             return order
         return None
@@ -1323,11 +1324,11 @@ class Simulator(SecuritiesComponySimulator):
             else:
                 limit = soft_limit
 
-            self.log("limit: %s %s(s) %s(h), price: %s(hld) %s(cur) %s(max), loss: %4d %4d(s) %4d(h), gain:%d" 
+            self.log(lambda: "limit: %s %s(s) %s(h), price: %s(hld) %s(cur) %s(max), loss: %4d %4d(s) %4d(h), gain:%d" 
                 % (limit, soft_limit, hard_limit, hold, price, hold+max_price_range, allowable_loss, soft_price_range, hard_price_range, max_gain))
 
             if limit > 0:
-                self.log("[auto_stop_loss][%s] price: %s, stop: %s, hold: %s" % (position.method, position.get_value(), limit, hold))
+                self.log(lambda: "[auto_stop_loss][%s] price: %s, stop: %s, hold: %s" % (position.method, position.get_value(), limit, hold))
                 self.repay_orders.add(ReverseLimitOrder(position.get_num(), limit, is_repay=True, is_short=position.is_short(), valid_term=0))
 
     def order_adjust(self, trade_data):
@@ -1338,7 +1339,7 @@ class Simulator(SecuritiesComponySimulator):
 
         # 手仕舞いの場合全部キャンセル
         if self.position.get_num() > 0 and len(self.closing_orders.get()) > 0:
-            self.log("[cancel] new/repay order. force closed")
+            self.log(lambda: "[cancel] new/repay order. force closed")
             self.new_orders.clear()
             self.repay_orders.clear()
             self.force_stop = True
@@ -1346,19 +1347,19 @@ class Simulator(SecuritiesComponySimulator):
 
         # ポジションがなければ返済シグナルは捨てる
         if self.position.get_num() <= 0 and len(self.closing_orders.get()) > 0:
-            self.log("[cancel] closing order")
+            self.log(lambda: "[cancel] closing order")
             self.closing_orders.clear()
             trade_data["canceled"] = "closing"
 
         # ポジションがなければ返済シグナルは捨てる
         if self.position.get_num() <= 0 and len(self.repay_orders.get()) > 0:
-            self.log("[cancel] repay order")
+            self.log(lambda: "[cancel] repay order")
             self.repay_orders.clear()
             trade_data["canceled"] = "repay"
 
         # 新規・返済が同時に出ている場合返済を優先
         if len(self.new_orders.get()) > 0 and len(self.repay_orders.get()) > 0:
-            self.log("[cancel] new order")
+            self.log(lambda: "[cancel] new order")
             self.new_orders.clear()
             trade_data["canceled"] = "new"
 
