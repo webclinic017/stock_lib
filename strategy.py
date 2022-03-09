@@ -393,6 +393,10 @@ def create_simulator_setting_by_json(args):
     setting_dict, _ = load_strategy_setting(args)
     if setting_dict is None:
         return simulator_setting
+    return create_simulator_setting_by_dict(args, setting_dict)
+
+def create_simulator_setting_by_dict(args, setting_dict):
+    simulator_setting = SimulatorSetting()
     simulator_setting.stop_loss_rate = setting_dict["stop_loss_rate"] if "stop_loss_rate" in setting_dict.keys() else simulator_setting.stop_loss_rate
     simulator_setting.taking_rate = setting_dict["taking_rate"] if "taking_rate" in setting_dict.keys() else simulator_setting.taking_rate
     simulator_setting.min_unit = setting_dict["min_unit"] if "min_unit" in setting_dict.keys() else simulator_setting.min_unit
@@ -403,6 +407,7 @@ def create_simulator_setting_by_json(args):
     simulator_setting.use_deposit = setting_dict["use_deposit"] if "use_deposit" in setting_dict.keys() else simulator_setting.use_deposit
     simulator_setting = apply_assets(args, simulator_setting)
     return simulator_setting
+
 
 def apply_assets(args, setting):
     assets = Loader.assets()

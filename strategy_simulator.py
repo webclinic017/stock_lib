@@ -83,6 +83,7 @@ class StrategySimulator:
         strategy_creator = self.strategy_creator(args)
         combination = strategy_creator.create_combination(strategy_settings)
         simulator_setting.strategy = strategy_creator.create(strategy_settings)
+
         for code in codes:
             if ignore_manda and self.is_manda(start_date, end_date, code):
                 continue
