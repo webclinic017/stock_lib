@@ -3,8 +3,11 @@ import utils
 import pandas
 from datetime import datetime
 
-def load_portfolio(date, price, length=10):
-    d = utils.to_format(datetime(date.year, date.month, 1))
+def load_portfolio(date, price, length=10, by_day=False):
+    if by_day:
+        d = utils.to_format(utils.select_weekday(date, to_before=False))
+    else:
+        d = utils.to_format(datetime(date.year, date.month, 1))
     try:
         data = pandas.read_csv("portfolio/new_high/%s.csv" % d, header=None)
         data.columns = ["code", "price"]

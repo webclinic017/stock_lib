@@ -23,7 +23,7 @@ class CombinationStrategy(CombinationCreator):
 
     def load_portfolio(self, date, length=10):
         limit = (self.setting.assets / 500) if self.setting.portfolio_limit is None else self.setting.portfolio_limit
-        return low_update.load_portfolio(date, limit, length)
+        return low_update.load_portfolio(date, limit, length, by_day=self.setting.portfolio_by_day)
 
     def subject(self, date):
         length = 10 if self.setting.portfolio_size is None else self.setting.portfolio_size

@@ -4,7 +4,7 @@ import pandas
 from datetime import datetime
 from portfolio import high_update
 
-def load_portfolio(date, length=10):
+def load_portfolio(date, length=10, by_day=False):
     d = utils.to_format(date)
     try:
         data = pandas.read_csv("portfolio/per/%s.csv" % d, header=None)

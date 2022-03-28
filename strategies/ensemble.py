@@ -23,7 +23,7 @@ class CombinationStrategy(CombinationCreator):
     def load_portfolio(self, date, length=10):
         portfolio = "filtered_high_update" if self.setting.portfolio is None else self.setting.portfolio
         limit = (self.setting.assets / 500) if self.setting.portfolio_limit is None else self.setting.portfolio_limit
-        return strategy.load_portfolio(portfolio, date, limit, length)
+        return strategy.load_portfolio(portfolio, date, limit, length, by_day=self.setting.portfolio_by_day)
 
     def subject(self, date):
         before = self.load_portfolio(utils.to_datetime(date) - utils.relativeterm(1))

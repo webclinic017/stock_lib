@@ -3,7 +3,7 @@ import utils
 import pandas
 from datetime import datetime
 
-def load_portfolio(date, price, length=10):
+def load_portfolio(date, price, length=10, by_day=False):
     d = utils.to_datetime(date)
     year = d.year
     month = (int(d.month / 3) + 1) * 3

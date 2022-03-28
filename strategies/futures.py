@@ -22,7 +22,7 @@ class CombinationStrategy(CombinationCreator):
         self.conditions_by_seed(setting.seed[0])
 
     def subject(self, date):
-        return futures.load_portfolio(date, self.setting.assets)["code"].values.tolist()
+        return futures.load_portfolio(date, self.setting.assets, by_day=self.setting.portfolio_by_day)["code"].values.tolist()
 
     def common(self, settings):
         default = self.default_common()

@@ -23,7 +23,7 @@ class CombinationStrategy(CombinationCreator):
         self.conditions_by_seed(setting.seed[0])
 
     def load_portfolio(self, date, length=10):
-        return per.load_portfolio(date, length)
+        return per.load_portfolio(date, length, by_day=self.setting.portfolio_by_day)
 
     def subject(self, date):
         length = 10 if self.setting.portfolio_size is None else self.setting.portfolio_size

@@ -23,7 +23,7 @@ class Rakuten(SecuritiesCompony):
         ]
 
         prev_limit = 0
-        price_range = None
+        price_range = prices_low[0][1]
         is_low = price < 1000
         table = prices_low if is_low else prices_high
         p = price/1000

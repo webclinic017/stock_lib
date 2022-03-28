@@ -49,6 +49,7 @@ def add_options(parser):
     parser.add_argument("--portfolio", type=str, action="store", default=None, dest="portfolio", help="ポートフォリオ")
     parser.add_argument("--portfolio_size", type=int, action="store", default=None, dest="portfolio_size", help="ポートフォリオの銘柄数")
     parser.add_argument("--portfolio_limit", type=int, action="store", default=None, dest="portfolio_limit", help="ポートフォリオの価格制限")
+    parser.add_argument("--portfolio_by_day", action="store_true", default=False, dest="portfolio_by_day", help="日次のポートフォリオを使用")
     parser.add_argument("--with_commission", action="store_true", default=False, dest="with_commission", help="損益に手数料を含める")
     parser.add_argument("--montecarlo", action="store_true", default=False, dest="montecarlo", help="ランダム取引")
 
@@ -355,6 +356,7 @@ def create_combination_setting(args, use_json=True):
     combination_setting.portfolio = combination_setting.portfolio if args.portfolio is None else args.portfolio
     combination_setting.portfolio_size = combination_setting.portfolio_size if args.portfolio_size is None else args.portfolio_size
     combination_setting.portfolio_limit = combination_setting.portfolio_limit if args.portfolio_limit is None else args.portfolio_limit
+    combination_setting.portfolio_by_day = combination_setting.portfolio_by_day if args.portfolio_by_day is None else args.portfolio_by_day
     combination_setting.conditions = combination_setting.conditions if args.conditions is None else args.conditions.split(",")
     combination_setting.appliable_signal = combination_setting.appliable_signal if args.appliable_signal is None else json.loads(args.appliable_signal)
     return combination_setting
@@ -371,6 +373,7 @@ def apply_combination_setting_by_dict(combination_setting, setting_dict):
     combination_setting.portfolio = setting_dict["portfolio"] if "portfolio" in setting_dict.keys() else combination_setting.portfolio
     combination_setting.portfolio_size = setting_dict["portfolio_size"] if "portfolio_size" in setting_dict.keys() else combination_setting.portfolio_size
     combination_setting.portfolio_limit = setting_dict["portfolio_limit"] if "portfolio_limit" in setting_dict.keys() else combination_setting.portfolio_limit
+    combination_setting.portfolio_by_day = setting_dict["portfolio_by_day"] if "portfolio_by_day" in setting_dict.keys() else combination_setting.portfolio_by_day
     combination_setting.conditions = setting_dict["conditions"] if "conditions" in setting_dict.keys() else combination_setting.conditions
     combination_setting.appliable_signal = setting_dict["appliable_signal"] if "appliable_signal" in setting_dict.keys() else combination_setting.appliable_signal
     return combination_setting
@@ -408,6 +411,21 @@ def create_simulator_setting_by_dict(args, setting_dict):
     simulator_setting = apply_assets(args, simulator_setting)
     return simulator_setting
 
+def create_output_setting(args):
+    return {
+        "date": args.date,
+        "term": args.validate_term,
+        "use_limit": args.use_limit,
+        "use_deposit": args.use_deposit,
+        "soft_limit": args.soft_limit,
+        "hard_limit": args.hard_limit,
+        "passive_leverage": args.passive_leverage,
+        "ensemble_dir": args.ensemble_dir,
+        "portfolio": args.portfolio,
+        "portfolio_size": args.portfolio_size,
+        "portfolio_limit": args.portfolio_limit,
+        "portfolio_by_day": args.portfolio_by_day,
+    }
 
 def apply_assets(args, setting):
     assets = Loader.assets()
@@ -932,6 +950,7 @@ class CombinationSetting:
     portfolio = None
     portfolio_size = 10
     portfolio_limit = None
+    portfolio_by_day = False
     conditions = []
 
 class Combination(StrategyCreator, StrategyUtil):
