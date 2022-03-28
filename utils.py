@@ -751,7 +751,7 @@ def split_list(data, condition):
 #        return data
     for i, d in enumerate(data):
         if condition(d):
-            return [data[:i+1]] + split_list(data[i+1:], condition)
+            return [data[:i]] + split_list(data[i+1:], condition)
     return [data]
 
 def chunked(iterable, n):
