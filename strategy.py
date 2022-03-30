@@ -178,11 +178,11 @@ def select_portfolio(portfolio_name):
     else:
         raise Exception("unsupported type: %s" % portfolio_name)
 
-def load_portfolio(portfolio_name, date, price, length=10):
+def load_portfolio(portfolio_name, date, price, length=10, by_day=False):
     if "%s/" % StrategyType().SIGNALS in portfolio_name: # signals/XXXX
-        return select_portfolio(portfolio_name).load_portfolio(portfolio_name, date, price, length)
+        return select_portfolio(portfolio_name).load_portfolio(portfolio_name, date, price, length, by_day)
     else:
-        return select_portfolio(portfolio_name).load_portfolio(date, price, length)
+        return select_portfolio(portfolio_name).load_portfolio(date, price, length, by_day)
 
 def load_strategy_creator_by_type(strategy_type, is_production, combination_setting):
     strategy_types = StrategyType()
