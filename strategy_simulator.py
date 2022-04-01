@@ -25,6 +25,11 @@ class StrategySimulator:
 
         self.load_manda()
 
+        self.activate()
+
+    def activate(self):
+        self._cache = {}
+
     def select_weekday(self, date, days):
         current = utils.to_datetime(date)
         for i in range(days):
@@ -47,25 +52,30 @@ class StrategySimulator:
             # 2019-08-01以降は2日前から株価データは変わっている
             return self.select_weekday(date, 2)
 
-    def strategy_creator(self, args):
+    def strategy_creator(self, args, use_cache=False):
+        if use_cache:
+            key = "strategy_creator"
+            if not key in self._cache.keys():
+                self._cache[key] = strategy.load_strategy_creator(args, self.combination_setting)
+            return self._cache[key]
         return strategy.load_strategy_creator(args, self.combination_setting)
 
     def select_codes(self, args, start_date, end_date):
         codes = []
 
-        dates = self.strategy_creator(args).select_dates(start_date, end_date, instant=args.instant)
+        dates = self.strategy_creator(args, use_cache=True).select_dates(start_date, end_date, instant=args.instant)
         for d in dates:
             date = utils.to_format(d)
-            targets = self.get_targets(args, codes, date)
+            targets = self.get_targets(args, codes, date, use_cache=True)
             codes = list(set(codes + targets))
 
         return codes
 
-    def get_targets(self, args, targets, date):
+    def get_targets(self, args, targets, date, use_cache=False):
         if args.code is None:
             if args.instant:
                 date = utils.to_format(utils.select_weekday(utils.to_datetime(date), to_before=False))
-            targets = list(self.strategy_creator(args).subject(date))
+            targets = list(self.strategy_creator(args, use_cache=use_cache).subject(date))
         else:
             targets = [args.code]
         return targets
