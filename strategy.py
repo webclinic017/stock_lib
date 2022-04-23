@@ -34,8 +34,7 @@ def add_options(parser):
     parser.add_argument("--max_position_size", action="store", default=None, dest="max_position_size", help="最大ポジションサイズ")
     parser.add_argument("--production", action="store_true", default=False, dest="production", help="本番向け") # 実行環境の選択
     parser.add_argument("--short", action="store_true", default=False, dest="short", help="空売り戦略")
-    parser.add_argument("--soft_limit", type=float, action="store", default=None, dest="soft_limit", help="価格ベース自動損切")
-    parser.add_argument("--hard_limit", type=float, action="store", default=None, dest="hard_limit", help="資産ベース自動損切")
+    parser.add_argument("--auto_limit", action="store_true", default=False, dest="auto_limit", help="自動損切有効化")
     parser.add_argument("--stop_loss_rate", action="store", default=None, dest="stop_loss_rate", help="損切レート")
     parser.add_argument("--taking_rate", action="store", default=None, dest="taking_rate", help="利食いレート")
     parser.add_argument("--min_unit", action="store", default=None, dest="min_unit", help="最低単元")
@@ -359,6 +358,7 @@ def create_combination_setting(args, use_json=True):
     combination_setting.portfolio_by_day = combination_setting.portfolio_by_day if args.portfolio_by_day is None else args.portfolio_by_day
     combination_setting.conditions = combination_setting.conditions if args.conditions is None else args.conditions.split(",")
     combination_setting.appliable_signal = combination_setting.appliable_signal if args.appliable_signal is None else json.loads(args.appliable_signal)
+    combination_setting.auto_limit = args.auto_limit if args.auto_limit else combination_setting.auto_limit
     return combination_setting
 
 def apply_combination_setting_by_dict(combination_setting, setting_dict):
@@ -376,6 +376,7 @@ def apply_combination_setting_by_dict(combination_setting, setting_dict):
     combination_setting.portfolio_by_day = setting_dict["portfolio_by_day"] if "portfolio_by_day" in setting_dict.keys() else combination_setting.portfolio_by_day
     combination_setting.conditions = setting_dict["conditions"] if "conditions" in setting_dict.keys() else combination_setting.conditions
     combination_setting.appliable_signal = setting_dict["appliable_signal"] if "appliable_signal" in setting_dict.keys() else combination_setting.appliable_signal
+    combination_setting.auto_limit = setting_dict["auto_limit"] if "auto_limit" in setting_dict.keys() else combination_setting.auto_limit
     return combination_setting
 
 def create_simulator_setting(args, use_json=True):
@@ -384,8 +385,6 @@ def create_simulator_setting(args, use_json=True):
     simulator_setting.taking_rate = simulator_setting.taking_rate if args.taking_rate is None else float(args.taking_rate)
     simulator_setting.min_unit = simulator_setting.min_unit if args.min_unit is None else int(args.min_unit)
     simulator_setting.short_trade = args.short
-    simulator_setting.soft_limit = simulator_setting.soft_limit if args.soft_limit is None else args.soft_limit
-    simulator_setting.hard_limit = simulator_setting.hard_limit if args.hard_limit is None else args.hard_limit
     simulator_setting.ignore_volume = args.futures
     simulator_setting.use_deposit = args.use_deposit if args.use_deposit else simulator_setting.use_deposit
     simulator_setting = apply_assets(args, simulator_setting)
@@ -404,8 +403,6 @@ def create_simulator_setting_by_dict(args, setting_dict):
     simulator_setting.taking_rate = setting_dict["taking_rate"] if "taking_rate" in setting_dict.keys() else simulator_setting.taking_rate
     simulator_setting.min_unit = setting_dict["min_unit"] if "min_unit" in setting_dict.keys() else simulator_setting.min_unit
     simulator_setting.short_trade = args.short
-    simulator_setting.soft_limit = setting_dict["soft_limit"] if "soft_limit" in setting_dict.keys() else simulator_setting.soft_limit
-    simulator_setting.hard_limit = setting_dict["hard_limit"] if "hard_limit" in setting_dict.keys() else simulator_setting.hard_limit
     simulator_setting.ignore_volume = args.futures
     simulator_setting.use_deposit = setting_dict["use_deposit"] if "use_deposit" in setting_dict.keys() else simulator_setting.use_deposit
     simulator_setting = apply_assets(args, simulator_setting)
@@ -417,8 +414,7 @@ def create_output_setting(args):
         "term": args.validate_term,
         "use_limit": args.use_limit,
         "use_deposit": args.use_deposit,
-        "soft_limit": args.soft_limit,
-        "hard_limit": args.hard_limit,
+        "auto_limit": args.auto_limit,
         "passive_leverage": args.passive_leverage,
         "ensemble_dir": args.ensemble_dir,
         "portfolio": args.portfolio,
@@ -433,6 +429,45 @@ def apply_assets(args, setting):
     return setting
 
 # ========================================================================
+
+class SignalSetting:
+    def __init__(self, new=False, taking=False, stop_loss=False, closing=False):
+        self.new = new
+        self.taking = taking
+        self.stop_loss = stop_loss
+        self.closing = closing
+
+class CombinationSetting:
+    on_close = {
+        "new": False,
+        "repay": False
+    }
+    enabled = {
+        "signal": SignalSetting(new=True, taking=True, stop_loss=True, closing=False), # 全体のシグナル
+        "simple": SignalSetting() # commonのみ
+    }
+    use_limit = False
+    position_sizing = False
+    position_adjust = True
+    strict = True
+    assets = 0
+    max_position_size = 4
+    max_leverage = None
+    passive_leverage = False
+    condition_size = 5
+    appliable_signal = {
+        "condition_size": ["new", "taking", "stop_loss", "closing", "x2", "x4", "x8", "x0_5"]
+    }
+    seed = [int(t.time())]
+    ensemble = []
+    weights = {}
+    montecarlo = False
+    portfolio = None
+    portfolio_size = 10
+    portfolio_limit = None
+    portfolio_by_day = False
+    conditions = []
+    auto_limit = False
 
 class StrategyUtil:
     def apply(self, data, conditions):
@@ -914,44 +949,6 @@ class StrategyCreateSetting:
         return strategy_types.COMBINATION
 
 ## 指定可能な戦略====================================================================================================================
-
-class SignalSetting:
-    def __init__(self, new=False, taking=False, stop_loss=False, closing=False):
-        self.new = new
-        self.taking = taking
-        self.stop_loss = stop_loss
-        self.closing = closing
-
-class CombinationSetting:
-    on_close = {
-        "new": False,
-        "repay": False
-    }
-    enabled = {
-        "signal": SignalSetting(new=True, taking=True, stop_loss=True, closing=False), # 全体のシグナル
-        "simple": SignalSetting() # commonのみ
-    }
-    use_limit = False
-    position_sizing = False
-    position_adjust = True
-    strict = True
-    assets = 0
-    max_position_size = 4
-    max_leverage = None
-    passive_leverage = False
-    condition_size = 5
-    appliable_signal = {
-        "condition_size": ["new", "taking", "stop_loss", "closing", "x2", "x4", "x8", "x0_5"]
-    }
-    seed = [int(t.time())]
-    ensemble = []
-    weights = {}
-    montecarlo = False
-    portfolio = None
-    portfolio_size = 10
-    portfolio_limit = None
-    portfolio_by_day = False
-    conditions = []
 
 class Combination(StrategyCreator, StrategyUtil):
     def __init__(self, conditions, common, setting=None):

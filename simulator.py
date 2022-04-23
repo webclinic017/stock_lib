@@ -399,7 +399,6 @@ class SimulatorSetting:
         self.stop_loss_rate = 0.02
         self.taking_rate = 1.0
         self.min_unit = 100
-        self.soft_limit = None
         self.hard_limit = None
         self.ignore_volume = False # 指値時の出来高チェックをスキップ
         self.use_deposit = False
@@ -564,7 +563,7 @@ class SimulatorStats:
         return 0 if len(min_unrealized_gain) == 0 else min(min_unrealized_gain)
 
     def closing_gain(self):
-        return sum(list(map(lambda x: x["gain"], self.find(lambda x: x["closing"]))))
+        return sum(list(map(lambda x: x["gain"], self.find(lambda x: x["closing"] and x["gain"]))))
 
     def gain_rate(self):
         return list(filter(lambda x: x is not None, map(lambda x: x["gain_rate"], self.trade_history)))
@@ -751,6 +750,11 @@ class SecuritiesComponySimulator(SecuritiesCompony):
 
     def create_appliable_data(self, data, index):
         return AppliableData(data, index, self.position, self.total_assets(data.middle["close"].iloc[-1].item()), self.setting, self.stats)
+
+    def clear_orders(self):
+        self.new_orders.clear()
+        self.repay_orders.clear()
+        self.closing_orders.clear()
 
     def update_deposit(self, deposit):
         self.deposit = deposit
@@ -964,23 +968,17 @@ class SecuritiesComponySimulator(SecuritiesCompony):
 
     # 指値の条件に使うデータ
     def limit(self, price, low, high, order):
-#        return high if order.is_short else low  # worst
         if order.is_short:
             best_price = price if low > order.price else order.price
-#            return self.adjust_tick(high - int((high - best_price) / 2)) # half
         else:
             best_price = price if high < order.price else order.price
-#            return self.adjust_tick(low + int((best_price - low) / 2)) # half
         return best_price # best
 
     def reverse_limit(self, price, low, high, order):
-#        return low if order.is_short else high  # worst
         if order.is_short:
             best_price = price if high < order.price else order.price
-#            return self.adjust_tick(low + int((best_price - low) / 2)) # half
         else:
             best_price = price if low > order.price else order.price
-#            return self.adjust_tick(high - int((high - best_price) / 2)) # half
         return best_price # best
 
     # 指値の約定価格
@@ -1177,12 +1175,13 @@ class SecuritiesComponySimulator(SecuritiesCompony):
         trade_data["size"] = self.position.get_num()
         trade_data["term"] = self.position.get_term()
 
-        # 損切の逆指値
-        self.auto_stop_loss(data.middle["close"].iloc[-2], self.position)
 
         # 寄り付き====================================================================
         if self.setting.virtual_trade: # 注文の約定チェック
             trade_data = self.open_trade(volume, data, trade_data)
+
+        # 損切の逆指値
+        self.auto_stop_loss(data.middle["close"].iloc[-2])
 
         # ザラバ
         if self.setting.virtual_trade:
@@ -1278,58 +1277,21 @@ class Simulator(SecuritiesComponySimulator):
 
         return trade_data
 
-    def auto_stop_loss(self, price, position):
-        if self.setting.soft_limit is None and self.setting.hard_limit is None:
+    def auto_stop_loss(self, price):
+        if self.setting.hard_limit is None:
             return
 
-        signal = None
-        if len(self.stats.trade_history) > 0:
-            trade_data = self.stats.last()
-            signal = trade_data["signal"]
+        # ストップまでの価格差
+        price_range = self.adjust_tick(self.setting.hard_limit)
 
-        # ザラ場中の注文を避けるために1日以上保有で新たな注文が出なかったものだけにする
-        if position.get_num() > 0 and position.get_term() > 0 and signal == None:
-            tick_price = self.tick_price(price)
-            hold = self.adjust_tick(position.get_value())
-            position_size = position.get_num() * position.min_unit
+        if self.position.is_short():
+            limit = price + price_range
+        else:
+            limit = price - price_range
 
-            max_gain = self.stats.current_max_unrealized_gain(split_condition=lambda x: x["repay"] is not None)
-            max_gain_range = (0 if max_gain < 0 else max_gain) / position_size
-
-            # ストップまでの価格差
-            soft_auto_stop_loss = 0 if self.setting.soft_limit is None else self.setting.soft_limit
-            hard_auto_stop_loss = 0 if self.setting.hard_limit is None else self.setting.hard_limit
-
-            allowable_loss = position.get_value() * soft_auto_stop_loss
-            soft_allowable_loss = (hold - max_gain_range if position.is_short() else hold + max_gain_range) * soft_auto_stop_loss # 過去最高値からの割合
-#            hard_allowable_loss = (self.setting.assets * hard_auto_stop_loss) / position_size
-            hard_allowable_loss = hold * hard_auto_stop_loss # 保有価格からの割合
-
-            max_price_range = self.adjust_tick(max_gain_range)
-            soft_price_range = self.adjust_tick(soft_allowable_loss)
-            hard_price_range = self.adjust_tick(hard_allowable_loss)
-
-            # 保有価格に近い方を適用する
-            if position.is_short():
-                max_price = hold - max_price_range
-                soft_limit = max_price + soft_price_range
-                hard_limit = hold + hard_price_range
-            else:
-                max_price = hold + max_price_range
-                soft_limit = max_price - soft_price_range
-                hard_limit = hold - hard_price_range
-
-            if soft_price_range == 0 or max_price_range < hard_price_range:
-                limit = hard_limit
-            else:
-                limit = soft_limit
-
-            self.log(lambda: "limit: %s %s(s) %s(h), price: %s(hld) %s(cur) %s(max), loss: %4d %4d(s) %4d(h), gain:%d" 
-                % (limit, soft_limit, hard_limit, hold, price, hold+max_price_range, allowable_loss, soft_price_range, hard_price_range, max_gain))
-
-            if limit > 0:
-                self.log(lambda: "[auto_stop_loss][%s] price: %s, stop: %s, hold: %s" % (position.method, position.get_value(), limit, hold))
-                self.repay_orders.add(ReverseLimitOrder(position.get_num(), limit, is_repay=True, is_short=position.is_short(), valid_term=0))
+        if limit > 0:
+            self.log(lambda: "[auto_stop_loss][%s] price: %s, stop: %s, range: %s" % (self.position.method, self.position.get_value(), limit, self.setting.hard_limit))
+            self.repay_orders.add(ReverseLimitOrder(self.position.get_num(), limit, is_repay=True, is_short=self.position.is_short(), valid_term=0))
 
     def order_adjust(self, trade_data):
 

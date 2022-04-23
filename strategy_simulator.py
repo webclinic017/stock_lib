@@ -127,14 +127,15 @@ class StrategySimulator:
                 simulators[code].force_closing(dates[-1], split_data)
         return simulators
 
-    def closing(self, stats, simulators):
+    def closing(self, args, stats, simulators):
         auto_stop_loss = sum(list(map(lambda x: len(x.stats.lose_auto_stop_loss()) - len(x.stats.win_auto_stop_loss()), simulators.values())))
 
         conditions = [
-            auto_stop_loss >= 3
+            auto_stop_loss >= 1,
+            self.combination_setting.auto_limit and args.instant and stats["gain"] < -self.simulator_setting.assets * 0.01
         ]
 
-        if all(conditions):
+        if any(conditions):
             for code in simulators.keys():
                 simulators[code].closing(force_stop=True)
                 stats["closing"] = True
@@ -212,12 +213,19 @@ class StrategySimulator:
             stats["date"] = date
 
             binding = sum(list(map(lambda x: x.order_binding(), simulators.values())))
+            # atrを元にhard_limitを設定
+            atrs = list(map(lambda x: int(stocks[x].middle[stocks[x].middle["date"] <= date]["atr"].iloc[-1]), simulators.keys()))
+            hard_limit = max(atrs)
+            self.log(lambda : "allow_max_loss: %s, hard_limit: %s" % (hard_limit * self.combination_setting.max_position_size * self.simulator_setting.min_unit, hard_limit))
+            risk = 0
 
             for code in simulators.keys():
                 # 対象日までのデータの整形
                 self.log(lambda: "[%s]" % code)
                 # M&A 適用
                 simulators = self.manda_by_date(date, code, simulators)
+                # hard_limit設定
+                simulators[code].setting.hard_limit = hard_limit if self.combination_setting.auto_limit else None
 
                 if self.simulator_setting.use_deposit:
                     simulators[code].update_deposit(simulators[code].deposit if deposit is None else deposit)
@@ -228,11 +236,19 @@ class StrategySimulator:
                 deposit = simulators[code].deposit if self.simulator_setting.use_deposit else simulators[code].capacity
                 binding += simulators[code].order_binding() - simulators[code].unbound
 
+                if risk > self.simulator_setting.assets * 0.1 and self.combination_setting.auto_limit:
+                    self.log(lambda : " ! clear orders. risk: %s" % (risk))
+                    simulators[code].clear_orders()
+
+                last_order = simulators[code].stats.last()["new_order"]
+                risk = risk + hard_limit * (0 if last_order is None else last_order.num) * self.simulator_setting.min_unit
+
+
             stats["unrealized_gain"] = self.sum_stats(simulators, lambda x: x.stats.last_unrealized_gain())
             stats["gain"] = self.sum_stats(simulators, lambda x: x.stats.get("gain", 0))
             self.stats.append(stats)
 
-            stats, simulators = self.closing(stats, simulators)
+            stats, simulators = self.closing(args, stats, simulators)
             self.log(lambda: "unrealized_gain: %s, gain: %s, total gain: %s, deposit: %s, binding: %s" % (stats["unrealized_gain"], stats["gain"], sum(self.stats.gain()), deposit, binding))
 
         # 手仕舞い
