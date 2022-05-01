@@ -159,7 +159,7 @@ class Order:
         self.valid_term = None
         self.order_type = None
         self.binding = 0
-
+        self.set_order = None
 
     def is_market(self):
         return all([
@@ -189,6 +189,10 @@ class Order:
             "position": position
         }
         return all(list(map(lambda x:x(data), self.conditions)))
+
+    def add_set_order(self, order):
+        self.set_order = order
+        return self
 
 class MarketOrder(Order):
     def __init__(self, num, is_short=False, on_close=False):
@@ -1285,9 +1289,9 @@ class Simulator(SecuritiesComponySimulator):
         price_range = self.adjust_tick(self.setting.hard_limit)
 
         if self.position.is_short():
-            limit = price + price_range
+            limit = self.adjust_tick(price + price_range)
         else:
-            limit = price - price_range
+            limit = self.adjust_tick(price - price_range)
 
         if limit > 0:
             self.log(lambda: "[auto_stop_loss][%s] price: %s, stop: %s, range: %s" % (self.position.method, self.position.get_value(), limit, self.setting.hard_limit))
